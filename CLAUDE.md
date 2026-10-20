@@ -1,46 +1,87 @@
-# KIMA CONSULTING
+# KIMA Compliance OS
 
-Marketing / brochure site for KIMA Consulting.
+Tax compliance management, accounting workflow automation and digital taxpayer
+services. Initial market Cameroon, expansion CEMAC. Currency XAF. French and
+English at launch. Company: Kima Consulting. Product: KIMA Compliance OS.
 
-> **TODO (owner):** fill in what the firm actually advises on, who the buyer is, and
-> any existing brand assets (logo, colours, fonts). The design direction below was
-> generated from a generic "professional consulting firm" brief and should be
-> re-derived once that is known.
+**Tagline:** Clear Records. Confident Compliance. / Vos comptes en ordre. Vos
+obligations maîtrisées.
 
-## Design authority
+## Baseline document
 
-`docs/design/design-system/kima-consulting/MASTER.md` is the single source of truth for
-colour, typography, spacing, motion and the pre-delivery checklist. Read it before
-writing any UI.
+`docs/blueprint/kima-compliance-os-blueprint-v1.0.md` is the product baseline —
+the owner's Business Concept Note, Product Requirements & AI Development
+Blueprint v1.0. Read it before proposing or building anything. Where this file
+and the blueprint disagree, the blueprint wins.
 
-Per-page overrides live in `docs/design/design-system/kima-consulting/pages/<page>.md`.
-When a page file exists it **overrides** MASTER.md; otherwise MASTER.md applies.
+Six product areas: **Kima Client** (taxpayer portal), **Kima Workspace**
+(accountant OS), **Kima DSF Bridge** (Sage/Excel import to DSF preparation),
+**Kima Compliance Radar** (obligations and deadlines), **Kima Clarity AI**
+(constrained bilingual assistant), **Kima Evidence Vault** (archive).
 
-## Design workflow
+## Hard constraints — do not violate
 
-Use the `ui-ux-pro-max` skill for all UI work (installed at user scope, available here).
-Its local database answers style / palette / typography / UX / stack questions without
-guessing:
+These come from the blueprint and are not negotiable for convenience:
+
+- **Never invent regulatory rules.** Every tax rule carries a legal source,
+  jurisdiction, effective date and verification status. Unverified rules stay
+  inactive.
+- **Never claim government integration.** No DGI API access, e-filing
+  capability, authorization or partnership may be represented as established
+  without written verification.
+- **Tax regime is not the DSF accounting format.** Model them separately. The
+  system normal and the minimum cash-basis system (SMT) are not interchangeable
+  labels for the real and simplified tax regimes. Do not infer a filing
+  obligation from turnover alone.
+- **A declaration is never "filed" because someone clicked a button.** Recorded
+  filing status requires official submission evidence or an identified
+  authorized integration response.
+- **Human authorization before any external submission.** AI never approves
+  entries, declarations or amounts, and never presents its output as an official
+  DGI determination.
+- **Tenant isolation is a correctness requirement.** Firm A cannot reach Firm
+  B's data; a taxpayer cannot reach another taxpayer's files by guessing IDs or
+  URLs. Taxpayer ownership and firm engagement are separate concepts.
+- **Money and dates are exact.** Decimal or integer minor units, never floats.
+  Unambiguous periods, time zones and regulatory effective dates.
+- **Preserve originals.** Imported source files are kept; financial mappings are
+  traceable from source to result; approved declarations keep the exact reviewed
+  version.
+- Distinguish confirmed fact, interview observation, assumption, and
+  "needs legal or technical validation". Irina's interview is one data point,
+  not market data.
+
+## Design
+
+Blueprint section 9 is the design authority: deep navy `#163B66`, teal green
+`#1E9E74`, white, soft gray `#E9EEF3`, dark text `#142235`, amber reserved for
+genuine attention and warning states. Premium financial-technology aesthetic,
+high information density without clutter, restrained motion, excellent mobile
+experience on slow connections.
+
+> `docs/design/design-system/kima-consulting/MASTER.md` is **provisional and
+> superseded** — it was generated before the blueprint was available, from a
+> generic "professional consulting firm" brief, and its palette and typography
+> do not match section 9. Regenerate it against the blueprint before building UI.
+
+Use the `ui-ux-pro-max` skill for UI work (installed at user scope):
 
 ```
 python ~/.claude/skills/ui-ux-pro-max/scripts/search.py "<query>" -d <domain> -n 5
-python ~/.claude/skills/ui-ux-pro-max/scripts/search.py "<page brief>" --design-system \
-  --project-name "KIMA Consulting" --persist \
-  --output-dir docs/design --format markdown
 ```
 
-Domains: `style`, `color`, `typography`, `landing`, `product`, `ux`, `chart`, `icons`,
-`gsap`, `react`, `web`, `google-fonts`. Add `--stack <stack>` for stack-specific rules.
+Domains: `style`, `color`, `typography`, `landing`, `product`, `ux`, `chart`,
+`icons`, `gsap`, `react`, `web`, `google-fonts`. Add `--stack nextjs` for
+stack-specific rules. Related skills: `ui-styling`, `design-system`, `brand`.
 
-Related skills: `ui-styling` (shadcn/Tailwind implementation), `design-system` (token
-architecture), `brand` (voice and identity), `banner-design`, `slides`.
+## UI non-negotiables
 
-## Non-negotiables
-
-- Text contrast >= 4.5:1 in light and dark mode.
-- Visible focus rings (3-4px) on every interactive element; full keyboard navigation.
-- Respect `prefers-reduced-motion`; no autoplaying carousel without pause/stop.
+- Text contrast >= 4.5:1, light and dark.
+- Visible focus rings (3-4px); full keyboard navigation.
+- Respect `prefers-reduced-motion`.
 - Touch targets >= 44x44px.
-- SVG icons (Heroicons / Lucide) - never emojis as icons.
-- Verify at 375px, 768px, 1024px and 1440px.
-- Avoid: playful styling, hidden credentials, AI purple/pink gradients.
+- SVG icons (Heroicons / Lucide) — never emojis as icons.
+- Verify at 375px, 768px, 1024px, 1440px.
+- The interface must visibly distinguish confirmed information, draft
+  calculations, estimated risk, and work awaiting review.
+- Full French and English parity on every core journey.
