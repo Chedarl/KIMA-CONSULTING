@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * KIMA Compliance OS tokens.
+ *
+ * The brand colours come from blueprint section 9: deep navy #163B66, teal
+ * green #1E9E74, soft gray #E9EEF3, dark text #142235, with amber reserved for
+ * genuine attention and warning states.
+ *
+ * Note the split between a brand colour and its text colour. Teal #1E9E74 is
+ * only about 3:1 on white, so it is a fill and graphic colour; teal-text is the
+ * darkened variant used for type and icons. Same for amber. The non-negotiable
+ * is 4.5:1, so the brand colour cannot double as the text colour.
+ */
+
+:root {
+  --bg: 247 249 252;
+  --surface: 255 255 255;
+  --surface-sunken: 239 243 248;
+  --border: 220 228 238;
+  --border-strong: 188 201 217;
+
+  --fg: 20 34 53; /* #142235 — 15.8:1 on surface */
+  --fg-muted: 74 90 112; /* 6.8:1 */
+  --fg-subtle: 101 116 137; /* 4.9:1 — secondary text only */
+
+  --navy: 22 59 102; /* #163B66 — 9.6:1 on white */
+  --navy-strong: 15 42 74;
+  --navy-soft: 232 238 246;
+
+  --teal: 30 158 116; /* #1E9E74 — fills and graphics only */
+  --teal-text: 15 107 79; /* 5.4:1 — type and icons */
+  --teal-soft: 230 244 238;
+
+  --amber: 245 158 11; /* fills only */
+  --amber-text: 146 64 14; /* 7.0:1 */
+  --amber-soft: 253 244 227;
+
+  --danger: 220 38 38;
+  --danger-text: 185 28 28; /* 6.2:1 */
+  --danger-soft: 254 232 232;
+
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: 11 22 36;
+    --surface: 18 31 49;
+    --surface-sunken: 14 26 41;
+    --border: 34 53 75;
+    --border-strong: 51 73 98;
+
+    --fg: 232 238 246;
+    --fg-muted: 169 184 204;
+    --fg-subtle: 132 150 173;
+
+    --navy: 120 165 220;
+    --navy-strong: 160 195 235;
+    --navy-soft: 20 38 62;
+
+    --teal: 53 188 141;
+    --teal-text: 102 214 170;
+    --teal-soft: 14 48 38;
+
+    --amber: 245 180 90;
+    --amber-text: 242 196 120;
+    --amber-soft: 50 36 14;
+
+    --danger: 239 120 120;
+    --danger-text: 242 150 150;
+    --danger-soft: 54 22 22;
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: 11 22 36;
+  --surface: 18 31 49;
+  --surface-sunken: 14 26 41;
+  --border: 34 53 75;
+  --border-strong: 51 73 98;
+
+  --fg: 232 238 246;
+  --fg-muted: 169 184 204;
+  --fg-subtle: 132 150 173;
+
+  --navy: 120 165 220;
+  --navy-strong: 160 195 235;
+  --navy-soft: 20 38 62;
+
+  --teal: 53 188 141;
+  --teal-text: 102 214 170;
+  --teal-soft: 14 48 38;
+
+  --amber: 245 180 90;
+  --amber-text: 242 196 120;
+  --amber-soft: 50 36 14;
+
+  --danger: 239 120 120;
+  --danger-text: 242 150 150;
+  --danger-soft: 54 22 22;
+
+  color-scheme: dark;
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--fg));
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Focus: 3px minimum, always visible, never removed. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid rgb(var(--navy));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Money and account codes line up in columns. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Honour the user's motion preference — no exceptions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+}
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--border-strong));
+  border-radius: 6px;
+}
