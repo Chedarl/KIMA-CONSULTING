@@ -22,7 +22,7 @@ export default function FirmLayout({
 
   const nav: NavItem[] = [
     { href: base, label: w.firm.nav.overview, icon: "grid", ready: true },
-    { href: `${base}/clients`, label: w.firm.nav.clients, icon: "people", ready: false },
+    { href: `${base}/clients`, label: w.firm.nav.clients, icon: "people", ready: true },
     { href: `${base}/inbox`, label: w.firm.nav.inbox, icon: "inbox", ready: false },
     { href: `${base}/queue`, label: w.firm.nav.queue, icon: "queue", ready: false },
     { href: `${base}/declarations`, label: w.firm.nav.declarations, icon: "file", ready: false },

@@ -3,9 +3,11 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 /**
  * Browser Supabase client.
  *
- * The publishable key is public by design; the real boundary is Row Level
- * Security. Every table has RLS on, and the demo policies are scoped to the
- * single seeded demo taxpayer, so this key cannot reach anything else.
+ * The publishable key is public by design. Every table has RLS enabled, but
+ * READ THIS HONESTLY: the demo policies are permissive, not tenant-scoped.
+ * Onboarding has to create taxpayers, so anon can read and write the working
+ * tables across the whole project. With synthetic data that is vandalism at
+ * worst; with real data it would be a breach.
  *
  * This is NOT the production access model. Production requires authenticated
  * users, membership-based tenant scoping and the engagement check in
@@ -81,12 +83,18 @@ export type ActivityRow = {
   occurred_at: string;
 };
 
-/** The demo tenant. There is exactly one. */
+/**
+ * The demo tenant: the seeded taxpayer, which is the OLDEST row.
+ *
+ * Ordering matters now that onboarding creates taxpayers — an unordered
+ * limit(1) would bind the client portal to whichever row Postgres returned
+ * first, and uploads would land under the wrong tenant.
+ */
 export async function demoIds(): Promise<{ taxpayerId: string; organizationId: string } | null> {
   const db = supabase();
   const [{ data: tp }, { data: org }] = await Promise.all([
-    db.from("taxpayers").select("id").limit(1).maybeSingle(),
-    db.from("organizations").select("id").limit(1).maybeSingle(),
+    db.from("taxpayers").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle(),
+    db.from("organizations").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle(),
   ]);
   if (!tp?.id || !org?.id) return null;
   return { taxpayerId: tp.id as string, organizationId: org.id as string };
