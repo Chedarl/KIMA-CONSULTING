@@ -351,6 +351,53 @@ const fr = {
     principleThreeBody:
       "L'arborescence vient de vos obligations : un dossier qui devrait contenir quelque chose et reste vide se voit avant l'échéance.",
   },
+
+  /**
+   * Document acceptance. The practitioner reads a document and records what is
+   * on it; the verdicts follow. Nothing here asks for a conclusion — the facts
+   * are the input, the judgement is the output, and the citation travels with it.
+   */
+  verdicts: {
+    title: "Recevabilité d'une pièce",
+    subtitle:
+      "Une pièce porte trois avis qui peuvent diverger. Une pièce refusée en comptabilité reste enregistrée.",
+    factsTitle: "Ce que porte la pièce",
+    factsHint: "Renseignez ce que vous lisez. Les avis se recalculent à chaque changement.",
+    docType: "Nature de la pièce",
+    docPurchase: "Facture d'achat",
+    docSales: "Facture de vente",
+    docReceipt: "Reçu de dépense",
+    docBank: "Relevé bancaire",
+    clientRegime: "Régime du client",
+    supplierRegime: "Régime du fournisseur",
+    supplierUnknown: "Inconnu",
+    framework: "Référentiel comptable",
+    frameworkNormal: "Système normal",
+    frameworkSmt: "SMT",
+    frameworkUnknown: "Non renseigné",
+    payment: "Mode de paiement",
+    payCash: "Espèces",
+    payBank: "Virement",
+    payCheque: "Chèque",
+    payMobile: "Mobile Money",
+    payUnknown: "Inconnu",
+    amount: "Montant TTC (FCFA)",
+    mentions: "Mentions présentes",
+    mSupplierNiu: "NIU du fournisseur",
+    mCustomerNiu: "NIU du client",
+    mItemised: "Détail des biens ou services",
+    mPurpose: "Lien avec l'exploitation apparent",
+    verdictsTitle: "Les trois avis",
+    recorded: "La pièce est enregistrée dans tous les cas, y compris lorsqu'un avis est négatif.",
+    needsPractitioner: "Décision du praticien requise",
+    missingTitle: "Mentions manquantes",
+    missingHint:
+      "Liste de contrôle issue de la pratique. Seul le NIU du fournisseur est exigé par une règle vérifiée ; les autres sont des contrôles de complétude.",
+    missingNone: "Toutes les mentions attendues sont présentes.",
+    sourceVerified: "Règle vérifiée",
+    sourceInferred: "À valider",
+    sourceUnverified: "Non tracée",
+  },
 };
 
 type WorkspaceDictionary = typeof fr;
@@ -685,6 +732,48 @@ const en: WorkspaceDictionary = {
     principleThreeTitle: "An empty folder is a finding",
     principleThreeBody:
       "The tree comes from your obligations: a folder that should hold something and does not is visible before the deadline.",
+  },
+
+  verdicts: {
+    title: "Document acceptance",
+    subtitle:
+      "A document carries three verdicts that may disagree. One refused for accounting is still recorded.",
+    factsTitle: "What the document carries",
+    factsHint: "Record what you read. The verdicts recompute on every change.",
+    docType: "Kind of document",
+    docPurchase: "Purchase invoice",
+    docSales: "Sales invoice",
+    docReceipt: "Expense receipt",
+    docBank: "Bank statement",
+    clientRegime: "Client's regime",
+    supplierRegime: "Supplier's regime",
+    supplierUnknown: "Unknown",
+    framework: "Accounting framework",
+    frameworkNormal: "Système normal",
+    frameworkSmt: "SMT",
+    frameworkUnknown: "Not recorded",
+    payment: "Method of payment",
+    payCash: "Cash",
+    payBank: "Bank transfer",
+    payCheque: "Cheque",
+    payMobile: "Mobile Money",
+    payUnknown: "Unknown",
+    amount: "Amount including tax (FCFA)",
+    mentions: "Mentions present",
+    mSupplierNiu: "Supplier's NIU",
+    mCustomerNiu: "Customer's NIU",
+    mItemised: "Itemised goods or services",
+    mPurpose: "Business purpose apparent",
+    verdictsTitle: "The three verdicts",
+    recorded: "The document is recorded either way, including where a verdict is negative.",
+    needsPractitioner: "Practitioner's decision required",
+    missingTitle: "Missing mentions",
+    missingHint:
+      "A checklist from practice. Only the supplier's NIU is required by a verified rule; the rest are completeness checks.",
+    missingNone: "Every expected mention is present.",
+    sourceVerified: "Verified rule",
+    sourceInferred: "To be validated",
+    sourceUnverified: "Not traced",
   },
 };
 

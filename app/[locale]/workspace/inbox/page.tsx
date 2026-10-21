@@ -3,6 +3,7 @@ import { getDictionary, isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import { DemoBanner } from "@/components/ui";
 import { InboxWorkspace } from "@/components/live/inbox-workspace";
+import { DocumentVerdicts } from "@/components/live/document-verdicts";
 
 /** Every document that arrived, across every client, with bulk review and file operations. */
 export default function InboxPage({ params }: { params: { locale: string } }) {
@@ -56,6 +57,11 @@ export default function InboxPage({ params }: { params: { locale: string } }) {
           live: t.work.live,
         }}
       />
+
+      {/* The panel above still accepts or returns a document in one move. This
+          one is what that move loses: three verdicts that may disagree, each
+          carrying the rule it rests on. */}
+      <DocumentVerdicts locale={locale} t={w.verdicts} />
     </div>
   );
 }
