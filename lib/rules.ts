@@ -42,12 +42,55 @@
  */
 export type VerificationStatus = "verified" | "inferred" | "unverified";
 
+/**
+ * The six CEMAC states. The product is built for the zone, not for one country,
+ * and the reason that is tractable rather than ambitious is that the accounting
+ * substrate is already harmonised while the tax plumbing is not:
+ *
+ *   Harmonised — SYSCOHADA révisé (in force 1 January 2018 across all seventeen
+ *   OHADA states), the DSF/liasse harmonised with OHADA accounting law, the
+ *   CEMAC VAT directive (n° 11/22-CEMAC-UEAC-010A-6CM-638 of 28 October 2022,
+ *   which floors the VAT threshold at 30M FCFA and leaves states free above it),
+ *   the CEMAC income and profit tax directive (n° 0119/25-UEAC-177-CM-42,
+ *   January 2025), one currency and one working language.
+ *
+ *   Divergent — rates, thresholds, regimes, deadlines, tax centres, filing
+ *   platforms and e-invoicing timetables, all set nationally.
+ *
+ * So: one engine, six thin rule packs. A rule already carries its jurisdiction,
+ * so a pack is a filter over this data, never a fork of the code. Adding a
+ * country should be a data exercise; if it ever needs code, that is the signal
+ * to fix the architecture before adding a third.
+ */
+export type Jurisdiction = "CM" | "GA" | "CG" | "TD" | "CF" | "GQ";
+
+export const JURISDICTIONS: { code: Jurisdiction; fr: string; en: string }[] = [
+  { code: "CM", fr: "Cameroun", en: "Cameroon" },
+  { code: "GA", fr: "Gabon", en: "Gabon" },
+  { code: "CG", fr: "Congo", en: "Congo" },
+  { code: "TD", fr: "Tchad", en: "Chad" },
+  { code: "CF", fr: "République centrafricaine", en: "Central African Republic" },
+  { code: "GQ", fr: "Guinée équatoriale", en: "Equatorial Guinea" },
+];
+
+/**
+ * The only pack with any content today. Everything in this file is Cameroon;
+ * naming the default explicitly means a second country cannot arrive by
+ * accident, inheriting Cameroonian deadlines because nobody set a field.
+ */
+export const DEFAULT_JURISDICTION: Jurisdiction = "CM";
+
+export const jurisdictionLabel = (code: Jurisdiction, locale: "fr" | "en") => {
+  const j = JURISDICTIONS.find((x) => x.code === code);
+  return j ? (locale === "fr" ? j.fr : j.en) : code;
+};
+
 export type RuleSource = {
   /** How a practitioner would cite it. */
   citation: string;
   authority: string;
   url?: string;
-  jurisdiction: "CM";
+  jurisdiction: Jurisdiction;
   /** ISO date the rule took effect. */
   effective_from: string;
   /** ISO date it ceased to apply, where it has. */
@@ -329,9 +372,17 @@ export const REGIMES: RegimeDef[] = [
 
 export const regime = (k: Regime) => REGIMES.find((r) => r.key === k);
 
-/** Regimes a client may select for a period — abolished ones drop out. */
-export const selectableRegimes = (onDate: string) =>
-  REGIMES.filter((r) => inForce(r.source, onDate));
+/**
+ * Regimes a client may select for a period — abolished ones drop out, and so do
+ * other jurisdictions' regimes once this file holds more than one country.
+ */
+export const selectableRegimes = (
+  onDate: string,
+  jurisdiction: Jurisdiction = DEFAULT_JURISDICTION,
+) =>
+  REGIMES.filter(
+    (r) => r.source.jurisdiction === jurisdiction && inForce(r.source, onDate),
+  );
 
 // ---------------------------------------------------------------------------
 // Axis 3 — tax centre. Drives WHEN the DSF is due.
@@ -609,12 +660,21 @@ export const OBLIGATIONS: Obligation[] = [
   },
 ];
 
-/** The obligations that apply to a taxpayer — never derived from turnover. */
+/**
+ * The obligations that apply to a taxpayer — never derived from turnover.
+ *
+ * The jurisdiction narrows to one rule pack. It defaults rather than being
+ * required, so existing callers keep working; when a second pack lands, an
+ * un-narrowed call would otherwise silently merge two countries' obligations.
+ */
 export function obligationsFor(input: {
   type: TaxpayerType;
   regime: Regime | null;
+  jurisdiction?: Jurisdiction;
 }): Obligation[] {
+  const j = input.jurisdiction ?? DEFAULT_JURISDICTION;
   return OBLIGATIONS.filter((o) => {
+    if (o.source.jurisdiction !== j) return false;
     if (o.taxpayerTypes.length && !o.taxpayerTypes.includes(input.type)) return false;
     if (o.regimes.length) {
       if (!input.regime) return false;
@@ -622,6 +682,40 @@ export function obligationsFor(input: {
     }
     return true;
   });
+}
+
+/** Tax centres in one jurisdiction. Centres are national, never shared. */
+export const taxCentresFor = (jurisdiction: Jurisdiction = DEFAULT_JURISDICTION) =>
+  TAX_CENTRES.filter((c) => c.source.jurisdiction === jurisdiction);
+
+/** Every rule in a pack, for review: what we claim to know about one country. */
+export const rulePack = (jurisdiction: Jurisdiction = DEFAULT_JURISDICTION) => ({
+  jurisdiction,
+  regimes: REGIMES.filter((r) => r.source.jurisdiction === jurisdiction),
+  taxCentres: taxCentresFor(jurisdiction),
+  obligations: OBLIGATIONS.filter((o) => o.source.jurisdiction === jurisdiction),
+});
+
+/**
+ * How much of a pack is actually actionable. Most of the Cameroon corpus is
+ * `inferred` and therefore inactive by construction — see
+ * `docs/foundation/cameroon-rule-corpus-research.md`. Surfacing the ratio keeps
+ * that honest instead of letting it quietly drift toward "mostly verified".
+ */
+export function packCoverage(jurisdiction: Jurisdiction = DEFAULT_JURISDICTION) {
+  const pack = rulePack(jurisdiction);
+  const sources = [
+    ...pack.regimes.map((r) => r.source),
+    ...pack.taxCentres.map((c) => c.source),
+    ...pack.obligations.map((o) => o.source),
+  ];
+  const count = (s: VerificationStatus) => sources.filter((x) => x.status === s).length;
+  return {
+    total: sources.length,
+    verified: count("verified"),
+    inferred: count("inferred"),
+    unverified: count("unverified"),
+  };
 }
 
 // ---------------------------------------------------------------------------

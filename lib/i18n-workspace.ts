@@ -294,6 +294,62 @@ const fr = {
     demoNotice:
       "Démonstration : le numéro de contribuable n'est pas un mot de passe secret. En production, un code à usage unique sera envoyé à votre adresse de contact.",
   },
+
+  /**
+   * The filing framework. Plain language throughout: the client who has to use
+   * this is photographing a receipt on a phone, not reading a specification.
+   */
+  filing: {
+    title: "Cadre de classement Kima",
+    subtitle:
+      "Un seul système de noms et de dossiers. Le dossier où vous déposez une pièce décide de son nom.",
+    anatomyTitle: "Anatomie d'une référence",
+    anatomyHint:
+      "Chaque pièce reçoit une référence qui se lit sans ouvrir le fichier, même dans dix ans.",
+    segMarker: "Marqueur Kima",
+    segTaxpayer: "Code client",
+    segTaxpayerHint: "Dérivé du nom et du NIU. Le NIU lui-même n'apparaît jamais dans le nom.",
+    segPeriod: "Période",
+    segPeriodHint: "M = mois, T = trimestre, A = exercice.",
+    segClass: "Nature de la pièce",
+    segSeq: "Numéro d'ordre",
+    segCheck: "Caractère de contrôle",
+    segCheckHint: "Détecte une référence mal recopiée dans un e-mail ou dictée au téléphone.",
+    builderTitle: "Construire une référence",
+    builderHint: "Choisissez la nature et la période : le nom et le dossier se déduisent.",
+    classLabel: "Nature de la pièce",
+    periodLabel: "Période",
+    resultReference: "Référence",
+    resultFilename: "Nom du fichier",
+    resultFolder: "Dossier",
+    checkerTitle: "Vérifier une référence",
+    checkerHint: "Collez une référence reçue par e-mail ou notée à la main.",
+    checkerPlaceholder: "KM-…",
+    checkerValid: "Référence valide",
+    checkerInvalid:
+      "Référence invalide. Le caractère de contrôle ne correspond pas : vérifiez la recopie.",
+    treeTitle: "L'arborescence suit vos obligations",
+    treeHint:
+      "Un client au réel voit des dossiers mensuels, un client à l'IGS des dossiers trimestriels. Personne ne voit un dossier pour un impôt qu'il ne paie pas — c'est ce qui donne un sens à un dossier vide.",
+    treeRegime: "Régime",
+    treeFolders: "dossiers pour l'exercice",
+    treeFirmRetrieved: "récupéré par le cabinet",
+    readerTitle: "Ce que le téléphone a appelé le fichier",
+    readerHint:
+      "Les noms envoyés par WhatsApp ou par un appareil photo contiennent souvent la date. Nous la lisons et la proposons ; personne ne classe à votre place.",
+    readerSuggestion: "Proposition",
+    readerNone: "Aucun indice",
+    principlesTitle: "Trois principes",
+    principleOneTitle: "Le dossier est le formulaire",
+    principleOneBody:
+      "Un client ne remplit pas quatre champs, mais il dépose un fichier dans un dossier. Le dossier porte l'information.",
+    principleTwoTitle: "Le nom survit au système",
+    principleTwoBody:
+      "Sur une clé USB, dans une pièce jointe ou dans le coffre en 2032, la pièce se décrit elle-même.",
+    principleThreeTitle: "Un dossier vide est une alerte",
+    principleThreeBody:
+      "L'arborescence vient de vos obligations : un dossier qui devrait contenir quelque chose et reste vide se voit avant l'échéance.",
+  },
 };
 
 type WorkspaceDictionary = typeof fr;
@@ -575,6 +631,58 @@ const en: WorkspaceDictionary = {
     continueToPortal: "Continue to my space",
     demoNotice:
       "Demonstration: the taxpayer number is not a secret password. In production a one-time code will be sent to your contact address.",
+  },
+
+  filing: {
+    title: "The Kima filing framework",
+    subtitle:
+      "One system of names and folders. The folder you drop a document into decides its name.",
+    anatomyTitle: "Anatomy of a reference",
+    anatomyHint:
+      "Every document gets a reference that reads without opening the file, even ten years from now.",
+    segMarker: "Kima marker",
+    segTaxpayer: "Client code",
+    segTaxpayerHint: "Derived from the name and the NIU. The NIU itself never appears in the name.",
+    segPeriod: "Period",
+    segPeriodHint: "M = month, T = quarter, A = financial year.",
+    segClass: "Kind of document",
+    segSeq: "Sequence number",
+    segCheck: "Check character",
+    segCheckHint: "Catches a reference mistyped into an email or read down a phone line.",
+    builderTitle: "Build a reference",
+    builderHint: "Choose the kind and the period: the name and the folder follow.",
+    classLabel: "Kind of document",
+    periodLabel: "Period",
+    resultReference: "Reference",
+    resultFilename: "Filename",
+    resultFolder: "Folder",
+    checkerTitle: "Check a reference",
+    checkerHint: "Paste a reference received by email or written down by hand.",
+    checkerPlaceholder: "KM-…",
+    checkerValid: "Valid reference",
+    checkerInvalid:
+      "Invalid reference. The check character does not match: verify how it was copied.",
+    treeTitle: "The tree follows your obligations",
+    treeHint:
+      "A réel client sees monthly folders, an IGS client quarterly ones. Nobody sees a folder for a tax they do not pay — which is what makes an empty folder mean something.",
+    treeRegime: "Regime",
+    treeFolders: "folders for the year",
+    treeFirmRetrieved: "retrieved by the firm",
+    readerTitle: "What the phone called the file",
+    readerHint:
+      "Names sent by WhatsApp or from a camera usually carry the date. We read it and suggest it; nobody files on your behalf.",
+    readerSuggestion: "Suggestion",
+    readerNone: "No clue",
+    principlesTitle: "Three principles",
+    principleOneTitle: "The folder is the form",
+    principleOneBody:
+      "A client will not fill in four fields, but they will drop a file in a folder. The folder carries the information.",
+    principleTwoTitle: "The name survives the system",
+    principleTwoBody:
+      "On a USB stick, in an email attachment, or in the vault in 2032, the document describes itself.",
+    principleThreeTitle: "An empty folder is a finding",
+    principleThreeBody:
+      "The tree comes from your obligations: a folder that should hold something and does not is visible before the deadline.",
   },
 };
 
