@@ -74,3 +74,24 @@ bucket, and insert rows without limit. All of it against fabricated data.
 7. Migrations in version control, plus an automated test proving a second
    tenant's JWT returns zero rows and zero objects.
 8. This demo project kept separate from production.
+
+## Outbound email (Resend)
+
+`POST /api/inquiry` sends a client the list of documents still outstanding,
+including the reason recorded against each. It takes a **taxpayer id, not an
+address** — the recipient is read from the database, so the endpoint cannot be
+used to mail arbitrary people from a public site.
+
+| Variable | Where | Notes |
+|---|---|---|
+| `RESEND_API_KEY` | Vercel (sensitive) + `.env.local` | Server only. Never `NEXT_PUBLIC`. |
+| `KIMA_MAIL_FROM` | Vercel + `.env.local` | Currently `onboarding@resend.dev` |
+
+**Delivery is limited until a Kima domain is verified.** The only domain on the
+Resend account is `urbannighlift.com`, whose status is `failed`, and it belongs
+to a different business in any case. With the `onboarding@resend.dev` sender,
+Resend delivers **only to the Resend account owner's own address** — mail to a
+client address is accepted by the API and never arrives.
+
+To lift this: add a Kima domain in Resend, publish the DNS records it gives
+you, then set `KIMA_MAIL_FROM` to an address at that domain.
