@@ -19,6 +19,19 @@ Six product areas: **Kima Client** (taxpayer portal), **Kima Workspace**
 **Kima Compliance Radar** (obligations and deadlines), **Kima Clarity AI**
 (constrained bilingual assistant), **Kima Evidence Vault** (archive).
 
+## Foundation documents
+
+Phase 1 deliverables live in `docs/foundation/`:
+
+- `sitemap.md` — deliverable C: every route, four trust boundaries, locale parity
+- `erd.md` — deliverable E: the thirty entities, the scoping model, the two-status decision
+- `permissions-matrix.md` — deliverable F: roles, conditions, required negative tests
+- `risk-register.md` — deliverable I: thirty-two risks with phase gates
+
+Still outstanding from blueprint §20: A (software PRD), B (backlog with acceptance
+tests), D (journey diagrams), G (component UI/UX specification), H (technical
+architecture and API plan), J (phased implementation plan).
+
 ## Hard constraints — do not violate
 
 These come from the blueprint and are not negotiable for convenience:
