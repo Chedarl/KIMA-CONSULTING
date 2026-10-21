@@ -111,6 +111,51 @@ model rather than in UI copy.
 | `tax_rules` | `id`, `jurisdiction`, `version`, `supersedes_id`, `taxpayer_category`, `tax_regime`, `accounting_framework`, `obligation_type`, `period_kind`, `filing_deadline_rule`, `effective_from`, `effective_to`, `source_id`, `verification_status`, `verified_by`, `verified_at` | global | **Versioned, never deleted.** Verification required before it can drive an obligation. Historical periods keep resolving against the version in force at the time |
 | `audit_events` | `id`, `occurred_at`, `actor_user_id`, `actor_role`, `organization_id`, `taxpayer_id`, `action`, `resource_type`, `resource_id`, `before`, `after`, `ip`, `user_agent`, `request_id` | both | **Append-only, immutable for every role.** All material status changes recorded (§11) |
 
+## H. Reviewer pool — [ADDED], approved 2026-10-20
+
+Decided after the blueprint was written: Kima runs a **pool of qualified reviewers** who
+sign up directly, rather than depending on one expert. This resolves the solo-practitioner
+problem in Scenario E — a one-person firm routes review to the pool instead of
+self-approving — and it pulls a scoped-down form of the blueprint's P2 "accountant
+marketplace" (§10) forward into the core. That reordering is deliberate and should be
+acknowledged as a change to the baseline.
+
+Two distinct reviewer jobs exist and must not be merged:
+**declaration review** (approving a client's filing) and **rule verification**
+(activating a tax rule). A reviewer may hold either capability, or both.
+
+| Entity | Key columns | Scope | Invariants |
+|---|---|---|---|
+| `reviewer_profiles` | `id`, `user_id`, `credential_type`, `licence_number`, `issuing_body`, `jurisdiction`, `specialisations`, `can_approve_declarations`, `can_verify_rules`, `verification_status`, `verified_by`, `verified_at`, `capacity_per_week`, `status`, `engaged_via` (kima_pool / firm_internal / external_named) | global | A reviewer cannot act until `verification_status='verified'`. Credentials are checked by Kima against the issuing body, and that check is recorded, not assumed |
+| `review_assignments` | `id`, `declaration_id`, `reviewer_user_id`, `source`, `assigned_by`, `assigned_at`, `accepted_at`, `due_at`, `status` (offered / accepted / declined / completed / expired / withdrawn), `conflict_declared`, `completed_at` | both | **Grants narrow, time-boxed access** — see below. One active assignment per declaration |
+
+### Reviewer access is narrow by construction
+
+A pool reviewer is **not** a member of the firm and gets **no** engagement. An accepted
+`review_assignment` grants read access to exactly:
+
+- the declaration under review and its approved-candidate snapshot,
+- its `dsf_preparation`, `dsf_field_values` and `validation_findings`,
+- the `document_versions` cited as supporting evidence for that period,
+- nothing else — not the client list, not other periods, not messages.
+
+Access ends when the assignment reaches `completed`, `declined`, `expired` or `withdrawn`.
+Every reviewer read is written to `audit_events` and is visible in the taxpayer's own
+access history. This is a **fourth** access path alongside taxpayer ownership, firm
+engagement and platform support, and it needs its own RLS policy and its own negative
+tests — a reviewer reaching anything outside their assignment is a breach.
+
+### Consequences elsewhere
+
+- `approvals.reviewer_user_id` may now reference a user outside the firm. The
+  no-self-approval rule is unchanged and becomes satisfiable for solo firms.
+- A **conflict-of-interest declaration** is required before an assignment is accepted;
+  a reviewer must be able to decline without giving a reason.
+- Sharing taxpayer financial data with an external professional needs a **lawful basis and
+  taxpayer notice** under Law 2024/017 — see R-33.
+- Paying reviewers is out of scope for now. Note that `invoices` and `service_payments`
+  currently model money flowing *to* Kima, not *from* it.
+
 ## Coverage check
 
 All thirty blueprint entities appear above, unrenamed: organizations, users, memberships,
@@ -119,18 +164,25 @@ document_requests, documents, document_versions, source_imports, accounting_mapp
 dsf_preparations, dsf_field_values, validation_findings, declarations, approvals,
 submission_evidence, correction_cases, correspondence, tasks, messages, notifications,
 invoices, service_payments, tax_payment_evidence, regulatory_sources, tax_rules,
-audit_events. Nothing extra was invented.
+audit_events.
 
-## Open modelling questions for you
+Beyond those thirty, two entities are **[ADDED]** and approved: `reviewer_profiles` and
+`review_assignments` (section H). One more is **[ADDED] and pending**: the channel-agnostic
+intake queue (below). Nothing else was invented.
 
-1. **Single-professional firms.** Scenario E forbids self-approval, but Irina is a solo
-   practitioner. Does a solo firm get a recorded exception, an external reviewer, or a
-   relaxed gate for low-risk declaration types? This changes `approvals`.
+## Open modelling questions
+
+1. ~~**Single-professional firms.**~~ **Resolved 2026-10-20:** a solo firm routes review to
+   a Kima pool reviewer. No self-approval exception is needed, so none is granted.
 2. **Multiple firms per taxpayer.** Can a taxpayer engage two firms at once, for example
    while switching accountants mid-year? The current design allows it, which affects what
-   "the assigned accountant" means in the portal.
-3. **WhatsApp-sourced documents.** If WhatsApp-in happens, documents arrive with no known
-   `taxpayer_id`. That needs an intake-queue entity **[ADDED]** — it should not be
-   retrofitted onto `documents`.
+   "the assigned accountant" means in the portal. **Still open.**
+3. **Intake queue — [ADDED], needed.** WhatsApp-in is deferred, but email-in has the same
+   shape: an item arrives with no `taxpayer_id`, period or request. It must land in a
+   channel-agnostic intake queue and be bound by a human before becoming a `document`.
+   See `sage-dsf-ingestion-research.md` §6. **Should not be retrofitted onto `documents`.**
 4. **Retention.** Law 2024/017 plus tax record-retention duties determine how long evidence
    lives and what deletion means in an immutable vault. Legal input required before Phase 5.
+5. **Note ageing input.** Maturity splits the DSF notes require cannot be derived from a
+   trial balance, so they need their own structured entity or a typed field set on
+   `dsf_preparations`. **Open until the real workbook is in hand.**

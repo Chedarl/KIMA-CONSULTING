@@ -26,7 +26,9 @@ Phase 1 deliverables live in `docs/foundation/`:
 - `sitemap.md` — deliverable C: every route, four trust boundaries, locale parity
 - `erd.md` — deliverable E: the thirty entities, the scoping model, the two-status decision
 - `permissions-matrix.md` — deliverable F: roles, conditions, required negative tests
-- `risk-register.md` — deliverable I: thirty-two risks with phase gates
+- `risk-register.md` — deliverable I: thirty-five risks with phase gates
+- `sage-dsf-ingestion-research.md` — Sage export formats, DSF workbooks, intake channels and
+  parsing rules, with every claim labelled VERIFIED / INFERRED / UNKNOWN
 
 Still outstanding from blueprint §20: A (software PRD), B (backlog with acceptance
 tests), D (journey diagrams), G (component UI/UX specification), H (technical
@@ -60,6 +62,13 @@ These come from the blueprint and are not negotiable for convenience:
 - **Preserve originals.** Imported source files are kept; financial mappings are
   traceable from source to result; approved declarations keep the exact reviewed
   version.
+- **Map accounts on the OHADA decimal root, never the full code.** OHADA codification
+  stops at four digits and a company chart may legitimately extend past it (`7011781`
+  under root `7011`). Longest-root match, 4 digits down to 1; anything unresolved is
+  flagged for a human, never defaulted.
+- **Kima fills the DGI's own locked DSF workbook** — it does not invent a DSF format.
+- **Reviewer access is assignment-scoped.** A pool reviewer holds no engagement and sees
+  only the declaration assigned to them, its preparation, findings and cited evidence.
 - Distinguish confirmed fact, interview observation, assumption, and
   "needs legal or technical validation". Irina's interview is one data point,
   not market data.

@@ -47,9 +47,12 @@ assign names before Phase 3.
 
 | ID | Risk | L | I | Mitigation | Owner | Status |
 |---|---|---|---|---|---|---|
-| R-24 | Clients will not leave WhatsApp for a portal | **H** | **H** | Decide WhatsApp-in viability in Phase 0; design onboarding assuming resistance; measure document-collection time against the pre-Kima baseline | Product | **Blocking Phase 4 design** |
-| R-25 | Real Sage exports differ from assumptions | **H** | M | Five to ten real anonymised workbooks before the DSF Bridge is designed; manual mapping resolution is a first-class feature, not a fallback | Product | **Blocking Phase 6** |
-| R-26 | No qualified tax reviewer available | M | **H** | Radar and rules ship inactive rather than unverified; Phases 3 to 5 do not depend on the reviewer | Founder | **Blocking Phase 7** |
+| R-24 | Clients will not leave WhatsApp for a portal | **H** | **H** | **WhatsApp-in deferred by decision, 2026-10-20.** Intake is signed upload links as primary and email-in as secondary, both through a channel-agnostic intake queue so WhatsApp becomes an adapter later, not a schema change. Measure document-collection time against the pre-Kima baseline; if adoption stalls, this reopens | Product | Deferred — **monitor** |
+| R-25 | Real Sage exports differ from assumptions | **H** | M | **Confirmed obtainable from the practitioner, 2026-10-20.** Research closed the format question negatively: there is no canonical Sage column order, so profile detection plus human confirmation is the design. Files become anonymised fixtures and regression tests. See `sage-dsf-ingestion-research.md` §4, §7 | Product | Open — **files requested** |
+| R-26 | No qualified tax reviewer available | M | **H** | **Resolved in principle, 2026-10-20:** a reviewer **pool** replaces the single expert. Reviewers sign up directly with Kima, are credential-verified, and hold capability flags. Radar and rules still ship inactive until a reviewer with `can_verify_rules` exists | Founder | Mitigated — capacity still to build |
+| R-33 | Taxpayer financial data shared with an external reviewer without a lawful basis | M | **H** | **[NEW] 2026-10-20, from the reviewer-pool decision.** Law 2024/017 basis and taxpayer notice established before the first external review; professional confidentiality undertaking signed at reviewer sign-up; access limited to the assigned declaration and audited into the taxpayer's own access history | Founder + counsel | **Blocking first external review** |
+| R-34 | A pool reviewer is unqualified, conflicted, or rubber-stamps | M | **H** | **[NEW] 2026-10-20.** Credentials checked against the issuing body and the check recorded, never assumed; conflict declared before acceptance with a no-reason decline; capability flags default to off on sign-up; review turnaround and approval patterns monitored for rubber-stamping | Tax reviewer | Open |
+| R-35 | Reviewer capacity becomes the bottleneck at deadline peaks | M | M | **[NEW] 2026-10-20.** Deadlines cluster by tax centre — 15 March, 15 April, 15 May — so demand is spiky by construction. `capacity_per_week` on the reviewer profile, assignment expiry and re-offer, and pool depth recruited against the March peak, not the average | Founder | Open |
 | R-27 | Firms reject client visibility | M | M | Coarse client status; the firm controls the mapping; pilot interviews test it early | Product | Open |
 | R-28 | Scope creeps back to all eighteen "Priority 0" items | **H** | M | Thin vertical slice; billing, education centre and rules engine explicitly deferred; each phase ends in a demonstrable deliverable | Product | Open |
 | R-29 | Building for Kima's own practice and calling it a product | M | M | Three to five external firms in the pilot from the start, not only Kima's team | Founder | Open |
@@ -63,9 +66,10 @@ A phase does not close while a **blocking** item against it remains open.
 
 | Gate | Must be clear |
 |---|---|
-| Phase 0 to 1 | R-05 and R-08 decided; R-06 under way; R-24 and R-25 answered |
-| Phase 3 to 4 | R-09, R-10, R-15 proven by passing negative tests |
+| Phase 0 to 1 | R-05 and R-08 decided; R-06 under way; R-24 and R-25 answered ✓ |
+| Phase 3 to 4 | R-09, R-10, R-15 proven by passing negative tests, **including the reviewer-scope cases** |
 | Phase 4 to 5 | R-30 tested on a throttled connection; R-32 confirmed synthetic-only |
-| Phase 6 start | R-25 closed — real workbooks in hand |
-| Phase 7 start | R-26 closed — reviewer named |
+| First external review | **R-33 closed** — lawful basis, taxpayer notice and confidentiality undertaking in place |
+| Phase 6 start | R-25 closed — real workbooks in hand and parsed into fixtures |
+| Phase 7 start | A reviewer with `can_verify_rules` verified (R-26); R-34 controls live |
 | Milestone 5 | R-06, R-07, R-17 closed; acceptance scenarios A to J all green; penetration test passed |
