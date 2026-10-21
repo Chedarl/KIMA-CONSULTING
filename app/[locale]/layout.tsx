@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import "../globals.css";
 import { Chrome } from "@/components/chrome";
 import { Footer } from "@/components/footer";
+import { ToastProvider } from "@/components/toast";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 
 /**
@@ -94,6 +95,7 @@ export default function LocaleLayout({
         <a href="#main" className="skip-link">
           {t.nav.skip}
         </a>
+        <ToastProvider>
         <Chrome
           locale={locale}
           labels={{
@@ -110,6 +112,7 @@ export default function LocaleLayout({
           {children}
         </main>
         <Footer locale={locale} />
+        </ToastProvider>
       </body>
     </html>
   );

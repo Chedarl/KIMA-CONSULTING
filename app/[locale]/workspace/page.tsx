@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getDictionary, isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
+import { IntakePanel } from "@/components/live/intake-panel";
 import {
   Card,
   CardHeader,
@@ -240,32 +241,22 @@ export default function FirmOverview({
                 ) : undefined
               }
             />
-            <ul className="divide-y divide-border">
-              {intakeQueue.map((q) => (
-                <li key={q.id} className="px-3 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-mono text-xs text-fg">{q.file}</span>
-                    <span className="tnum shrink-0 font-mono text-[11px] text-fg-subtle">
-                      {formatTime(q.arrivedAt, locale)}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-                        q.arrivedVia === "upload"
-                          ? "bg-teal-soft text-teal-text"
-                          : "bg-surface-sunken text-fg-muted"
-                      }`}
-                    >
-                      {q.arrivedVia === "upload" ? t.work.viaLink : t.work.viaEmail}
-                    </span>
-                    <span className="truncate text-xs text-fg-muted">
-                      {q.client ?? t.work.unknownClient}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {/* Live: a client's upload lands here within the second, and the
+                accept/return decision travels straight back to their portal. */}
+            <IntakePanel
+              locale={locale}
+              labels={{
+                incoming: t.work.incoming,
+                accept: t.work.accept,
+                returnIt: t.work.returnIt,
+                accepted: t.work.accepted,
+                returned: t.work.returned,
+                live: t.work.live,
+                connecting: t.work.connecting,
+                offline: t.work.offline,
+                empty: w.client.actionsEmpty,
+              }}
+            />
           </Card>
 
           <Card>
