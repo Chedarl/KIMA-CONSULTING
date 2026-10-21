@@ -68,7 +68,30 @@ and checks that the committed migrations fully describe the schema they produce.
 Concurrency is set so a migration is never cancelled mid-flight.
 
 Both skip cleanly while `supabase/migrations/` holds no `.sql` files, so neither
-goes red on doc-only pushes.
+goes red on doc-only pushes. Confirmed on PR #1: the verify job ran and passed
+with no migrations present.
+
+### The Supabase GitHub App is also connected
+
+PR #1 received a third-party check run named **Supabase Preview**, concluding
+`skipped`, pointing at this project's integrations settings. So the Supabase
+GitHub App has access to this repository independently of the workflows above —
+most likely installed account-wide for an earlier project rather than set up
+for this one.
+
+It is inert today: Supabase branching requires a paid plan, so the check skips.
+**But it stops being inert the moment the plan is upgraded.** Native branching
+also applies migrations when a PR merges, which would mean two mechanisms
+applying the same migrations to the same database. Supabase records which
+migrations have been applied, so the second should no-op rather than double-run,
+but the two racing is not a situation to discover during an incident.
+
+Before enabling branching, pick one mechanism and disable the other: either
+remove `supabase-migrations.yml` and let branching own production, or disconnect
+the repository under Project Settings → Integrations. Not both.
+
+Worth confirming the App's current scope in the dashboard — the evidence here is
+one skipped check run, not a read of the integration settings.
 
 ### Three manual steps before the migration workflow can run
 
