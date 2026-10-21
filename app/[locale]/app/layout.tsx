@@ -26,7 +26,7 @@ export default function ClientLayout({
     { href: `${base}/declarations`, label: w.client.nav.declarations, icon: "file", ready: true },
     { href: `${base}/archive`, label: w.client.nav.archive, icon: "archive", ready: true },
     { href: `${base}/messages`, label: w.client.nav.messages, icon: "chat", ready: true },
-    { href: `${base}/payments`, label: w.client.nav.payments, icon: "card", ready: false },
+    { href: `${base}/payments`, label: w.client.nav.payments, icon: "card", ready: true },
     { href: `${base}/support`, label: w.client.nav.support, icon: "help", ready: false },
     { href: `${base}/profile`, label: w.client.nav.profile, icon: "user", ready: false },
   ];
