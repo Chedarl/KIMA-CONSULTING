@@ -220,3 +220,89 @@ h1, h2, h3, .font-display {
   border: 1px solid rgb(var(--border-strong));
   border-radius: 6px;
 }
+
+/* ---------------------------------------------------------------- the halo */
+
+/*
+ * The halo, after the Hirael reference — rendered as concentric rings and a
+ * radial wash rather than the reference's full-bleed video. A video hero would
+ * be the single heaviest thing on the page, and this product is explicitly for
+ * people on slow Cameroonian connections (Scenario J). Same motif, no payload.
+ */
+.halo {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 55% at 50% 42%, rgb(var(--teal) / 0.16) 0%, transparent 62%),
+    radial-gradient(90% 80% at 50% 0%, rgb(var(--navy) / 0.3) 0%, transparent 70%),
+    rgb(var(--surface-sunken));
+}
+
+:root[data-theme="dark"] .halo,
+.halo--ink {
+  background:
+    radial-gradient(60% 55% at 50% 42%, rgb(30 158 116 / 0.22) 0%, transparent 62%),
+    radial-gradient(90% 80% at 50% 0%, rgb(22 59 102 / 0.75) 0%, transparent 72%),
+    #0b1624;
+}
+
+/* Concentric rings behind the mark. Static: nothing to suppress for
+   reduced-motion, nothing to repaint on scroll. */
+.halo__rings {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: -1;
+  aspect-ratio: 1;
+  width: min(140%, 920px);
+  translate: -50% -50%;
+  border-radius: 9999px;
+  background:
+    repeating-radial-gradient(
+      circle,
+      rgb(255 255 255 / 0.05) 0 1px,
+      transparent 1px 64px
+    );
+  mask-image: radial-gradient(circle, black 35%, transparent 72%);
+}
+
+/* ------------------------------------------------------------- the marquee */
+
+.marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+.marquee__track {
+  display: flex;
+  width: max-content;
+  gap: 2.5rem;
+  animation: marquee-scroll 38s linear infinite;
+}
+
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Reduced motion gets a static, centred, non-duplicated row. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    mask-image: none;
+  }
+  .marquee__track {
+    animation: none;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem 2rem;
+  }
+  .marquee__dup {
+    display: none;
+  }
+}
