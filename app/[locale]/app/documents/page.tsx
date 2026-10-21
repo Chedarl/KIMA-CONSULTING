@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getDictionary, isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
-import { Button, Card, CardHeader, DemoBanner, DueBadge } from "@/components/ui";
+import { Card, CardHeader, DemoBanner, DueBadge, PendingAction } from "@/components/ui";
 import { documentRequests, pick, requestIsOpen } from "@/lib/demo-data";
 
 /**
@@ -28,13 +28,13 @@ export default function DocumentsPage({ params }: { params: { locale: string } }
           <h2 className="font-display text-lg font-semibold text-fg">{c.documentsTitle}</h2>
           <p className="text-sm text-fg-muted">{c.documentsSubtitle}</p>
         </div>
-        <Button href={`/${locale}/app/documents`}>{c.upload}</Button>
+        <PendingAction locale={locale}>{c.upload}</PendingAction>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
         <Card className="overflow-hidden">
           <CardHeader title={c.documentsTitle} dense />
-          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={c.documentsTitle}>
+          <div className="overflow-x-auto focus-visible:outline-offset-[-3px]" tabIndex={0} role="region" aria-label={c.documentsTitle}>
             <table className="w-full border-collapse text-left text-sm">
               <caption className="sr-only">{c.documentsTitle}</caption>
               <thead>
@@ -95,14 +95,14 @@ export default function DocumentsPage({ params }: { params: { locale: string } }
             <ul className="divide-y divide-border">
               {missing.map((d) => (
                 <li key={d.id} className="flex items-center gap-2.5 px-4 py-2.5">
-                  <span className="h-4 w-4 shrink-0 rounded-full border-2 border-dashed border-amber-text/60" />
+                  <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-full border-2 border-dashed border-amber-text/60" />
                   <span className="flex-1 text-sm text-fg">{pick(d.label, locale)}</span>
                 </li>
               ))}
             </ul>
           )}
           <div className="border-t border-border px-4 py-3">
-            <Button href={`/${locale}/app/documents`}>{c.uploadNow}</Button>
+            <PendingAction locale={locale}>{c.uploadNow}</PendingAction>
           </div>
         </Card>
       </div>

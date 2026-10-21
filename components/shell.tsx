@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 /**
  * The workspace shell: a persistent left rail plus a content area, after the
@@ -59,6 +59,11 @@ export function Shell({
   const pathname = usePathname() || "";
   const [open, setOpen] = useState(false);
 
+  // Close the mobile rail after navigating, or it stays over the content.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:gap-7">
       {/* On a phone the rail collapses behind a disclosure rather than
@@ -91,13 +96,15 @@ export function Shell({
             if (!item.ready) {
               return (
                 <li key={item.label}>
-                  <span
-                    aria-disabled="true"
-                    className="rail-item flex min-h-[40px] cursor-default items-center gap-2.5 px-3 text-sm text-fg-subtle"
-                  >
+                  {/* Not a link and not aria-disabled: aria-disabled on a
+                      bare span is not a supported pattern and most screen
+                      readers ignore it. The "soon" text carries the meaning,
+                      separated so it is not read as one run-on phrase. */}
+                  <span className="rail-item flex min-h-[40px] cursor-default items-center gap-2.5 px-3 text-sm text-fg-subtle">
                     <Icon name={item.icon} />
-                    <span className="flex-1 truncate">{item.label}</span>
-                    <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                    <span className="flex-1 break-words">{item.label}</span>
+                    <span className="sr-only">, </span>
+                    <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-xs font-semibold">
                       {soonLabel}
                     </span>
                   </span>
@@ -116,7 +123,7 @@ export function Shell({
                   }`}
                 >
                   <Icon name={item.icon} />
-                  <span className="truncate">{item.label}</span>
+                  <span className="break-words">{item.label}</span>
                 </Link>
               </li>
             );

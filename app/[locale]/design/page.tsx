@@ -272,9 +272,9 @@ export default function DesignPage({ params }: { params: { locale: string } }) {
               {locale === "fr" ? "Complétude" : "Completeness"}
             </p>
             <div className="flex flex-col gap-2.5">
-              <Completeness received={5} total={5} />
-              <Completeness received={3} total={5} />
-              <Completeness received={0} total={5} />
+              <Completeness received={5} total={5} locale={locale} />
+              <Completeness received={3} total={5} locale={locale} />
+              <Completeness received={0} total={5} locale={locale} />
             </div>
             <p className="mt-3 text-xs text-fg-subtle">
               {locale === "fr"
@@ -288,6 +288,7 @@ export default function DesignPage({ params }: { params: { locale: string } }) {
               {locale === "fr" ? "Avancement client" : "Client progress"}
             </p>
             <Timeline
+              locale={locale}
               steps={[
                 { label: locale === "fr" ? "Pièces reçues" : "Documents received", state: "done" },
                 { label: locale === "fr" ? "En préparation" : "In preparation", state: "current" },

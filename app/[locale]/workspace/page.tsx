@@ -73,8 +73,8 @@ export default function FirmOverview({
     <a
       key={key}
       href={`/${locale}/workspace${key === "dsf" ? "?view=dsf" : ""}`}
-      aria-current={view === key ? "true" : undefined}
-      className={`inline-flex min-h-[40px] items-center rounded-rail px-3 text-sm transition-colors ${
+      aria-current={view === key ? "page" : undefined}
+      className={`inline-flex min-h-[44px] items-center rounded-rail px-3 text-sm transition-colors ${
         view === key
           ? "bg-navy font-semibold text-surface"
           : "text-fg-muted hover:bg-surface-sunken hover:text-fg"
@@ -91,7 +91,7 @@ export default function FirmOverview({
       <div
         className="flex flex-wrap gap-1 rounded-rail border border-border bg-surface p-1"
         role="group"
-        aria-label={f.tabRoutine}
+        aria-label={t.work.viewLabel}
       >
         {tab("routine", f.tabRoutine)}
         {tab("dsf", f.tabDsf)}
@@ -173,7 +173,7 @@ export default function FirmOverview({
               action={<span className="text-[11px] text-fg-subtle">{t.work.demoDates}</span>}
             />
             <div
-              className="overflow-x-auto"
+              className="overflow-x-auto focus-visible:outline-offset-[-3px]"
               tabIndex={0}
               role="region"
               aria-label={t.workspace.clientsTitle}
@@ -203,18 +203,13 @@ export default function FirmOverview({
                       </th>
                       <td className="tnum px-3 py-2 font-mono text-xs text-fg-muted">{r.period}</td>
                       <td className="px-3 py-2">
-                        <abbr
-                          title={r.taxCentre}
-                          className="rounded border border-border bg-surface-sunken px-1.5 py-0.5 font-mono text-[11px] text-fg-muted no-underline"
-                        >
-                          {r.taxCentre}
-                        </abbr>
+                        <span className="rounded border border-border bg-surface-sunken px-1.5 py-0.5 font-mono text-[11px] text-fg-muted no-underline">{r.taxCentre}</span>
                       </td>
                       <td className="px-3 py-2">
                         <DueBadge dueOn={r.dueOn} locale={locale} settled={r.state.kind === "filed"} />
                       </td>
                       <td className="px-3 py-2">
-                        <Completeness received={r.docsReceived} total={r.docsTotal} />
+                        <Completeness received={r.docsReceived} total={r.docsTotal} locale={locale} />
                       </td>
                       <td className="px-3 py-2">
                         <span className="flex flex-col items-start gap-1">

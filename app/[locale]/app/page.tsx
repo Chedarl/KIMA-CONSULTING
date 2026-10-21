@@ -1,7 +1,15 @@
 import { notFound } from "next/navigation";
 import { getDictionary, isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
-import { Button, Card, CardHeader, DemoBanner, DueBadge, Timeline } from "@/components/ui";
+import {
+  Button,
+  Card,
+  CardHeader,
+  DemoBanner,
+  DueBadge,
+  PendingAction,
+  Timeline,
+} from "@/components/ui";
 import {
   activeServices,
   activityFeed,
@@ -58,9 +66,9 @@ export default function ClientDashboard({ params }: { params: { locale: string }
       {/* Four summary cards: safe? due? needed? paying for? */}
       <div className="grid gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-surface p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
             {c.cards.statusTitle}
-          </p>
+          </h3>
           <p
             className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-sm font-semibold ${status.cls}`}
           >
@@ -69,9 +77,9 @@ export default function ClientDashboard({ params }: { params: { locale: string }
         </div>
 
         <div className="bg-surface p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
             {c.cards.deadlineTitle}
-          </p>
+          </h3>
           {nextObligation ? (
             <>
               <p className="mt-2 text-sm font-semibold text-fg">
@@ -87,9 +95,9 @@ export default function ClientDashboard({ params }: { params: { locale: string }
         </div>
 
         <div className="bg-surface p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
             {c.cards.missingTitle}
-          </p>
+          </h3>
           <p className="mt-2 font-display text-2xl font-bold text-amber-text">
             {openRequests.length}
           </p>
@@ -102,9 +110,9 @@ export default function ClientDashboard({ params }: { params: { locale: string }
         </div>
 
         <div className="bg-surface p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-fg-subtle">
             {c.cards.servicesTitle}
-          </p>
+          </h3>
           <ul className="mt-2 flex flex-col gap-0.5">
             {activeServices.map((s) => (
               <li key={s.en} className="text-sm text-fg">
@@ -122,6 +130,7 @@ export default function ClientDashboard({ params }: { params: { locale: string }
             <CardHeader title={c.progressTitle} />
             <div className="px-5 py-4">
               <Timeline
+                locale={locale}
                 steps={clientTimeline.map((s) => ({
                   label: pick(s.step, locale),
                   state: s.state,
@@ -182,33 +191,57 @@ export default function ClientDashboard({ params }: { params: { locale: string }
           <Card>
             <CardHeader title={c.readinessTitle} />
             <div className="px-5 py-4">
-              <div className="flex items-end gap-3">
-                <p className="font-display text-3xl font-bold text-navy">{readiness}%</p>
-              </div>
+              <p className="font-display text-3xl font-bold text-navy">
+                {readiness}%
+                <span className="sr-only"> {t.work.readinessLabel}</span>
+              </p>
+              {/* The track needs a border: surface-sunken is ~1.1:1 against the
+                  card, so the 100% extent would otherwise be invisible. */}
               <div
-                className="mt-2 h-2 overflow-hidden rounded-full bg-surface-sunken"
+                className="mt-2 h-2 overflow-hidden rounded-full border border-border-strong bg-surface-sunken"
                 aria-hidden="true"
               >
-                <div
-                  className="h-full rounded-full bg-teal"
-                  style={{ width: `${readiness}%` }}
-                />
+                <div className="h-full rounded-full bg-teal" style={{ width: `${readiness}%` }} />
               </div>
               <ul className="mt-4 flex flex-col gap-2">
-                {readinessCategories.map((cat) => (
-                  <li key={cat.label.en} className="flex items-center gap-2.5 text-sm">
-                    <span
-                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                        cat.state === "complete"
-                          ? "bg-teal"
-                          : cat.state === "partial"
-                            ? "bg-amber"
-                            : "border-2 border-dashed border-danger-text"
-                      }`}
-                    />
-                    <span className="flex-1 text-fg-muted">{pick(cat.label, locale)}</span>
-                  </li>
-                ))}
+                {readinessCategories.map((cat) => {
+                  // Glyph + word, never colour alone: the amber fill is ~2:1
+                  // and a 10px dot cannot carry meaning on its own.
+                  const state =
+                    cat.state === "complete"
+                      ? { cls: "text-teal-text", word: t.work.complete }
+                      : cat.state === "partial"
+                        ? { cls: "text-amber-text", word: t.work.partial }
+                        : { cls: "text-danger-text", word: t.work.missing };
+                  return (
+                    <li key={cat.label.en} className="flex items-center gap-2.5 text-sm">
+                      <svg
+                        viewBox="0 0 16 16"
+                        className={`h-4 w-4 shrink-0 ${state.cls}`}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        aria-hidden="true"
+                      >
+                        {cat.state === "complete" ? (
+                          <>
+                            <circle cx="8" cy="8" r="6.4" />
+                            <path d="M5.2 8.2 7.2 10.2l3.6-4" strokeLinecap="round" />
+                          </>
+                        ) : cat.state === "partial" ? (
+                          <>
+                            <circle cx="8" cy="8" r="6.4" />
+                            <path d="M8 1.6a6.4 6.4 0 0 1 0 12.8z" fill="currentColor" stroke="none" />
+                          </>
+                        ) : (
+                          <circle cx="8" cy="8" r="6.4" strokeDasharray="3 2.5" />
+                        )}
+                      </svg>
+                      <span className="flex-1 text-fg-muted">{pick(cat.label, locale)}</span>
+                      <span className={`text-xs font-semibold ${state.cls}`}>{state.word}</span>
+                    </li>
+                  );
+                })}
               </ul>
               <div className="mt-4">
                 <Button href={`/${locale}/app/documents`} variant="secondary">
@@ -232,9 +265,7 @@ export default function ClientDashboard({ params }: { params: { locale: string }
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button href={`/${locale}/app`} variant="secondary">
-                  {c.advisorMessage}
-                </Button>
+                <PendingAction locale={locale}>{c.advisorMessage}</PendingAction>
               </div>
             </div>
           </Card>

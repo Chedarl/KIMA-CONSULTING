@@ -148,7 +148,7 @@ export default function OverviewPage({ params }: { params: { locale: string } })
               ))}
             </ul>
             <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-sunken px-5 py-3">
-              <Completeness received={2} total={3} />
+              <Completeness received={2} total={3} locale={locale} />
               <StatusChip kind="awaitingReview" locale={locale} size="sm" />
             </div>
           </Card>
