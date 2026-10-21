@@ -3,10 +3,41 @@
 How a commit reaches production. Two independent pipelines, deliberately not
 coupled: Vercel deploys code, GitHub Actions applies database migrations.
 
-**Status of this document:** the pipeline described here is configured but
-unexercised — there is no application code and no migration in the repository
-yet, so nothing has deployed through it. Treat the behaviour below as intended,
-not observed, until the first real change goes through.
+**Status of this document:** the pipeline described here is configured but has
+never applied a migration. Treat its behaviour as intended, not observed, until
+the first migration goes through it.
+
+**The database and the repository have diverged.** The Paris project already
+holds schema — six migrations, verified against the live database on
+2026-10-21:
+
+```
+20261021031500  kima_core_schema
+20261021031559  demo_access_policies
+20261021031616  realtime_and_storage
+20261021032505  fix_policy_recursion
+20261021034146  onboarding_and_diagnostics
+20261021034903  harden_definer_function
+```
+
+None of that SQL is in `supabase/migrations/`. It was applied directly through
+the Supabase management tools, so it bypassed both workflows below — nothing
+replayed it on a clean database, and no pull request has ever shown the access
+policies it created. `supabase/README.md` records the same gap and asks for the
+export; this is not a disagreement between the two documents.
+
+**When that SQL is exported, keep these exact version numbers as the filenames.**
+`supabase db push` decides what to apply by comparing local filenames against
+the versions already recorded remotely. Re-exported under fresh timestamps, the
+same statements would be treated as new work and replayed against a database
+that already has those objects, and the push would fail on the first
+`create table`. Exported under the versions above, every one is already
+recorded remotely and `db push` correctly skips them — the repository becomes
+the source of truth without touching the database.
+
+Until the export happens, the honest position is that the schema is live and
+unreviewed, and that `supabase/README.md` carries a security review listing
+seven gaps that all block real taxpayer data.
 
 ## Infrastructure
 
