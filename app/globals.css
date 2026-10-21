@@ -18,7 +18,7 @@
 :root {
   --bg: 247 249 252;
   --surface: 255 255 255;
-  --surface-sunken: 239 243 248;
+  --surface-sunken: 238 243 247; /* #EEF3F7 */
   --border: 220 228 238;
   --border-strong: 188 201 217;
 
@@ -34,11 +34,11 @@
   --teal-text: 15 107 79; /* 5.4:1 — type and icons */
   --teal-soft: 230 244 238;
 
-  --amber: 245 158 11; /* fills only */
+  --amber: 245 166 35; /* #F5A623 — fills only */
   --amber-text: 146 64 14; /* 7.0:1 */
   --amber-soft: 253 244 227;
 
-  --danger: 220 38 38;
+  --danger: 214 69 69; /* #D64545 */
   --danger-text: 185 28 28; /* 6.2:1 */
   --danger-soft: 254 232 232;
 
@@ -120,9 +120,10 @@ html {
 }
 
 body {
-  --font-sans: var(--font-plex-sans);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-poppins);
   --font-mono: var(--font-plex-mono);
-  font-family: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   background-color: rgb(var(--bg));
   color: rgb(var(--fg));
   -webkit-font-smoothing: antialiased;
@@ -194,6 +195,17 @@ body {
   box-shadow: 0 6px 20px rgb(20 34 53 / 0.1);
 }
 
+/* Headings use the display face; body stays Inter. */
+h1, h2, h3, .font-display {
+  font-family: var(--font-poppins), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.015em;
+}
+
+/* Squircle-leaning radii on the 8px grid, after the Settle reference. */
+.rail-item {
+  border-radius: 10px;
+}
+
 .skip-link {
   position: absolute;
   left: -9999px;
@@ -207,4 +219,163 @@ body {
   background: rgb(var(--surface));
   border: 1px solid rgb(var(--border-strong));
   border-radius: 6px;
+}
+
+/* ---------------------------------------------------------------- the halo */
+
+/*
+ * The halo, after the Hirael reference — rendered as concentric rings and a
+ * radial wash rather than the reference's full-bleed video. A video hero would
+ * be the single heaviest thing on the page, and this product is explicitly for
+ * people on slow Cameroonian connections (Scenario J). Same motif, no payload.
+ */
+.halo {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 55% at 50% 42%, rgb(var(--teal) / 0.16) 0%, transparent 62%),
+    radial-gradient(90% 80% at 50% 0%, rgb(var(--navy) / 0.3) 0%, transparent 70%),
+    rgb(var(--surface-sunken));
+}
+
+:root[data-theme="dark"] .halo,
+.halo--ink {
+  background:
+    radial-gradient(60% 55% at 50% 42%, rgb(30 158 116 / 0.22) 0%, transparent 62%),
+    radial-gradient(90% 80% at 50% 0%, rgb(22 59 102 / 0.75) 0%, transparent 72%),
+    #0b1624;
+}
+
+/* Concentric rings behind the mark. Static: nothing to suppress for
+   reduced-motion, nothing to repaint on scroll. */
+.halo__rings {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: -1;
+  aspect-ratio: 1;
+  width: min(140%, 920px);
+  translate: -50% -50%;
+  border-radius: 9999px;
+  background:
+    repeating-radial-gradient(
+      circle,
+      rgb(255 255 255 / 0.05) 0 1px,
+      transparent 1px 64px
+    );
+  mask-image: radial-gradient(circle, black 35%, transparent 72%);
+}
+
+/* ------------------------------------------------------------- the marquee */
+
+.marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+.marquee__track {
+  display: flex;
+  width: max-content;
+  gap: 2.5rem;
+  animation: marquee-scroll 38s linear infinite;
+}
+
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Reduced motion gets a static, centred, non-duplicated row. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    mask-image: none;
+  }
+  .marquee__track {
+    animation: none;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem 2rem;
+  }
+  .marquee__dup {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------- motion primitives */
+
+/*
+ * Entry motion: 400ms, expo-like ease, small travel. Staggered by index at the
+ * call site. All of it is suppressed by the global reduced-motion rule above,
+ * which renders the final state immediately.
+ */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Loading placeholder — shape of the content, not a spinner. */
+@keyframes skeleton-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--surface-sunken)) 25%,
+    rgb(var(--border)) 37%,
+    rgb(var(--surface-sunken)) 63%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+/* The live indicator. Opacity only, so it never triggers layout or paint of
+   neighbours. */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* A value that just changed, briefly highlighted so the eye catches it. */
+@keyframes flash-change {
+  from {
+    background-color: rgb(var(--teal) / 0.22);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.flash-change {
+  animation: flash-change 1.2s ease-out both;
 }

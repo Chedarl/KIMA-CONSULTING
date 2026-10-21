@@ -45,11 +45,13 @@ const config: Config = {
         // these variables on <body>, so an indirection declared at :root would
         // resolve to nothing, invalidate the whole declaration, and drop the
         // page back to the browser's default serif.
-        sans: ["var(--font-plex-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-poppins)", "var(--font-inter)", "ui-sans-serif", "sans-serif"],
         mono: ["var(--font-plex-mono)", "ui-monospace", "monospace"],
       },
       borderRadius: {
-        card: "10px",
+        card: "12px",
+        rail: "10px",
       },
       boxShadow: {
         card: "0 1px 2px rgb(20 34 53 / 0.04), 0 1px 3px rgb(20 34 53 / 0.06)",

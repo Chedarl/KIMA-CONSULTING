@@ -36,7 +36,7 @@ export function CardHeader({
         dense ? "px-3 py-2" : "px-4 py-3 sm:px-5 sm:py-4"
       }`}
     >
-      <h2 className={`font-semibold text-fg ${dense ? "text-sm" : "text-base"}`}>{title}</h2>
+      <h3 className={`font-display font-semibold text-fg ${dense ? "text-sm" : "text-base"}`}>{title}</h3>
       {action}
     </div>
   );
@@ -208,13 +208,22 @@ export function Money({
 }
 
 /** Document completeness, as a count and a bar — never a bare percentage. */
-export function Completeness({ received, total }: { received: number; total: number }) {
+export function Completeness({
+  received,
+  total,
+  locale,
+}: {
+  received: number;
+  total: number;
+  locale: Locale;
+}) {
   const complete = total > 0 && received >= total;
   const pct = total === 0 ? 0 : Math.min(100, Math.max(0, (received / total) * 100));
   return (
     <span className="flex items-center gap-2">
       <span className="tnum font-mono text-xs text-fg-muted">
         {received}/{total}
+        <span className="sr-only"> {getDictionary(locale).work.docsReceived}</span>
       </span>
       <span
         className="h-1.5 w-14 overflow-hidden rounded-full bg-surface-sunken"
@@ -231,13 +240,20 @@ export function Completeness({ received, total }: { received: number; total: num
 
 export function Timeline({
   steps,
+  locale,
 }: {
   steps: { label: string; state: "done" | "current" | "todo" }[];
+  locale: Locale;
 }) {
+  const t = getDictionary(locale);
   return (
     <ol className="flex flex-col gap-0">
       {steps.map((s, i) => (
-        <li key={s.label} className="flex gap-3">
+        <li
+          key={s.label}
+          aria-current={s.state === "current" ? "step" : undefined}
+          className="flex gap-3"
+        >
           <div className="flex flex-col items-center">
             <span
               className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
@@ -245,7 +261,8 @@ export function Timeline({
                   ? "border-teal-text bg-teal-text text-surface"
                   : s.state === "current"
                     ? "border-navy bg-surface"
-                    : "border-border-strong bg-surface"
+                    : // border-strong is ~1.7:1 and fails 1.4.11 as a state marker
+                      "border-fg-subtle bg-surface"
               }`}
             >
               {s.state === "done" ? (
@@ -280,6 +297,18 @@ export function Timeline({
             }`}
           >
             {s.label}
+            {/* The step's state is the answer to "why isn't it ready yet", so
+                it cannot live in colour and shape alone. */}
+            <span className="sr-only">
+              {" "}
+              (
+              {s.state === "done"
+                ? t.work.stepDone
+                : s.state === "current"
+                  ? t.work.stepCurrent
+                  : t.work.stepTodo}
+              )
+            </span>
           </span>
         </li>
       ))}
@@ -324,7 +353,16 @@ export function DueBadge({
 
   // A settled obligation is never "overdue" — the deadline stopped applying.
   if (settled || bucket === "later") {
-    return <span className="tnum font-mono text-xs text-fg-muted">{dueOn}</span>;
+    return (
+      <time dateTime={dueOn} className="tnum font-mono text-xs text-fg-muted">
+        {new Intl.DateTimeFormat(locale === "fr" ? "fr-CM" : "en-CM", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          timeZone: "Africa/Douala",
+        }).format(new Date(`${dueOn}T00:00:00Z`))}
+      </time>
+    );
   }
 
   const style =
@@ -343,9 +381,13 @@ export function DueBadge({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${style}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${style}`}
     >
+      {bucket !== "overdue" && <span className="sr-only">{t.work.dueIn}&nbsp;</span>}
       <span className="tnum font-mono">{label}</span>
+      <time className="sr-only" dateTime={dueOn}>
+        {dueOn}
+      </time>
     </span>
   );
 }
@@ -362,17 +404,19 @@ export function Metric({
   hint?: string;
   tone?: "neutral" | "warn";
 }) {
+  // A <dl> may only contain dt/dd groups (optionally wrapped in a div), so the
+  // number is the definition of its label. Order is flipped visually only.
   return (
-    <div className="bg-surface px-4 py-3.5">
-      <p
-        className={`tnum font-mono text-xl font-semibold ${
+    <div className="flex flex-col bg-surface px-4 py-3.5">
+      <dt className="order-2 mt-1 text-xs leading-snug text-fg-muted">{label}</dt>
+      <dd
+        className={`order-1 tnum font-mono text-xl font-semibold ${
           tone === "warn" ? "text-amber-text" : "text-navy"
         }`}
       >
         {value}
-      </p>
-      <p className="mt-1 text-xs leading-snug text-fg-muted">{label}</p>
-      {hint && <p className="mt-1 text-[11px] leading-snug text-fg-subtle">{hint}</p>}
+      </dd>
+      {hint && <dd className="order-3 mt-1 text-xs leading-snug text-fg-subtle">{hint}</dd>}
     </div>
   );
 }
@@ -384,12 +428,40 @@ export function Metric({
 export function EvidenceRef({ evidence, locale }: { evidence: FilingEvidence; locale: Locale }) {
   const t = getDictionary(locale);
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] text-fg-muted">
+    <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
       <span className="font-medium">{t.work.evidence}</span>
-      <code className="tnum rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[10px]">
+      <code className="tnum rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-xs">
         {evidence.reference}
       </code>
     </span>
+  );
+}
+
+/**
+ * An action the design calls for but the prototype cannot perform yet.
+ *
+ * Rendered as a disabled button rather than a link to the current page: a
+ * control that looks live and does nothing is worse than one that says so.
+ */
+export function PendingAction({
+  children,
+  locale,
+}: {
+  children: ReactNode;
+  locale: Locale;
+}) {
+  const t = getDictionary(locale);
+  return (
+    <button
+      type="button"
+      disabled
+      className="inline-flex min-h-[44px] cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-border bg-surface-sunken px-4 text-sm font-semibold text-fg-subtle"
+    >
+      {children}
+      <span className="rounded bg-surface px-1.5 py-0.5 text-xs font-semibold">
+        {t.work.comingSoon}
+      </span>
+    </button>
   );
 }
 
