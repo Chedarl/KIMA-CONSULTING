@@ -32,6 +32,24 @@ Still outstanding from blueprint §20: A (software PRD), B (backlog with accepta
 tests), D (journey diagrams), G (component UI/UX specification), H (technical
 architecture and API plan), J (phased implementation plan).
 
+## Deployment
+
+`docs/deployment.md` is the deployment reference — read it before changing
+anything under `.github/workflows/` or `supabase/`.
+
+Vercel deploys code through its own Git integration (`main` → production, any
+other branch → preview). **Never add a Vercel deploy step to a GitHub Actions
+workflow** — it would deploy twice and race over the alias.
+
+Database schema reaches production only through forward-only migrations in
+`supabase/migrations/`, verified on every PR and applied on push to `main`.
+Production is Supabase project ref `vhrnrbnjhmxrygvyfirf`, region `eu-west-3`.
+
+Two standing caveats that follow from the hard constraints below: migrations are
+irreversible and the current plan has no point-in-time recovery, and preview
+deployments currently point at the production database. Both are recorded in
+`docs/deployment.md` and must be resolved before real taxpayer data lands.
+
 ## Hard constraints — do not violate
 
 These come from the blueprint and are not negotiable for convenience:
