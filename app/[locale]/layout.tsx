@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Inter, Poppins, IBM_Plex_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import "../globals.css";
 import { Chrome } from "@/components/chrome";
@@ -11,13 +11,24 @@ import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
  * `lang` on <html> is always correct for the page being read — a screen reader
  * must not announce French copy with an English voice.
  *
- * IBM Plex Sans is the "Financial Trust" pairing: a fintech face with full
- * French diacritic coverage, plus a mono companion for tabular XAF figures.
+ * Poppins for headings, Inter for body — the specified pairing. IBM Plex Mono
+ * stays for tabular XAF figures and account codes, because neither Poppins nor
+ * Inter ships tabular-figure behaviour as reliably for columns of money.
+ *
+ * Both subsets include latin-ext so French diacritics render from the webfont
+ * rather than falling back mid-word.
  */
-const plexSans = IBM_Plex_Sans({
+const inter = Inter({
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "600", "700"],
-  variable: "--font-plex-sans",
+  weight: ["400", "500", "600"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const poppins = Poppins({
+  subsets: ["latin", "latin-ext"],
+  weight: ["600", "700"],
+  variable: "--font-poppins",
   display: "swap",
 });
 
@@ -79,7 +90,7 @@ export default function LocaleLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
       </head>
-      <body className={`${plexSans.variable} ${plexMono.variable} font-sans`}>
+      <body className={`${inter.variable} ${poppins.variable} ${plexMono.variable} font-sans`}>
         <a href="#main" className="skip-link">
           {t.nav.skip}
         </a>

@@ -421,3 +421,115 @@ export function formatTime(iso: string, locale: Locale): string {
     timeZone: "Africa/Douala",
   }).format(new Date(iso));
 }
+
+/* ------------------------------------------------- client workspace (demo) */
+
+export type ClientAction = {
+  id: string;
+  label: { fr: string; en: string };
+  kind: "upload" | "review" | "pay";
+};
+
+export const clientActions: ClientAction[] = [
+  {
+    id: "a-1",
+    label: {
+      fr: "Déposer le relevé bancaire d'octobre",
+      en: "Upload the October bank statement",
+    },
+    kind: "upload",
+  },
+  {
+    id: "a-2",
+    label: {
+      fr: "Confirmer vos informations d'identification fiscale",
+      en: "Confirm your taxpayer identification details",
+    },
+    kind: "review",
+  },
+  {
+    id: "a-3",
+    label: { fr: "Approuver le devis de service Kima", en: "Approve the Kima service quotation" },
+    kind: "review",
+  },
+];
+
+export type ActivityEntry = {
+  id: string;
+  text: { fr: string; en: string };
+  at: string;
+};
+
+/** Every entry reflects a real staff action — never an optimistic estimate. */
+export const activityFeed: ActivityEntry[] = [
+  {
+    id: "ac-1",
+    text: {
+      fr: "Kima a examiné vos factures de ventes",
+      en: "Kima reviewed your sales invoices",
+    },
+    at: "2026-10-20T10:42:00Z",
+  },
+  {
+    id: "ac-2",
+    text: {
+      fr: "Votre déclaration de septembre est en revue finale",
+      en: "Your September declaration is in final review",
+    },
+    at: "2026-10-19T16:05:00Z",
+  },
+  {
+    id: "ac-3",
+    text: { fr: "Nouveau message de Kima", en: "New message from Kima" },
+    at: "2026-10-19T09:20:00Z",
+  },
+  {
+    id: "ac-4",
+    text: { fr: "Facture KMC-204 émise", en: "Invoice KMC-204 issued" },
+    at: "2026-10-18T14:10:00Z",
+  },
+];
+
+export const activeServices: { fr: string; en: string }[] = [
+  { fr: "Déclarations mensuelles", en: "Monthly declarations" },
+  { fr: "Préparation annuelle de la DSF", en: "Annual DSF preparation" },
+];
+
+export type ReadinessCategory = {
+  label: { fr: string; en: string };
+  state: "complete" | "partial" | "missing";
+};
+
+export const readinessCategories: ReadinessCategory[] = [
+  { label: { fr: "Factures de ventes", en: "Sales invoices" }, state: "complete" },
+  { label: { fr: "Factures d'achats", en: "Purchase invoices" }, state: "complete" },
+  { label: { fr: "Relevés bancaires", en: "Bank statements" }, state: "missing" },
+  { label: { fr: "Justificatifs de frais", en: "Expense receipts" }, state: "partial" },
+];
+
+export function readinessPercent(cats: ReadinessCategory[] = readinessCategories): number {
+  const score = cats.reduce(
+    (sum, c) => sum + (c.state === "complete" ? 1 : c.state === "partial" ? 0.5 : 0),
+    0,
+  );
+  return Math.round((score / cats.length) * 100);
+}
+
+/**
+ * The taxpayer's tax profile. `verified: false` is shown as "to verify" rather
+ * than presented as established — classification must be confirmed against
+ * current rules, never assumed (blueprint section 13).
+ */
+export const taxProfile = {
+  niu: "P0582 •••• 417K",
+  regime: { fr: "Régime du réel", en: "Real regime" },
+  framework: { fr: "Système normal (SYSCOHADA révisé)", en: "Système normal (SYSCOHADA revised)" },
+  centre: "CDI Douala I",
+  verified: false,
+};
+
+/** The client-visible advisor. Fictitious, like every other demo person here. */
+export const demoAdvisor = {
+  initials: "AN",
+  name: "A. Nkeng",
+};
