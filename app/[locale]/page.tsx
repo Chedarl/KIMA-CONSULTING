@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getDictionary, isLocale } from "@/lib/i18n";
+import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import { Button, Card, Completeness, DemoBanner, StatusChip } from "@/components/ui";
 
 /**
@@ -47,6 +48,14 @@ export default function OverviewPage({ params }: { params: { locale: string } })
             {t.home.ctaSecondary}
           </a>
         </div>
+        {/* The real front door for an existing client: name plus taxpayer
+            number. Kept quieter than the two entrances above, which walk
+            straight into the portals without signing in. */}
+        <p className="mt-5 text-sm text-white/80">
+          <a href={`/${locale}/login`} className="font-semibold text-white underline">
+            {getWorkspaceDictionary(locale).login.title}
+          </a>
+        </p>
       </section>
 
       {/* The six areas as a marquee — static and wrapped under reduced motion. */}

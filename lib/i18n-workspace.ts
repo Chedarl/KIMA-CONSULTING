@@ -185,6 +185,9 @@ const fr = {
       cancel: "Annuler",
       derived: "Pièces qui seront demandées",
       derivedHint: "Déduites de vos réponses, avec la raison de chaque demande.",
+      firmRetrieved: "Pièces que le cabinet récupère",
+      firmRetrievedHint:
+        "Disponibles en ligne auprès de la DGI. Nous nous en chargeons : rien à envoyer.",
       reviewer: "À confirmer par un réviseur",
       reviewerHint: "Ce questionnaire ne décide pas des obligations déclaratives.",
       required: "Champ obligatoire",
@@ -246,6 +249,50 @@ const fr = {
       emailNoAddress: "Aucune adresse e-mail pour ce client.",
       emailBlocked: "Envoi refusé par le fournisseur : un domaine Kima doit être vérifié.",
     },
+  },
+
+  /**
+   * Portal sign-in. The labels differ by audience on purpose: an individual
+   * recognises "NIU", a business owner more often says "numéro de contribuable".
+   * Same number, the name each person actually uses for it.
+   */
+  login: {
+    title: "Accéder à votre espace",
+    intro: "Choisissez votre situation, puis saisissez vos informations.",
+    tabIndividual: "Je suis un particulier",
+    tabBusiness: "Je représente une entreprise",
+    nameIndividual: "Nom et prénoms",
+    nameBusiness: "Raison sociale de l'entreprise",
+    nameHintIndividual: "Tels qu'ils figurent sur vos documents fiscaux.",
+    nameHintBusiness: "Telle qu'elle figure sur vos documents fiscaux.",
+    numberIndividual: "Numéro d'identifiant unique (NIU)",
+    numberBusiness: "Numéro de contribuable",
+    numberHint:
+      "Il figure sur vos documents fiscaux et sur vos factures. Les espaces et tirets n'ont pas d'importance.",
+    submit: "Accéder à mon espace",
+    submitting: "Vérification…",
+    signOut: "Se déconnecter",
+    incomplete: "Renseignez les deux champs.",
+    noMatch:
+      "Ces informations ne correspondent à aucun dossier. Vérifiez l'orthographe du nom et le numéro, puis réessayez.",
+    error: "Connexion impossible pour le moment. Réessayez dans un instant.",
+    mismatch:
+      "Ce dossier est enregistré dans l'autre catégorie. Vous êtes bien connecté ; utilisez l'autre onglet la prochaine fois.",
+    welcome: "Bienvenue",
+    detailsTitle: "Vos informations",
+    detailsHint:
+      "Notez-les : ce sont celles que l'administration fiscale et votre comptable vous demanderont.",
+    detailName: "Nom au dossier",
+    detailNumber: "Numéro de contribuable",
+    detailCentre: "Centre des impôts",
+    detailRegime: "Régime fiscal",
+    detailUnknown: "Non renseigné",
+    unverified:
+      "Profil non encore vérifié par un réviseur. Les informations ci-dessus sont celles que vous nous avez communiquées.",
+    verified: "Profil vérifié par un réviseur.",
+    continueToPortal: "Continuer vers mon espace",
+    demoNotice:
+      "Démonstration : le numéro de contribuable n'est pas un mot de passe secret. En production, un code à usage unique sera envoyé à votre adresse de contact.",
   },
 };
 
@@ -425,6 +472,9 @@ const en: WorkspaceDictionary = {
       cancel: "Cancel",
       derived: "Documents that will be requested",
       derivedHint: "Derived from the answers, each with the reason it is needed.",
+      firmRetrieved: "Documents the firm retrieves",
+      firmRetrievedHint:
+        "Available online from the DGI. We handle these: nothing for you to send.",
       reviewer: "For a reviewer to confirm",
       reviewerHint: "This questionnaire does not decide filing obligations.",
       required: "Required field",
@@ -486,6 +536,45 @@ const en: WorkspaceDictionary = {
       emailNoAddress: "No email address for this client.",
       emailBlocked: "Provider refused the send: a Kima domain must be verified.",
     },
+  },
+
+  login: {
+    title: "Sign in to your space",
+    intro: "Choose your situation, then enter your details.",
+    tabIndividual: "I am an individual",
+    tabBusiness: "I represent a business",
+    nameIndividual: "Full name",
+    nameBusiness: "Registered business name",
+    nameHintIndividual: "As it appears on your tax documents.",
+    nameHintBusiness: "As it appears on your tax documents.",
+    numberIndividual: "Unique taxpayer number (NIU)",
+    numberBusiness: "Taxpayer number",
+    numberHint:
+      "It appears on your tax documents and on your invoices. Spaces and hyphens do not matter.",
+    submit: "Go to my space",
+    submitting: "Checking…",
+    signOut: "Sign out",
+    incomplete: "Fill in both fields.",
+    noMatch:
+      "These details do not match any file. Check the spelling of the name and the number, then try again.",
+    error: "Cannot sign in at the moment. Try again shortly.",
+    mismatch:
+      "This file is recorded under the other category. You are signed in; use the other tab next time.",
+    welcome: "Welcome",
+    detailsTitle: "Your details",
+    detailsHint:
+      "Write these down: they are what the tax administration and your accountant will ask you for.",
+    detailName: "Name on file",
+    detailNumber: "Taxpayer number",
+    detailCentre: "Tax centre",
+    detailRegime: "Tax regime",
+    detailUnknown: "Not recorded",
+    unverified:
+      "Profile not yet verified by a reviewer. The details above are the ones you gave us.",
+    verified: "Profile verified by a reviewer.",
+    continueToPortal: "Continue to my space",
+    demoNotice:
+      "Demonstration: the taxpayer number is not a secret password. In production a one-time code will be sent to your contact address.",
   },
 };
 

@@ -36,6 +36,8 @@ export default function ClientsPage({ params }: { params: { locale: string } }) 
           cancel: o.cancel,
           derived: o.derived,
           derivedHint: o.derivedHint,
+          firmRetrieved: o.firmRetrieved,
+          firmRetrievedHint: o.firmRetrievedHint,
           reviewer: o.reviewer,
           reviewerHint: o.reviewerHint,
           required: o.required,
