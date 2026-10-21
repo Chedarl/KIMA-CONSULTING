@@ -26,6 +26,8 @@ const fr = {
     design: "Système de design",
     language: "Langue",
     skip: "Aller au contenu principal",
+    mainNav: "Navigation principale",
+    theme: "Changer de thème",
   },
   home: {
     heroTitle: "Comprenez vos impôts. Organisez vos pièces. Restez prêt.",
@@ -140,6 +142,10 @@ const fr = {
     awaitingEvidence: "Dépôt non confirmé",
     awaitingEvidenceHelp: "Transmis, mais sans accusé de réception au dossier.",
   },
+  footer: {
+    disclaimer:
+      "Prototype d'interface — aucune autorisation, aucun partenariat et aucune intégration de télédéclaration avec la DGI n'est établi ou revendiqué.",
+  },
   work: {
     myDay: "À faire",
     overdue: "En retard",
@@ -222,6 +228,8 @@ const en: Dictionary = {
     design: "Design system",
     language: "Language",
     skip: "Skip to main content",
+    mainNav: "Main navigation",
+    theme: "Switch theme",
   },
   home: {
     heroTitle: "Understand your taxes. Organize your records. Stay ready.",
@@ -335,6 +343,10 @@ const en: Dictionary = {
     actionNeededHelp: "Something is expected from you.",
     awaitingEvidence: "Filing unconfirmed",
     awaitingEvidenceHelp: "Submitted, but no acknowledgment on record.",
+  },
+  footer: {
+    disclaimer:
+      "Interface prototype — no DGI authorization, partnership or e-filing integration is established or claimed.",
   },
   work: {
     myDay: "To do",

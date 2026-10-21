@@ -113,6 +113,12 @@
  * the font variables do not exist, which invalidates the whole font-family
  * declaration and drops the page to the browser default serif.
  */
+/* The header is sticky, so anchored and focused targets need clearance or the
+   header covers them (WCAG 2.4.11). */
+html {
+  scroll-padding-top: 5rem;
+}
+
 body {
   --font-sans: var(--font-plex-sans);
   --font-mono: var(--font-plex-mono);

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Locale } from "@/lib/i18n";
 import { formatXaf, getDictionary } from "@/lib/i18n";
@@ -170,10 +171,11 @@ export function Button({
     secondary: "border border-border-strong bg-surface text-fg hover:bg-surface-sunken",
     quiet: "text-navy hover:bg-navy-soft",
   } as const;
+  // next/link: client-side navigation and prefetch. Internal routes only.
   return (
-    <a href={href} className={`${base} ${styles[variant]}`}>
+    <Link href={href} className={`${base} ${styles[variant]}`}>
       {children}
-    </a>
+    </Link>
   );
 }
 

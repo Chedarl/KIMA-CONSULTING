@@ -4,8 +4,12 @@ Tax compliance management, accounting workflow automation and digital taxpayer
 services. Initial market Cameroon, expansion CEMAC. Currency XAF. French and
 English at launch. Company: Kima Consulting. Product: KIMA Compliance OS.
 
-**Tagline:** Clear Records. Confident Compliance. / Vos comptes en ordre. Vos
-obligations maîtrisées.
+**Tagline (canonical, confirmed 2026-10-20):**
+- EN: **Clear Records. Confident Compliance.**
+- FR: **Vos comptes en ordre. Vos obligations maîtrisées.**
+
+The brand-concept alternative "Tax Clarity. Business Confidence." was considered and
+**rejected**. Do not reintroduce it.
 
 ## Baseline document
 
