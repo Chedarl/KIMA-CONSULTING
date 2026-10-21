@@ -22,12 +22,30 @@ is enabled.
 | `firm_accountant` | an organization | Prepares work; cannot approve own work |
 | `firm_reviewer` | an organization | Authorized professional reviewer; can approve declarations |
 | `firm_owner` | an organization | Manages staff, billing, firm settings |
+| `external_reviewer` | nobody — signs up with Kima directly | **[ADDED] 2026-10-20.** A credential-verified professional in Kima's reviewer pool. Belongs to no firm and holds no engagement; reaches data only through an accepted `review_assignment`, and only that declaration's own records |
 | `platform_support` | Kima | Read-only operational access, every read audited |
-| `platform_reviewer` | Kima | Qualified tax reviewer; verifies and activates tax rules |
+| `platform_reviewer` | Kima | Qualified tax reviewer; verifies and activates tax rules. A **different job** from reviewing a client declaration |
 | `platform_admin` | Kima | Platform configuration; **not** a shortcut into taxpayer data |
 | `system_worker` | — | Background jobs; narrow service scope, never interactive |
 
-**Privileged roles — `firm_owner`, `firm_reviewer`, `platform_*` — require MFA** (§14).
+**Privileged roles — `firm_owner`, `firm_reviewer`, `external_reviewer`, `platform_*` —
+require MFA** (§14).
+
+### Reviewer capabilities are data, not role names
+
+`reviewer_profiles.can_approve_declarations` and `.can_verify_rules` decide what a verified
+reviewer may actually do. `firm_reviewer` and `external_reviewer` describe *where the
+reviewer comes from*; the capability flags describe *what they are qualified for*. A
+reviewer with neither flag set can do nothing, which is the default on sign-up.
+
+### Reviewer scope — the fourth access path
+
+Taxpayer ownership, firm engagement, platform support and now **review assignment** are
+four separate ways to reach data. An accepted assignment grants read-only access to
+exactly the declaration under review, its preparation, field values, validation findings,
+and the document versions cited as its supporting evidence — nothing else. Access lapses
+the moment the assignment leaves `accepted`. Every reviewer read is audited and surfaced in
+the taxpayer's own access history.
 
 ## Legend
 
@@ -76,7 +94,10 @@ is enabled.
 | 1 | **Taxpayer self-scope.** `taxpayer_owner` / `taxpayer_delegate` reach exactly one taxpayer's records — their own. Enforced by RLS, not by route. |
 | 2 | **Firm scope requires engagement.** Any firm role reaching a taxpayer requires an `engagement` that is active, for that `organization_id`, and **authorized by the taxpayer**. Revoking authorization removes access immediately and is audited. |
 | 3 | **Assignment scoping.** Where a firm enables it, `firm_assistant` and `firm_accountant` see only taxpayers assigned to them. `firm_owner` and `firm_reviewer` see the whole portfolio. |
-| 4 | **No self-approval.** The `firm_reviewer` who approves a declaration must not be the user who prepared it. Enforced in data, not in UI. If a firm has one professional, the blueprint's review requirement needs an explicit, recorded, firm-level exception — a deliberate product decision, **not** a silent bypass. |
+| 4 | **No self-approval.** The reviewer who approves a declaration must not be the user who prepared it. Enforced in data, not in UI. **Resolved 2026-10-20:** a solo firm satisfies this by routing review to an `external_reviewer` from Kima's pool, so no exception and no silent bypass is needed. |
+| 4a | **Reviewer must be verified and capable.** An approval requires `reviewer_profiles.verification_status='verified'` **and** `can_approve_declarations`. Sign-up alone grants nothing. |
+| 4b | **Assignment before access.** An `external_reviewer` with no accepted `review_assignment` has no access to any taxpayer record. The assignment is the grant; revoking, declining, completing or expiring it ends access immediately. |
+| 4c | **Conflict of interest.** A reviewer declares any conflict before accepting, and may decline without stating a reason. A declined assignment leaves no residual access. |
 | 5 | **Approval is append-only.** `approvals` are never updated or deleted. A withdrawn approval is a new record, and the approved declaration version is preserved byte-for-byte. |
 | 6 | **Filing status is evidence-gated.** No role, including `platform_admin`, can set a declaration to filed without `submission_evidence` or an identified authorized integration response (Scenario F). |
 | 7 | **Tax rule activation is reserved.** Authoring is `platform_admin`; **activation is `platform_reviewer` only**. An unverified rule may exist but may never drive a user-visible obligation or deadline. |
@@ -100,4 +121,11 @@ Scenario C is a correctness property. These run in CI from the first schema comm
 - Any principal activating an unverified tax rule → **denied**.
 - Any principal updating or deleting an `audit_event` → **denied**.
 - Unassigned staff reading a client under assignment scoping → **denied**.
+- `external_reviewer` with no accepted assignment reading any taxpayer record → **denied**.
+- `external_reviewer` reading a client list, another period, messages, or a declaration
+  outside their assignment → **denied**.
+- `external_reviewer` whose assignment is completed, declined, expired or withdrawn
+  reading the previously assigned declaration → **denied**.
+- Unverified reviewer, or verified reviewer lacking `can_approve_declarations`, approving a
+  declaration → **denied**.
 - RLS verified with the application's own database role, not a superuser connection.
