@@ -155,7 +155,7 @@ export function Button({
   const base =
     "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors cursor-pointer";
   const styles = {
-    primary: "bg-navy text-white hover:bg-navy-strong",
+    primary: "bg-navy text-surface hover:bg-navy-strong",
     secondary: "border border-border-strong bg-surface text-fg hover:bg-surface-sunken",
     quiet: "text-navy hover:bg-navy-soft",
   } as const;
@@ -223,7 +223,7 @@ export function Timeline({
             <span
               className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
                 s.state === "done"
-                  ? "border-teal-text bg-teal-text text-white"
+                  ? "border-teal-text bg-teal-text text-surface"
                   : s.state === "current"
                     ? "border-navy bg-surface"
                     : "border-border-strong bg-surface"

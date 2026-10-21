@@ -73,7 +73,7 @@ export function Chrome({ locale }: { locale: Locale }) {
                   <a
                     href={l.href}
                     aria-current={active ? "page" : undefined}
-                    className={`inline-flex min-h-[40px] items-center rounded-lg px-3 text-sm transition-colors ${
+                    className={`inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm transition-colors ${
                       active
                         ? "bg-navy-soft font-semibold text-navy"
                         : "text-fg-muted hover:bg-surface-sunken hover:text-fg"
@@ -98,8 +98,8 @@ export function Chrome({ locale }: { locale: Locale }) {
                 key={l}
                 href={`/${l}${rest ? `/${rest}` : ""}`}
                 aria-current={l === locale ? "true" : undefined}
-                className={`inline-flex min-h-[36px] min-w-[40px] items-center justify-center rounded-md px-2 text-xs font-semibold uppercase transition-colors ${
-                  l === locale ? "bg-navy text-white" : "text-fg-muted hover:bg-surface-sunken"
+                className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md px-2 text-xs font-semibold uppercase transition-colors ${
+                  l === locale ? "bg-navy text-surface" : "text-fg-muted hover:bg-surface-sunken"
                 }`}
               >
                 {l}
@@ -110,7 +110,7 @@ export function Chrome({ locale }: { locale: Locale }) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg border border-border text-fg-muted transition-colors hover:bg-surface-sunken hover:text-fg"
+            className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg border border-border text-fg-muted transition-colors hover:bg-surface-sunken hover:text-fg"
             aria-label={locale === "fr" ? "Changer de thème" : "Switch theme"}
           >
             <svg viewBox="0 0 16 16" className="h-4 w-4" stroke="currentColor" fill="none" aria-hidden="true">
@@ -128,20 +128,14 @@ export function Chrome({ locale }: { locale: Locale }) {
   );
 }
 
+/**
+ * The brand mark is served from `public/logo.svg` so replacing that one file
+ * swaps the logo everywhere, with no code change. The favicon is separate:
+ * `app/icon.svg`.
+ */
 function Mark() {
-  return (
-    <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true">
-      <rect width="28" height="28" rx="7" className="fill-navy" />
-      <path
-        d="M8 19.5V8.5M8 14l6-5.5M8 14l6.5 5.5"
-        stroke="white"
-        strokeWidth="2.1"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <circle cx="20" cy="9.6" r="2.1" className="fill-teal" />
-    </svg>
-  );
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />;
 }
 
 export function Footer({ locale }: { locale: Locale }) {

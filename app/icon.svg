@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- App icon / favicon: the mark reversed out of a navy tile. -->
+  <rect width="64" height="64" rx="14" fill="#163B66" />
+  <g transform="translate(32 32) scale(0.74) translate(-32 -32)">
+    <rect x="10" y="8" width="10" height="48" rx="3" fill="#FFFFFF" />
+    <path d="M24 30 L42 8 L54 8 L36 30 Z" fill="#FFFFFF" />
+    <path d="M24 34 L36 34 L54 56 L42 56 Z" fill="#1E9E74" />
+  </g>
+</svg>

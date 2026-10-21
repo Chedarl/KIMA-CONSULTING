@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 64" width="288" height="64" role="img" aria-label="KIMA CONSULTING">
+  <title>KIMA CONSULTING</title>
+  <!--
+    Monochrome. Everything inherits `currentColor`, so one file serves black,
+    white, engraving and single-colour print: set `color` on the parent, or
+    replace currentColor with a hex.
+
+    The teal arm becomes a tonal fill at 70% so the two arms stay distinguishable
+    without colour. Verified legible down to 16px.
+  -->
+  <g fill="currentColor">
+    <g transform="translate(8 8) scale(0.75)">
+      <rect x="10" y="8" width="10" height="48" rx="3" />
+      <path d="M24 30 L42 8 L54 8 L36 30 Z" />
+      <path d="M24 34 L36 34 L54 56 L42 56 Z" fill-opacity="0.7" />
+    </g>
+    <text
+      x="64"
+      y="35"
+      font-family="'IBM Plex Sans', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+      font-size="27"
+      font-weight="700"
+      letter-spacing="0.4"
+    >KIMA</text>
+    <text
+      x="65.5"
+      y="50"
+      font-family="'IBM Plex Sans', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+      font-size="10.5"
+      font-weight="500"
+      letter-spacing="4.1"
+      fill-opacity="0.72"
+    >CONSULTING</text>
+  </g>
+</svg>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 64" width="288" height="64" role="img" aria-label="KIMA CONSULTING">
+  <title>KIMA CONSULTING</title>
+  <!--
+    Dark-background variation. Navy disappears on dark, so the stem and upper
+    arm reverse to white; teal is kept because it holds up against dark navy
+    and carries the brand accent. Place only on #142235 or darker.
+  -->
+  <g transform="translate(8 8) scale(0.75)">
+    <rect x="10" y="8" width="10" height="48" rx="3" fill="#FFFFFF" />
+    <path d="M24 30 L42 8 L54 8 L36 30 Z" fill="#FFFFFF" />
+    <path d="M24 34 L36 34 L54 56 L42 56 Z" fill="#1E9E74" />
+  </g>
+  <text
+    x="64"
+    y="35"
+    font-family="'IBM Plex Sans', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+    font-size="27"
+    font-weight="700"
+    letter-spacing="0.4"
+    fill="#FFFFFF"
+  >KIMA</text>
+  <text
+    x="65.5"
+    y="50"
+    font-family="'IBM Plex Sans', 'Inter', 'Helvetica Neue', Arial, sans-serif"
+    font-size="10.5"
+    font-weight="500"
+    letter-spacing="4.1"
+    fill="#A9B8CC"
+  >CONSULTING</text>
+</svg>

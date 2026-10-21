@@ -53,7 +53,7 @@ export default function TaxpayerHome({ params }: { params: { locale: string } })
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
                     d.received
-                      ? "border-teal-text bg-teal-text text-white"
+                      ? "border-teal-text bg-teal-text text-surface"
                       : "border-dashed border-amber-text/60 text-amber-text"
                   }`}
                 >
