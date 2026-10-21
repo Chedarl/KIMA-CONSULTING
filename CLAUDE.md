@@ -27,6 +27,8 @@ Phase 1 deliverables live in `docs/foundation/`:
 - `erd.md` — deliverable E: the thirty entities, the scoping model, the two-status decision
 - `permissions-matrix.md` — deliverable F: roles, conditions, required negative tests
 - `risk-register.md` — deliverable I: thirty-five risks with phase gates
+- `portal-patterns-research.md` — how PwC Connect, Engagement Center, EY Canvas, KPMG
+  Clara and the mid-market tools model client work, and what Kima adopts or rejects
 - `sage-dsf-ingestion-research.md` — Sage export formats, DSF workbooks, intake channels and
   parsing rules, with every claim labelled VERIFIED / INFERRED / UNKNOWN
 

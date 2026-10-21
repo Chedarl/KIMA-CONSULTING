@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import type { Locale } from "@/lib/i18n";
 import { formatXaf, getDictionary } from "@/lib/i18n";
-import type { StatusKind } from "@/lib/demo-data";
+import type { FilingEvidence, StatusKind } from "@/lib/demo-data";
+import { bucketOf, daysUntil } from "@/lib/demo-data";
 
 export function Card({
   children,
@@ -100,6 +101,16 @@ const statusStyle: Record<StatusKind, { cls: string; glyph: ReactNode; dashed?: 
       </>
     ),
   },
+  awaitingEvidence: {
+    cls: "bg-amber-soft text-amber-text border-amber-text/40",
+    dashed: true,
+    glyph: (
+      <>
+        <rect x="3" y="2.5" width="8" height="9" rx="1.2" fill="none" strokeWidth="1.5" />
+        <path d="M5.4 7.4h3.2" strokeWidth="1.5" strokeLinecap="round" />
+      </>
+    ),
+  },
   actionNeeded: {
     cls: "bg-danger-soft text-danger-text border-danger-text/40",
     glyph: (
@@ -178,19 +189,26 @@ export function Money({
 }) {
   const t = getDictionary(locale);
   if (amount === null) {
-    return <span className={`text-fg-subtle ${className}`}>—</span>;
+    return (
+      <span className={`text-fg-subtle ${className}`}>
+        <span aria-hidden="true">—</span>
+        <span className="sr-only">{locale === "fr" ? "Non renseigné" : "Not provided"}</span>
+      </span>
+    );
   }
   return (
     <span className={`tnum font-mono ${className}`}>
       {formatXaf(amount, locale)}
-      <span className="ml-1 text-[0.85em] text-fg-muted">{t.common.xaf}</span>
+      {" "}
+      <span className="text-[0.85em] text-fg-muted">{t.common.xaf}</span>
     </span>
   );
 }
 
 /** Document completeness, as a count and a bar — never a bare percentage. */
 export function Completeness({ received, total }: { received: number; total: number }) {
-  const complete = received === total;
+  const complete = total > 0 && received >= total;
+  const pct = total === 0 ? 0 : Math.min(100, Math.max(0, (received / total) * 100));
   return (
     <span className="flex items-center gap-2">
       <span className="tnum font-mono text-xs text-fg-muted">
@@ -198,12 +216,11 @@ export function Completeness({ received, total }: { received: number; total: num
       </span>
       <span
         className="h-1.5 w-14 overflow-hidden rounded-full bg-surface-sunken"
-        role="img"
-        aria-label={`${received} / ${total}`}
+        aria-hidden="true"
       >
         <span
           className={`block h-full rounded-full ${complete ? "bg-teal" : "bg-amber"}`}
-          style={{ width: `${total === 0 ? 0 : (received / total) * 100}%` }}
+          style={{ width: `${pct}%` }}
         />
       </span>
     </span>
@@ -282,6 +299,95 @@ export function DemoBanner({ children }: { children: ReactNode }) {
       </svg>
       <p>{children}</p>
     </div>
+  );
+}
+
+/**
+ * Due date, bucketed after PwC Connect's My Day: overdue, today, within seven
+ * days, later. Quiet by default — colour appears only where action is needed,
+ * so that colour means something when it does appear.
+ */
+export function DueBadge({
+  dueOn,
+  locale,
+  settled = false,
+}: {
+  dueOn: string;
+  locale: Locale;
+  settled?: boolean;
+}) {
+  const t = getDictionary(locale);
+  const bucket = settled ? "later" : bucketOf(dueOn);
+  const days = daysUntil(dueOn);
+
+  // A settled obligation is never "overdue" — the deadline stopped applying.
+  if (settled || bucket === "later") {
+    return <span className="tnum font-mono text-xs text-fg-muted">{dueOn}</span>;
+  }
+
+  const style =
+    bucket === "overdue"
+      ? "bg-danger-soft text-danger-text border-danger-text/30"
+      : bucket === "today"
+        ? "bg-amber-soft text-amber-text border-amber-text/40"
+        : "bg-surface-sunken text-fg-muted border-border-strong";
+
+  const label =
+    bucket === "overdue"
+      ? `${t.work.overdue} · ${Math.abs(days)}${t.work.metrics.days}`
+      : bucket === "today"
+        ? t.work.today
+        : `${days}${t.work.metrics.days}`;
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${style}`}
+    >
+      <span className="tnum font-mono">{label}</span>
+    </span>
+  );
+}
+
+/** One metric in the workspace strip. The definition travels with the number. */
+export function Metric({
+  value,
+  label,
+  hint,
+  tone = "neutral",
+}: {
+  value: string;
+  label: string;
+  hint?: string;
+  tone?: "neutral" | "warn";
+}) {
+  return (
+    <div className="bg-surface px-4 py-3.5">
+      <p
+        className={`tnum font-mono text-xl font-semibold ${
+          tone === "warn" ? "text-amber-text" : "text-navy"
+        }`}
+      >
+        {value}
+      </p>
+      <p className="mt-1 text-xs leading-snug text-fg-muted">{label}</p>
+      {hint && <p className="mt-1 text-[11px] leading-snug text-fg-subtle">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * Filing evidence, shown wherever a declaration claims to be filed. Without it
+ * a declaration is not filed — it is `awaitingEvidence` (Scenario F).
+ */
+export function EvidenceRef({ evidence, locale }: { evidence: FilingEvidence; locale: Locale }) {
+  const t = getDictionary(locale);
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] text-fg-muted">
+      <span className="font-medium">{t.work.evidence}</span>
+      <code className="tnum rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[10px]">
+        {evidence.reference}
+      </code>
+    </span>
   );
 }
 

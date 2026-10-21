@@ -24,7 +24,7 @@
 
   --fg: 20 34 53; /* #142235 — 15.8:1 on surface */
   --fg-muted: 74 90 112; /* 6.8:1 */
-  --fg-subtle: 101 116 137; /* 4.9:1 — secondary text only */
+  --fg-subtle: 88 102 124; /* 5.9:1 on surface, 5.4:1 on surface-sunken */
 
   --navy: 22 59 102; /* #163B66 — 9.6:1 on white */
   --navy-strong: 15 42 74;

@@ -41,6 +41,8 @@ const statuses: StatusKind[] = [
   "draft",
   "estimated",
   "filed",
+  // The state the product exists to surface: submitted, but unproven.
+  "awaitingEvidence",
   "actionNeeded",
 ];
 
