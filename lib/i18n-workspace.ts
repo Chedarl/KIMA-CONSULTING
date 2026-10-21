@@ -209,6 +209,11 @@ const fr = {
       empty: "Aucune pièce ne correspond à ce filtre.",
       unbound: "Client inconnu",
       latest: "200 dernières pièces",
+      emailClient: "Relancer par e-mail",
+      emailSent: "E-mail envoyé",
+      emailNone: "Rien à demander à ce client.",
+      emailNoAddress: "Aucune adresse e-mail pour ce client.",
+      emailBlocked: "Envoi refusé par le fournisseur : un domaine Kima doit être vérifié.",
     },
   },
 };
@@ -413,6 +418,11 @@ const en: WorkspaceDictionary = {
       empty: "No documents match this filter.",
       unbound: "Unknown client",
       latest: "latest 200 documents",
+      emailClient: "Chase by email",
+      emailSent: "Email sent",
+      emailNone: "Nothing outstanding for this client.",
+      emailNoAddress: "No email address for this client.",
+      emailBlocked: "Provider refused the send: a Kima domain must be verified.",
     },
   },
 };
