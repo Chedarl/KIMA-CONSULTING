@@ -41,8 +41,12 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        // Referenced directly, not through an alias on :root. next/font defines
+        // these variables on <body>, so an indirection declared at :root would
+        // resolve to nothing, invalidate the whole declaration, and drop the
+        // page back to the browser's default serif.
+        sans: ["var(--font-plex-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-plex-mono)", "ui-monospace", "monospace"],
       },
       borderRadius: {
         card: "10px",

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Kima Consulting">
+  <title>Kima Consulting</title>
+  <!--
+    THE INTELLIGENT K — primary icon, light backgrounds.
+
+    Three modular panels on a 4-unit grid. The stem is the ledger spine; the two
+    arms are document panels that approach it across a 4-unit gap, so the
+    connection between records, accountants and obligations is held in negative
+    space rather than drawn as nodes. Navy carries the inbound arm, teal the
+    outbound one. Flat fills only — no gradient, glow or stroke effect.
+
+    Brand colours, blueprint section 9: navy #163B66, teal #1E9E74.
+  -->
+  <rect x="10" y="8" width="10" height="48" rx="3" fill="#163B66" />
+  <path d="M24 30 L42 8 L54 8 L36 30 Z" fill="#163B66" />
+  <path d="M24 34 L36 34 L54 56 L42 56 Z" fill="#1E9E74" />
+</svg>

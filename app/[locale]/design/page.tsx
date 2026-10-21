@@ -41,6 +41,8 @@ const statuses: StatusKind[] = [
   "draft",
   "estimated",
   "filed",
+  // The state the product exists to surface: submitted, but unproven.
+  "awaitingEvidence",
   "actionNeeded",
 ];
 
@@ -53,13 +55,86 @@ export default function DesignPage({ params }: { params: { locale: string } }) {
     <div className="flex flex-col gap-8">
       <PageHeading eyebrow={t.common.prototype} title={t.design.title} lede={t.design.intro} />
 
+      {/* Brand — the four required lockups, each from its own file. */}
+      <section>
+        <h2 className="mb-1 text-lg font-semibold text-fg">
+          {locale === "fr" ? "Identité" : "Brand"}
+        </h2>
+        <p className="mb-4 max-w-2xl text-sm text-fg-muted">
+          {locale === "fr"
+            ? "Le « K intelligent » : une tranche de registre et deux panneaux documentaires qui s'en approchent sans le toucher. Le lien se lit dans l'espace négatif, pas dans un graphe de nœuds."
+            : "The “intelligent K”: a ledger spine and two document panels that approach it without touching. The connection reads in the negative space rather than as a node graph."}
+        </p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Each variant sits on the background it is actually for, not on the
+              current theme surface — navy on dark is unreadable, and showing it
+              that way would be presenting the lockup incorrectly. */}
+          <Card className="flex flex-col gap-3 bg-white p-6">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#65748A]">
+              {locale === "fr" ? "Signature principale" : "Primary signature"}
+            </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/logo-horizontal.svg" alt="KIMA CONSULTING" width={288} height={64} />
+            <code className="tnum font-mono text-[11px] text-[#65748A]">
+              public/brand/logo-horizontal.svg
+            </code>
+          </Card>
+
+          <Card className="flex flex-col gap-3 bg-[#142235] p-6">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#8496AD]">
+              {locale === "fr" ? "Fond sombre" : "Dark background"}
+            </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/logo-dark.svg" alt="KIMA CONSULTING" width={288} height={64} />
+            <code className="tnum font-mono text-[11px] text-[#8496AD]">
+              public/brand/logo-dark.svg
+            </code>
+          </Card>
+
+          {/* text-[#142235] pins currentColor: the mono mark inherits it, and on
+              a white card the theme's light foreground would be invisible. */}
+          <Card className="flex flex-col gap-3 bg-white p-6 text-[#142235]">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#65748A]">
+              {locale === "fr" ? "Monochrome" : "Monochrome"}
+            </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/logo-mono.svg" alt="KIMA CONSULTING" width={288} height={64} />
+            <code className="tnum font-mono text-[11px] text-[#65748A]">
+              public/brand/logo-mono.svg
+            </code>
+          </Card>
+
+          <Card className="flex flex-col gap-3 p-6">
+            <p className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">
+              {locale === "fr" ? "Icône d'application" : "App icon"}
+            </p>
+            <div className="flex items-end gap-4">
+              {[64, 40, 28, 16].map((s) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={s}
+                  src="/icon.svg"
+                  alt={`${s}px`}
+                  width={s}
+                  height={s}
+                  style={{ width: s, height: s }}
+                />
+              ))}
+            </div>
+            <code className="tnum font-mono text-[11px] text-fg-subtle">
+              app/icon.svg · public/logo.svg
+            </code>
+          </Card>
+        </div>
+      </section>
+
       {/* Colour — each swatch states whether it may carry text, and its ratio. */}
       <section>
         <h2 className="mb-1 text-lg font-semibold text-fg">{t.design.colours}</h2>
         <p className="mb-4 max-w-2xl text-sm text-fg-muted">
           {locale === "fr"
-            ? "Teal #1E9E74 et amber #F59E0B n'atteignent pas 4,5:1 sur blanc : ce sont des couleurs de remplissage. Leurs variantes foncées portent le texte."
-            : "Teal #1E9E74 and amber #F59E0B do not reach 4.5:1 on white, so they are fill colours. Their darkened variants carry text."}
+            ? "Teal #1E9E74 et amber #F59E0B n'atteignent pas 4,5:1 sur blanc : ce sont des couleurs de remplissage. Leurs variantes foncées portent le texte. Les ratios indiqués sont mesurés sur la surface claire ; le thème sombre utilise des variantes distinctes."
+            : "Teal #1E9E74 and amber #F59E0B do not reach 4.5:1 on white, so they are fill colours. Their darkened variants carry text. The ratios shown are measured against the light surface; dark mode uses its own variants."}
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {brandColours.map((c) => (

@@ -24,7 +24,7 @@
 
   --fg: 20 34 53; /* #142235 — 15.8:1 on surface */
   --fg-muted: 74 90 112; /* 6.8:1 */
-  --fg-subtle: 101 116 137; /* 4.9:1 — secondary text only */
+  --fg-subtle: 88 102 124; /* 5.9:1 on surface, 5.4:1 on surface-sunken */
 
   --navy: 22 59 102; /* #163B66 — 9.6:1 on white */
   --navy-strong: 15 42 74;
@@ -41,9 +41,6 @@
   --danger: 220 38 38;
   --danger-text: 185 28 28; /* 6.2:1 */
   --danger-soft: 254 232 232;
-
-  --font-sans: var(--font-plex-sans);
-  --font-mono: var(--font-plex-mono);
 
   color-scheme: light;
 }
@@ -110,10 +107,26 @@
   color-scheme: dark;
 }
 
+/*
+ * next/font defines --font-plex-sans on <body>, not on :root, so the aliases
+ * are declared here too. Declaring them on :root resolves them in a scope where
+ * the font variables do not exist, which invalidates the whole font-family
+ * declaration and drops the page to the browser default serif.
+ */
+/* The header is sticky, so anchored and focused targets need clearance or the
+   header covers them (WCAG 2.4.11). */
+html {
+  scroll-padding-top: 5rem;
+}
+
 body {
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+  font-family: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
   background-color: rgb(var(--bg));
   color: rgb(var(--fg));
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* Focus: 3px minimum, always visible, never removed. */
@@ -139,6 +152,46 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/*
+ * Hero backdrop: a faint navy wash plus a hairline grid. Static, no animation,
+ * so there is nothing for reduced-motion to suppress and nothing that competes
+ * with the content for attention.
+ */
+.hero-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 110% at 88% 8%, rgb(var(--teal) / 0.1) 0%, transparent 55%),
+    radial-gradient(130% 120% at 0% 0%, rgb(var(--navy) / 0.14) 0%, transparent 60%),
+    rgb(var(--surface));
+  border: 1px solid rgb(var(--border));
+}
+
+.hero-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, rgb(var(--border) / 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--border) / 0.5) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(100% 80% at 50% 0%, black 10%, transparent 75%);
+}
+
+/* A card that reacts to the pointer without moving the layout. */
+.lift {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+.lift:hover {
+  border-color: rgb(var(--border-strong));
+  box-shadow: 0 6px 20px rgb(20 34 53 / 0.1);
 }
 
 .skip-link {
