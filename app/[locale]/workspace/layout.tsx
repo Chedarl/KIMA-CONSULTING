@@ -27,7 +27,7 @@ export default function FirmLayout({
     { href: `${base}/queue`, label: w.firm.nav.queue, icon: "queue", ready: false },
     { href: `${base}/declarations`, label: w.firm.nav.declarations, icon: "file", ready: false },
     { href: `${base}/calendar`, label: w.firm.nav.calendar, icon: "calendar", ready: false },
-    { href: `${base}/reviews`, label: w.firm.nav.reviews, icon: "check", ready: false },
+    { href: `${base}/reviews`, label: w.firm.nav.reviews, icon: "check", ready: true },
     { href: `${base}/messages`, label: w.firm.nav.messages, icon: "chat", ready: false },
     { href: `${base}/vault`, label: w.firm.nav.vault, icon: "archive", ready: false },
     { href: `${base}/billing`, label: w.firm.nav.billing, icon: "card", ready: false },
