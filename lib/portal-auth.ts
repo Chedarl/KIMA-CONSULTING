@@ -1,42 +1,17 @@
 /**
- * Portal sign-in — name plus taxpayer number.
+ * Portal sign-in — name + taxpayer number as IDENTIFIER, one-time code as secret.
  *
- * Asked for by the owner, 21 October 2026: an individual signs in with their
- * name and their NIU; a business signs in with its business name and its
- * numéro de contribuable. The stated reason is a good one — clients routinely
- * do not know their own taxpayer number, and a sign-in that uses it teaches
- * them where it lives.
+ * The NIU is printed on every invoice and is the DGI's Harmony username. It
+ * identifies a taxpayer; it must not authenticate one. The secret is an 8-digit
+ * code delivered to the contact address collected at onboarding.
  *
- * WHAT THIS IS NOT. The NIU is not a secret.
- *
- * It is printed on tax documents. It is a mandatory mention on every invoice —
- * `lib/document-review.ts` fails a VAT verdict for its absence, which means by
- * design every supplier and every customer holds it. And on the DGI's own
- * Harmony 2 it is the username, not the password.
- *
- * So this pair identifies a taxpayer; it does not authenticate one. Anyone
- * holding one of the client's invoices can sign in as them. That collides with
- * the blueprint's tenant isolation requirement — "a taxpayer cannot reach
- * another taxpayer's files by guessing IDs or URLs" — and the collision is real,
- * not theoretical.
- *
- * It ships because this project holds synthetic data only (supabase/README.md,
- * risk R-32) and because the owner asked for it with a clear purpose. It is
- * recorded in the risk register and must not reach real taxpayer data as it
- * stands.
- *
- * THE UPGRADE THAT KEEPS THE INTENT. The owner's goal is that clients learn
- * their own details. That survives intact if the NIU becomes the identifier and
- * the secret becomes a one-time code sent to the contact address we already
- * collect at onboarding: the client still types their name and number, still
- * learns both, and the number stops being the key. One change, same lesson, no
- * open door.
+ * After verify, the browser exchanges a magic-link token hash for a real
+ * Supabase Auth session so RLS can leave the anon demo branch.
  */
 
 import { supabase } from "./supabase";
 import { taxpayerType, type Regime, type TaxCentre, type TaxpayerType } from "./rules";
 
-/** Which sign-in form the visitor is using. */
 export type PortalAudience = "individual" | "business";
 
 export type PortalSession = {
@@ -51,58 +26,120 @@ export type PortalSession = {
   signedInAt: string;
 };
 
-/**
- * The taxpayer number as written on documents varies: spaces, hyphens, mixed
- * case. Compared stripped and upper-cased, so a client who types it the way
- * their own invoice shows it gets in.
- */
 export const normaliseTaxNumber = (raw: string): string =>
   raw.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
 export const normaliseName = (raw: string): string => raw.trim().replace(/\s+/g, " ");
 
-export type SignInResult =
-  | { ok: true; session: PortalSession }
-  | { ok: false; reason: "incomplete" | "no_match" | "error" };
+export type RequestCodeResult =
+  | {
+      ok: true;
+      reference: string | null;
+      maskedDestination: string | null;
+      demoCode: string | null;
+      sent: boolean;
+    }
+  | { ok: false; reason: "incomplete" | "not_configured" | "error" };
 
-/**
- * Looks the taxpayer up through the `portal_sign_in` function, which returns
- * identity fields only and never the client's documents or declarations.
- *
- * Deliberately gives one failure message for "no such name" and "wrong number".
- * Distinguishing them would turn the form into a way to test whether a given
- * business is a client of ours, which is information we do not owe a stranger.
- */
-export async function signIn(
-  audience: PortalAudience,
+export async function requestPortalCode(
   name: string,
   taxNumber: string,
-): Promise<SignInResult> {
+  locale: "fr" | "en",
+): Promise<RequestCodeResult> {
   const cleanName = normaliseName(name);
   const cleanNumber = normaliseTaxNumber(taxNumber);
   if (!cleanName || !cleanNumber) return { ok: false, reason: "incomplete" };
 
   try {
-    const db = supabase();
-    const { data, error } = await db.rpc("portal_sign_in", {
-      p_name: cleanName,
-      p_identifier: cleanNumber,
+    const res = await fetch("/api/portal/request-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: cleanName, identifier: cleanNumber, locale }),
     });
-    if (error) return { ok: false, reason: "error" };
+    if (res.status === 503) return { ok: false, reason: "not_configured" };
+    if (!res.ok) return { ok: false, reason: "error" };
+    const body = (await res.json()) as {
+      reference: string | null;
+      maskedDestination: string | null;
+      demoCode: string | null;
+      sent: boolean;
+    };
+    return {
+      ok: true,
+      reference: body.reference,
+      maskedDestination: body.maskedDestination,
+      demoCode: body.demoCode,
+      sent: body.sent,
+    };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
+}
 
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row) return { ok: false, reason: "no_match" };
+export type VerifyCodeResult =
+  | { ok: true; session: PortalSession }
+  | {
+      ok: false;
+      reason: "incomplete" | "wrong_code" | "expired" | "too_many_attempts" | "error" | "no_match";
+    };
+
+export async function verifyPortalCode(
+  audience: PortalAudience,
+  reference: string,
+  code: string,
+): Promise<VerifyCodeResult> {
+  const cleanCode = code.replace(/\D/g, "");
+  if (!reference || cleanCode.length < 6) return { ok: false, reason: "incomplete" };
+
+  try {
+    const res = await fetch("/api/portal/verify-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reference, code: cleanCode }),
+    });
+    const body = (await res.json()) as {
+      error?: string;
+      tokenHash?: string | null;
+      session?: {
+        taxpayerId: string;
+        displayName: string;
+        taxpayerType: string | null;
+        niu: string | null;
+        taxCentre: string | null;
+        taxRegime: string | null;
+        profileVerified: boolean;
+      };
+    };
+
+    if (!res.ok || !body.session) {
+      const err = body.error ?? "error";
+      if (err === "wrong_code" || err === "expired" || err === "too_many_attempts") {
+        return { ok: false, reason: err };
+      }
+      if (err === "no_match" || err === "unknown_reference") {
+        return { ok: false, reason: "no_match" };
+      }
+      return { ok: false, reason: "error" };
+    }
+
+    if (body.tokenHash) {
+      const { error } = await supabase().auth.verifyOtp({
+        token_hash: body.tokenHash,
+        type: "magiclink",
+      });
+      if (error) return { ok: false, reason: "error" };
+    }
 
     return {
       ok: true,
       session: {
-        taxpayerId: row.id,
-        displayName: row.legal_name,
-        taxpayerType: (row.taxpayer_type as TaxpayerType) ?? null,
-        niu: row.niu ?? null,
-        taxCentre: (row.tax_centre as TaxCentre) ?? null,
-        taxRegime: (row.tax_regime as Regime) ?? null,
-        profileVerified: Boolean(row.profile_verified),
+        taxpayerId: body.session.taxpayerId,
+        displayName: body.session.displayName,
+        taxpayerType: (body.session.taxpayerType as TaxpayerType) ?? null,
+        niu: body.session.niu,
+        taxCentre: (body.session.taxCentre as TaxCentre) ?? null,
+        taxRegime: (body.session.taxRegime as Regime) ?? null,
+        profileVerified: body.session.profileVerified,
         audience,
         signedInAt: new Date().toISOString(),
       },
@@ -112,12 +149,6 @@ export async function signIn(
   }
 }
 
-/**
- * Does the taxpayer we found match the door they came in through? A business
- * signing in on the individual form is worth saying out loud rather than
- * silently accepting — it usually means they picked the wrong form, and it is
- * the kind of mismatch that otherwise shows up as "the portal looks wrong".
- */
 export function audienceMismatch(session: PortalSession): boolean {
   if (!session.taxpayerType) return false;
   const family = taxpayerType(session.taxpayerType)?.family;
@@ -127,20 +158,11 @@ export function audienceMismatch(session: PortalSession): boolean {
 
 const KEY = "kima.portal.session";
 
-/**
- * Session storage, not local storage, and the typed number is never kept — only
- * the fact of a successful sign-in and the identity fields the client is
- * entitled to see. Closing the tab ends it.
- *
- * Every accessor is wrapped: storage throws in a private window and in some
- * embedded browsers, and a portal that white-screens because a client has
- * cookies blocked is worse than one that asks them to sign in again.
- */
 export function rememberSession(session: PortalSession): void {
   try {
     sessionStorage.setItem(KEY, JSON.stringify(session));
   } catch {
-    // Non-fatal: the caller holds the session in React state for this page.
+    // Non-fatal.
   }
 }
 
@@ -155,18 +177,18 @@ export function readSession(): PortalSession | null {
   }
 }
 
-export function clearSession(): void {
+export async function clearSession(): Promise<void> {
   try {
     sessionStorage.removeItem(KEY);
   } catch {
-    // Nothing to clear if storage is unavailable.
+    // Nothing to clear.
+  }
+  try {
+    await supabase().auth.signOut();
+  } catch {
+    // Auth may be unconfigured in some local shells.
   }
 }
 
-/**
- * How the taxpayer number is displayed back to the client. The whole point of
- * the owner's request: they should leave knowing this number. Grouped in fours
- * so it can be read aloud and copied onto a form without losing a digit.
- */
 export const formatTaxNumber = (raw: string | null): string =>
   raw ? normaliseTaxNumber(raw).replace(/(.{4})/g, "$1 ").trim() : "";

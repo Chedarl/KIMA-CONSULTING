@@ -44,6 +44,14 @@ export default function FirmLayout({
       soonLabel={w.soon}
       menuLabel={w.menu}
     >
+      <div className="mb-3 flex justify-end">
+        <a
+          href={`/${locale}/firm-login`}
+          className="min-h-[44px] inline-flex items-center text-sm font-semibold text-navy hover:underline"
+        >
+          {w.firmLogin.title}
+        </a>
+      </div>
       {children}
     </Shell>
   );

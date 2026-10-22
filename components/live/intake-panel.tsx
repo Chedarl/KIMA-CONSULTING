@@ -131,17 +131,15 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
         if (reqErr) throw reqErr;
       }
 
-      await db.from("activity_events").insert({
-        taxpayer_id: ids.taxpayerId,
-        actor: "firm",
-        text_fr:
-          decision === "accepted"
-            ? `Kima a accepté : ${doc.file_name}`
-            : `Kima a retourné une pièce : ${doc.file_name}`,
-        text_en:
-          decision === "accepted"
-            ? `Kima accepted: ${doc.file_name}`
-            : `Kima returned a document: ${doc.file_name}`,
+      const { recordCaseEvent } = await import("@/lib/record-event");
+      await recordCaseEvent({
+        taxpayerId: ids.taxpayerId,
+        organizationId: ids.organizationId,
+        actor: { role: "firm_staff", label: "Firm" },
+        kind: decision === "accepted" ? "request_accepted" : "request_returned",
+        from: previous,
+        to: decision === "accepted" ? "accepted" : "returned",
+        subject: doc.file_name,
       });
       await audit({
         taxpayerId: ids.taxpayerId,

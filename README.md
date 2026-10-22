@@ -116,6 +116,7 @@ without pretending the modules exist.
 npm install
 npm run dev        # http://localhost:3000
 npm run typecheck
+npm test           # pure-engine assertion harness
 npm run build
 npm start          # serves the production build
 ```
@@ -134,11 +135,12 @@ in `tailwind.config.ts` first.
 
 ### Environment
 
-Copy `.env.example` to `.env.local` and fill it in. Four variables:
-`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (read in
-`lib/supabase.ts`, which **throws** without them), plus `RESEND_API_KEY` and
-`KIMA_MAIL_FROM` for outbound inquiries. `.env.local` is gitignored and its
-values are deliberately not reproduced anywhere in the repo.
+Copy `.env.example` to `.env.local` and fill it in. Required for the browser
+client: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Required
+for OTP sign-in and authenticated mail: `SUPABASE_SERVICE_ROLE_KEY`, plus
+`RESEND_API_KEY` and `KIMA_MAIL_FROM`. For synthetic demos without Resend, set
+`KIMA_DEMO_OTP_REVEAL=1` so OTP routes return the code in the response body —
+never with real taxpayer data. `.env.local` is gitignored.
 
 ---
 
@@ -192,30 +194,15 @@ must be either committed here or set on the cloud environment.
 
 ### Testing the pure engines
 
-There is no test runner yet. The engines are pure functions, verified by
-compiling to a scratch directory and asserting under `node`:
-
 ```bash
-npx tsc lib/cases.ts lib/events.ts lib/rules.ts lib/diagnostics.ts \
-  lib/document-naming.ts --outDir <scratch> --module commonjs \
-  --target es2020 --skipLibCheck --esModuleInterop --strict
-node <scratch>/cases-check.js   # 86 assertions
-node <scratch>/f3-check.js      # 95 assertions
-node <scratch>/f4-check.js      # 86 assertions
+npm test
 ```
 
-**Pass `--strict`.** Without it `tsc` ignores `tsconfig.json` and the
-discriminated-union narrowing in `advance()` stops working, so the harness
-compile reports errors the project build does not have.
-
-267 assertions currently cover the rule packs, deadline resolution,
-prorogations, the naming grammar, the three verdicts, the case engine, the
-event log, the request chain, and roles, permissions and separation of duties.
-The pattern has caught eight real defects, so keep it: **add assertions with
-every rule change.** Promoting these to a real runner is open work.
-
-`npm run lint` works now (`.eslintrc.json`, `next/core-web-vitals` plus
-`eqeqeq`, `no-console` and two accessibility rules) and is clean.
+`scripts/engine-check.mjs` compiles the engines with `--strict` into a scratch
+directory and runs Node assertions (rule activation, proposeCases, permissions,
+command layer, three verdicts). CI runs the same command. **Add assertions with
+every rule or permission change.** Expanding coverage toward the earlier F2–F4
+counts remains open work.
 
 ### Verifying UI
 
@@ -386,13 +373,13 @@ Still open, and it is the honest limit of this increment:
   the demo taxpayer. That is what keeps the current interface working. It is
   one line, written on its own line, and **must be deleted before real taxpayer
   data exists** (R-32).
-- **R-36 is half closed.** The NIU is no longer a password: `portal_request_code`
-  issues a six-digit code, stores only a salted hash, expires it in ten minutes,
-  dies after five wrong attempts and is single-use, and the destination comes
-  back masked (`j*****o@example.cm`). What is missing is *delivery* — no mail is
-  sent yet, because no Kima domain is verified with Resend — and a real session.
-  `portal_sign_in` is still present for the synthetic demo and is marked
-  DEPRECATED in the database itself.
+- **R-36 close-out (apply migration `20261022213000_…`).** Portal and firm OTP
+  flows are wired in the app (`/login`, `/firm-login`). The server issues an
+  8-digit code via `portal_issue_code` / `firm_issue_code` (service role only),
+  delivers it through Resend (or `KIMA_DEMO_OTP_REVEAL=1` for synthetic demos),
+  verifies it, and mints a Supabase Auth session. `portal_sign_in` is revoked.
+  The anon demo branch of `can_see_taxpayer` is off unless
+  `app.allow_demo_anon = on`.
 - **`case_tasks` is now firm-only**, so with no firm session the work queue's
   task fetch returns empty and the derived blocker falls back to requests.
   Correct behaviour, and a visible consequence of the above.
@@ -470,18 +457,15 @@ intake path are their own piece of work.
 **Known open items**
 
 - Export the Supabase migrations into this repo
-- **R-36**: portal sign-in uses the taxpayer number as the password. The NIU is
-  not a secret — it is on every invoice and is the DGI's own username. This
-  blocks real taxpayer data; the fix is a one-time code to the onboarding
-  contact address, keeping the number as the identifier
-- No test runner; the scratch-compile harnesses above are the current net
+- Apply `20261022213000_auth_closeout_otp_and_capability_writes` on the live
+  Supabase project, set `SUPABASE_SERVICE_ROLE_KEY`, and seed firm/portal
+  contact emails before turning off any remaining demo escape hatches
+- Expand `npm test` coverage toward the full F2–F4 engine suites
 - `docs/design/.../MASTER.md` is stale and contradicts blueprint §9
-- **`activity_events` is a second, unstructured event log, still live.** Seven
-  components write pre-rendered `text_fr`/`text_en` sentences to it — no kind,
-  no visibility, no case link. It is exactly the failure `case_events` was built
-  to prevent, which is to say the problem is fixed in one place and still
-  present in another. Fold it in: give `case_events` a `taxpayer_id` and a
-  nullable `case_id`, move the seven writers, drop the table
+- Drop the `activity_events` table once the live project has run long enough on
+  `case_events` alone (writers now prefer `recordCaseEvent`)
+- Client `/app/compliance|declarations|archive` still use `lib/demo-data` and
+  are marked `ready: false` until live-wired
 - **A write that reads back its own row now fails for an anonymous caller.**
   `.insert(...).select()` needs SELECT, and several tables no longer grant it.
   Nothing in the codebase does this today — every insert uses the default
@@ -492,8 +476,6 @@ intake path are their own piece of work.
   policy expression runs as the calling role and needs EXECUTE. The proper fix
   is to move them to a schema PostgREST does not expose; it touches every
   policy, so it is deliberate work rather than a quick patch
-- `portal_sign_in` is still callable. It is marked DEPRECATED in the database
-  and is the only thing keeping the current demo login working; it goes when
-  the sign-in screens are rebuilt
-- `demo_taxpayer_id()` is executable by `anon` — deliberate for the
-  single-tenant demo, and part of the branch that must be removed
+- `portal_sign_in` execute grants are revoked by the auth-closeout migration
+- `demo_taxpayer_id()` remains executable; the anon branch that uses it is off
+  unless `app.allow_demo_anon = on`

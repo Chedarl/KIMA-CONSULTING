@@ -171,11 +171,14 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
       });
       if (e) throw e;
 
-      await db.from("activity_events").insert({
-        taxpayer_id: ids.taxpayerId,
-        actor: "taxpayer",
-        text_fr: `Paiement signalé pour la facture ${invoice.number}.`,
-        text_en: `Payment reported for invoice ${invoice.number}.`,
+      const { recordCaseEvent } = await import("@/lib/record-event");
+      await recordCaseEvent({
+        taxpayerId: ids.taxpayerId,
+        organizationId: ids.organizationId,
+        actor: { role: "client", label: "Client" },
+        kind: "note_added",
+        subject: invoice.number,
+        reason: `Paiement signalé / Payment reported for invoice ${invoice.number}`,
       });
       await audit({
         taxpayerId: ids.taxpayerId,

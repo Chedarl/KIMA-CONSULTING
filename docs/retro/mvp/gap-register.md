@@ -2,7 +2,7 @@
 
 **Perimeter:** whole shipped MVP — `lib/`, `app/`, `components/live/`, `supabase/`, `README.md`, `CLAUDE.md`, foundation docs.  
 **Method:** ECC `brownfield-retrospective` + `security-review` + architecture pass (2026-10-22).  
-**Current phase:** 3 (gap analysis complete; no fixes applied in this pass).
+**Current phase:** 5 (fix-forward in progress — auth, commands, rule gate, tests/CI, surface honesty).
 
 > Synthetic-data demo only. Findings that block real taxpayer data are marked **R-32 / R-36**.
 

@@ -1,6 +1,6 @@
 # Migrations
 
-**Status: partial export (12 of 28). Do not treat this directory as the whole schema yet.**
+**Status: partial export (13 of 29). Do not treat this directory as the whole schema yet.**
 
 The database of record is the Supabase project `kima-consulting`
 (`vhrnrbnjhmxrygvyfirf`, eu-west-3). Migrations were applied through the
@@ -41,6 +41,7 @@ directory is closing.
 | 20261022181457 | `scope_every_policy_to_the_caller` | ✅ |
 | 20261022181734 | `portal_one_time_code_replaces_niu_password` | ✅ |
 | 20261022192100 | `registration_kpis_runs_as_the_caller` | ✅ |
+| 20261022213000 | `auth_closeout_otp_and_capability_writes` | ✅ |
 
 ## Finishing the export
 

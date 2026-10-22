@@ -131,11 +131,14 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
         .eq("id", decl.id);
       if (e) throw e;
 
-      await db.from("activity_events").insert({
-        taxpayer_id: decl.taxpayer_id,
-        actor: "firm",
-        text_fr: `Votre déclaration ${decl.period} a été approuvée et transmise.`,
-        text_en: `Your ${decl.period} declaration was approved and submitted.`,
+      const { recordCaseEvent } = await import("@/lib/record-event");
+      await recordCaseEvent({
+        taxpayerId: decl.taxpayer_id,
+        organizationId: decl.organization_id,
+        actor: { role: "firm_reviewer", label: "Firm" },
+        kind: "note_added",
+        subject: decl.period,
+        reason: `Déclaration approuvée / Declaration approved for ${decl.period}`,
       });
       await audit({
         taxpayerId: decl.taxpayer_id,
@@ -180,11 +183,15 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
       // fields, so a failure here is the guarantee working, not a glitch.
       if (e) throw e;
 
-      await db.from("activity_events").insert({
-        taxpayer_id: decl.taxpayer_id,
-        actor: "firm",
-        text_fr: `Dépôt confirmé pour ${decl.period}. Référence ${ref}.`,
-        text_en: `Filing confirmed for ${decl.period}. Reference ${ref}.`,
+      const { recordCaseEvent } = await import("@/lib/record-event");
+      await recordCaseEvent({
+        taxpayerId: decl.taxpayer_id,
+        organizationId: decl.organization_id,
+        actor: { role: "firm_reviewer", label: "Firm" },
+        kind: "filing_verified",
+        to: "verified",
+        subject: ref,
+        reason: `Dépôt confirmé pour ${decl.period}`,
       });
       await audit({
         taxpayerId: decl.taxpayer_id,
