@@ -6,15 +6,19 @@ import { Card, CardHeader } from "@/components/ui";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import type { Regime, TaxpayerType } from "@/lib/rules";
 import {
+  awaitingClient,
   clientStatus,
   clientStatusLabel,
+  effectiveBlocker,
   obligationLabel,
   proposeCases,
   queueOrder,
   risk,
   stageLabel,
   unowned,
+  type CaseRequest,
   type CaseStage,
+  type CaseTask,
   type ComplianceCase,
   type Risk,
 } from "@/lib/cases";
@@ -39,6 +43,20 @@ type Dict = ReturnType<typeof getWorkspaceDictionary>;
 
 type Row = ComplianceCase & { taxpayer_name?: string | null };
 
+/** Requests and tasks grouped by the case they belong to. */
+type Work = { requests: Record<string, CaseRequest[]>; tasks: Record<string, CaseTask[]> };
+
+const EMPTY_WORK: Work = { requests: {}, tasks: {} };
+
+function groupByCase<T extends { case_id: string | null }>(rows: T[]): Record<string, T[]> {
+  const out: Record<string, T[]> = {};
+  for (const r of rows) {
+    if (!r.case_id) continue;
+    (out[r.case_id] ??= []).push(r);
+  }
+  return out;
+}
+
 const RISK_TONE: Record<Risk, string> = {
   overdue: "border-danger-text/40 bg-danger-soft text-danger-text",
   due_soon: "border-amber/50 bg-amber-soft text-amber-text",
@@ -48,6 +66,7 @@ const RISK_TONE: Record<Risk, string> = {
 
 export function WorkQueue({ locale, t }: { locale: "fr" | "en"; t: Dict["queue"] }) {
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [work, setWork] = useState<Work>(EMPTY_WORK);
   const [offline, setOffline] = useState(false);
   const [regime, setRegime] = useState<Regime>("reel");
 
@@ -57,14 +76,36 @@ export function WorkQueue({ locale, t }: { locale: "fr" | "en"; t: Dict["queue"]
       const { data, error } = await db
         .from("compliance_cases")
         .select(
-          "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status",
+          "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved",
         )
         .is("closed_at", null);
       if (error) throw error;
       setRows((data ?? []) as Row[]);
+
+      // The blocker and the client-facing status are DERIVED from these, not
+      // read from the case's own `blocker` column -- a derived value cannot go
+      // stale while a hand-written note survives the thing it described.
+      const [reqs, tasks] = await Promise.all([
+        db
+          .from("document_requests")
+          .select(
+            "id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count",
+          )
+          .not("case_id", "is", null),
+        db
+          .from("case_tasks")
+          .select(
+            "id, case_id, title, detail, assigned_to, state, is_blocking, due_on, completed_at",
+          ),
+      ]);
+      setWork({
+        requests: groupByCase((reqs.data ?? []) as CaseRequest[]),
+        tasks: groupByCase((tasks.data ?? []) as CaseTask[]),
+      });
     } catch {
       setOffline(true);
       setRows([]);
+      setWork(EMPTY_WORK);
     }
   }, []);
 
@@ -146,7 +187,10 @@ export function WorkQueue({ locale, t }: { locale: "fr" | "en"; t: Dict["queue"]
             <ul className="mt-4 flex flex-col gap-2">
               {ordered.map((c) => {
                 const r = risk(c);
-                const cs = clientStatus(c);
+                const requests = work.requests[c.id] ?? [];
+                const tasks = work.tasks[c.id] ?? [];
+                const cs = clientStatus(c, awaitingClient(requests));
+                const blocker = effectiveBlocker(c, { tasks, requests }, locale);
                 return (
                   <li
                     key={c.id}
@@ -205,11 +249,11 @@ export function WorkQueue({ locale, t }: { locale: "fr" | "en"; t: Dict["queue"]
 
                     <p
                       className={`mt-2 border-t border-border pt-2 text-xs ${
-                        c.blocker ? "text-amber-text" : "text-fg-subtle"
+                        blocker ? "text-amber-text" : "text-fg-subtle"
                       }`}
                     >
                       <span className="font-semibold">{t.blocker}: </span>
-                      {c.blocker ?? t.noBlocker}
+                      {blocker ?? t.noBlocker}
                     </p>
                   </li>
                 );

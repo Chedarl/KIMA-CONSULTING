@@ -28,6 +28,7 @@
 
 import {
   advance,
+  awaitingClient,
   billingLabel,
   clientStatus,
   clientStatusLabel,
@@ -88,6 +89,7 @@ export type EventKind =
   | "client_status_changed"
   | "case_closed"
   | "case_abandoned"
+  | "self_approval_disclosed"
   // what the administration acknowledged
   | "filing_attempted"
   | "filing_awaiting_verification"
@@ -235,6 +237,15 @@ export const EVENT_KINDS: Record<EventKind, KindSpec> = {
     tracks: "stage",
     fr: (e) => `Dossier abandonné : ${e.reason ?? "motif non enregistré"}`,
     en: (e) => `Case abandoned: ${e.reason ?? "no reason recorded"}`,
+  },
+  // Client-visible on purpose. If the same person prepared and approved the
+  // work, the person whose return it is has the clearest interest in knowing.
+  self_approval_disclosed: {
+    dimension: "work",
+    clientVisible: true,
+    tracks: null,
+    fr: (e) => `Préparé et validé par la même personne : ${e.to_value}`,
+    en: (e) => `Prepared and approved by the same person: ${e.to_value}`,
   },
 
   filing_attempted: {
@@ -540,7 +551,7 @@ const isBackwards = (fromStage: CaseStage, toStage: CaseStage) => {
  * the log cannot record a move the engine refused, or miss one it allowed.
  */
 export function eventsFromAdvance(
-  before: Pick<ComplianceCase, "id" | "stage" | "owner" | "blocker">,
+  before: Pick<ComplianceCase, "id" | "stage" | "owner" | "blocker" | "prepared_by">,
   input: AdvanceInput,
   actor: Actor,
 ): NewCaseEvent[] {
@@ -549,10 +560,17 @@ export function eventsFromAdvance(
   const e = (draft: EventDraft) => buildEvent(before.id, actor, draft, at);
 
   if (!result.ok) {
+    // The gates that protect the outside world, and one that protects the
+    // integrity of the review: somebody tried to pass their own work and the
+    // control stopped them. That attempt is exactly what an auditor asks about.
+    // `approval_not_checked` and `documents_not_checked` are absent on purpose:
+    // they are programming slips, not business refusals, and logging them would
+    // put a developer's mistake in a client's file.
     const audited =
       result.reason === "blocked_by_findings" ||
       result.reason === "filing_not_verified" ||
-      result.reason === "documents_outstanding";
+      result.reason === "documents_outstanding" ||
+      result.reason === "self_approval_refused";
     return audited
       ? [e({ kind: "advance_refused", from: before.stage, reason: result.reason })]
       : [];
@@ -582,8 +600,18 @@ export function eventsFromAdvance(
     out.push(e({ kind: "owner_assigned", to: result.patch.owner }));
   }
 
-  const wasShown = clientStatus(before);
-  const nowShown = clientStatus({ stage: next, blocker: result.patch.blocker ?? null });
+  // A disclosed self-approval is a fact about how the work was checked, so it
+  // belongs in the history the client can read -- not buried in a column.
+  if (result.patch.self_approved) {
+    out.push(e({ kind: "self_approval_disclosed", to: actor.label ?? "—" }));
+  }
+
+  // The requests do not change during a stage move, so only the stage differs
+  // between the two readings. Derived from the same input the gate used, so the
+  // log cannot claim a client-facing change the engine did not make.
+  const owed = awaitingClient(input.requests ?? []);
+  const wasShown = clientStatus(before, owed);
+  const nowShown = clientStatus({ stage: next }, owed);
   if (wasShown !== nowShown) {
     out.push(e({ kind: "client_status_changed", from: wasShown, to: nowShown }));
   }

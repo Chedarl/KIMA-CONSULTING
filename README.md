@@ -200,18 +200,22 @@ npx tsc lib/cases.ts lib/events.ts lib/rules.ts lib/diagnostics.ts \
   lib/document-naming.ts --outDir <scratch> --module commonjs \
   --target es2020 --skipLibCheck --esModuleInterop --strict
 node <scratch>/cases-check.js   # 86 assertions
-node <scratch>/f3-check.js      # 89 assertions
+node <scratch>/f3-check.js      # 95 assertions
+node <scratch>/f4-check.js      # 81 assertions
 ```
 
 **Pass `--strict`.** Without it `tsc` ignores `tsconfig.json` and the
 discriminated-union narrowing in `advance()` stops working, so the harness
 compile reports errors the project build does not have.
 
-175 assertions currently cover the rule packs, deadline resolution,
+262 assertions currently cover the rule packs, deadline resolution,
 prorogations, the naming grammar, the three verdicts, the case engine, the
-event log and the request chain. The pattern has caught five real defects, so
-keep it: **add assertions with every rule change.** Promoting these to a real
-runner is open work.
+event log, the request chain, and roles, permissions and separation of duties.
+The pattern has caught eight real defects, so keep it: **add assertions with
+every rule change.** Promoting these to a real runner is open work.
+
+`npm run lint` works now (`.eslintrc.json`, `next/core-web-vitals` plus
+`eqeqeq`, `no-console` and two accessibility rules) and is clean.
 
 ### Verifying UI
 
@@ -269,6 +273,9 @@ direct SQL write, not only through the interface:
 | An internal event can never be marked client-visible | `event_visibility_allowed` |
 | Billing never appears in a compliance history | `event_billing_never_client_facing` |
 | Every change carries a name unless the actor is `system` | `event_actor_named` |
+| A self-approval is permitted but can never be silent | `self_approval_must_be_disclosed` |
+| An approval records who and when, together | `approval_is_dated` |
+| A deactivated member carries the date they left | `inactive_has_a_date` |
 
 **`case_events` is append-only.** No UPDATE or DELETE policy exists, and
 UPDATE, DELETE and TRUNCATE are revoked from `anon` and `authenticated`. The
@@ -315,11 +322,23 @@ the owner's machine — ask for a copy if you do not have it.
   the authority chain taxpayer → engagement → case → request; tasks and a
   derived blocker (86 assertions)
 - **F3 Activity log** (`lib/events.ts`) — one change recorded once, read by
-  every surface. 33 event kinds with visibility derived from the kind and
+  every surface. 34 event kinds with visibility derived from the kind and
   mirrored by a SQL CHECK; refusals at the gates are recorded, not silent;
   `drift()` reports where a row and its own history disagree; the request →
   case chain with a composite FK and a second gate (documents → accounting is
-  refused while any attached document is unaccepted) (89 assertions)
+  refused while any attached document is unaccepted) (95 assertions)
+- **F4 Roles and permissions** (`lib/permissions.ts`) — capabilities as a
+  readable matrix rather than conditionals spread through the app. Firm access
+  is by role, client access is by contact link, and the two types do not
+  overlap. **`kima_admin` has no professional authority**: it manages members
+  and the rule corpus and cannot review a document, verify a filing or
+  authorise an engagement. The system itself may generate and remind, never
+  judge. **Separation of duties**: entering review stamps who prepared the work,
+  and `review → filing` consumes a `canApproveReview()` decision it cannot
+  fabricate — self-approval is refused outright in a firm with two
+  professionals, and permitted but *disclosed* for a sole practitioner, with
+  the disclosure written into the client-visible history and enforced by a
+  CHECK constraint (81 assertions)
 
 ### How work is built now
 
@@ -339,11 +358,6 @@ be exercised.
 
 **Next**
 
-- **F4 Roles and permissions** — the biggest remaining backend gap, and the one
-  that is painful to retrofit because it shapes every query. The `actor_role`
-  enum already exists (`client`, `firm_staff`, `firm_reviewer`, `firm_partner`,
-  `kima_admin`, `system`); permissions will reuse it rather than inventing a
-  second vocabulary
 - **F5 The seven error scenarios** (handoff spec §7) as real states rather than
   as UI copy — DGI outage mid-submission, a document that arrives by WhatsApp
   with no request, a revoked engagement mid-period, and the rest
@@ -351,6 +365,15 @@ be exercised.
   target shown at the point of work
 - **F7 KPI standard** — `docs/foundation/client-registration-standard.md`, each
   KPI defined once and computed once in the `registration_kpis` view
+
+**Authentication is the gap F4 leaves.** `firm_members.person_label` is the
+join, because there is no auth provider yet: a member is identified by the same
+label that appears in `compliance_cases.owner` and `case_events.actor_label`,
+which is why it carries a unique index. When auth arrives that column becomes a
+foreign key, and the RLS policies can start reading the capability matrix
+instead of `demo_taxpayer_id()`. Until then **the permission engine is advisory
+at the surface and only the CHECK constraints are structural** — worth knowing
+before anyone calls this multi-tenant.
 
 **Then the front end**, rebuilt to the supplied mockup — deliberately after the
 engine, on the owner's instruction. Three conflicts in that mockup must be
@@ -369,10 +392,6 @@ claim.
   contact address, keeping the number as the identifier
 - No test runner; the scratch-compile harnesses above are the current net
 - `docs/design/.../MASTER.md` is stale and contradicts blueprint §9
-- **The work queue still renders the `blocker` column, not `effectiveBlocker()`.**
-  The engine now derives a blocker from open tasks and requests and knows whose
-  court the ball is in; the queue has not been pointed at it yet. One surface
-  change, left for the front-end phase
 - `registration_kpis` is a SECURITY DEFINER view and `demo_taxpayer_id()` is
   executable by `anon`. Both are deliberate for the single-tenant demo and both
   must be revisited before a second tenant exists

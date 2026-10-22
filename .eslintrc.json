@@ -1,0 +1,10 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "eqeqeq": ["error", "smart"],
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "@next/next/no-img-element": "error",
+    "jsx-a11y/alt-text": "error"
+  },
+  "ignorePatterns": ["node_modules/", ".next/", "out/", "design-system/"]
+}

@@ -1,6 +1,6 @@
 # Migrations
 
-**Status: partial export. Do not treat this directory as the whole schema yet.**
+**Status: partial export (6 of 22). Do not treat this directory as the whole schema yet.**
 
 The database of record is the Supabase project `kima-consulting`
 (`vhrnrbnjhmxrygvyfirf`, eu-west-3). Migrations were applied through the
@@ -33,6 +33,8 @@ directory is closing.
 | 20261022131746 | `engagement_scope_and_case_chain` | ✅ |
 | 20261022134744 | `case_event_log_and_request_case_chain` | ✅ |
 | 20261022134826 | `case_events_revoke_truncate` | ✅ |
+| 20261022142916 | `firm_members_and_separation_of_duties` | ✅ |
+| 20261022143324 | `event_kind_self_approval_disclosed` | ✅ |
 
 ## Finishing the export
 
@@ -46,7 +48,7 @@ from supabase_migrations.schema_migrations
 order by version;
 ```
 
-Two cautions learned while exporting the four below:
+Two cautions learned while exporting the six below:
 
 - `array_to_string(...) || ';'` appends a semicolon to statements that already
   end in one, producing a trailing `;;`. Strip it.

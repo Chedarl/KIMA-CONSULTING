@@ -38,6 +38,10 @@ import {
 } from "./rules";
 import { periodToken, type Period } from "./document-naming";
 import { hasBlocking, type Finding } from "./diagnostics";
+// Type-only, and deliberately so: `lib/permissions.ts` imports this module's
+// types the same way, and a value import in either direction would make the
+// two mutually dependent at runtime.
+import type { ApprovalDecision } from "./permissions";
 
 // ---------------------------------------------------------------------------
 // The record
@@ -191,6 +195,30 @@ export const requestIsOutstanding = (s: RequestStatus): boolean =>
 export const openRequests = <T extends Pick<CaseRequest, "status">>(requests: T[]): T[] =>
   requests.filter((r) => requestIsOpen(r.status));
 
+/**
+ * Whose court the ball is in for one request. Defined once, because two
+ * consumers need it and they must not disagree: the derived blocker names the
+ * single thing holding the case up, and `awaitingClient` asks whether ANYTHING
+ * is owed by the client.
+ *
+ * Once a document has been submitted it is ours to review, whoever was asked
+ * for it. Before that, whoever is responsible still owes it.
+ */
+export const waitsOn = (r: Pick<CaseRequest, "status" | "responsible">): "client" | "firm" =>
+  r.status === "submitted" ? "firm" : r.responsible === "taxpayer" ? "client" : "firm";
+
+/**
+ * Is anything at all outstanding from the client?
+ *
+ * Distinct from the derived blocker on purpose. The blocker is the ONE earliest
+ * item, and an internal task due sooner than a client's document would
+ * otherwise hide the fact that the client owes something — which is exactly the
+ * wrong thing for a portal to get wrong.
+ */
+export const awaitingClient = (
+  requests: Pick<CaseRequest, "status" | "responsible">[],
+): boolean => requests.some((r) => requestIsOpen(r.status) && waitsOn(r) === "client");
+
 export type ComplianceCase = {
   id: string;
   taxpayer_id: string;
@@ -215,6 +243,16 @@ export type ComplianceCase = {
   filing_verified_at: string | null;
   payment_evidence_status: PaymentEvidenceStatus;
   billing_status: BillingStatus;
+
+  // Separation of duties. Stamped by `advance()` on entering and leaving
+  // review, never typed by hand -- the whole value of this control is that
+  // nobody chooses what it says.
+  prepared_by: string | null;
+  prepared_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  /** The same person prepared and approved, and said so. Never silent. */
+  self_approved: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -292,22 +330,33 @@ export const CLIENT_STATUS_LABELS: Record<ClientStatus, { fr: string; en: string
 /**
  * The one place the internal stage is translated for the client.
  *
- * `documents` reads as "waiting on you" ONLY when a blocker is actually
- * recorded. A case sitting in documents because the firm has not started is
- * not the client's fault and must not be shown as though it were — that is how
- * a portal quietly blames the customer for the firm's own backlog.
+ * `documents` reads as "waiting on you" ONLY when something is actually
+ * outstanding FROM THE CLIENT. A case sitting in documents because the firm
+ * has not started is not the client's fault and must not be shown as though
+ * it were — that is how a portal quietly blames the customer for the firm's
+ * own backlog.
+ *
+ * THE SECOND ARGUMENT IS REQUIRED. It was briefly optional, falling back to the
+ * free-text `blocker` column, and that was a trap: the correct reading was
+ * opt-in, so every caller that forgot kept the old one with no warning. The
+ * free-text column cannot say WHOSE court the ball is in, and guessing
+ * "the client's" is the one direction where being wrong is rude.
+ *
+ * It takes `awaitingClient` rather than the derived blocker, because the
+ * blocker is the single earliest item: a task due sooner than a client's
+ * document would hide the fact that the client owes anything at all.
+ *
+ * The consequence is deliberate: a case blocked only by a hand-written note
+ * reads as work in progress, not as waiting on the client. To tell a client
+ * they owe something, raise a request — which is what requests are for.
  */
 export function clientStatus(
-  c: Pick<ComplianceCase, "stage" | "blocker">,
-  blocker?: DerivedBlocker | null,
+  c: Pick<ComplianceCase, "stage">,
+  awaitingClient: boolean,
 ): ClientStatus {
   switch (c.stage) {
     case "documents":
-      // When the structured blocker is available it decides, because it knows
-      // WHOSE court the ball is in; the free-text column only knows that
-      // something is wrong. Absent it, the old reading stands.
-      if (blocker !== undefined) return blocker?.waiting_on === "client" ? "waiting_on_you" : "in_progress";
-      return c.blocker ? "waiting_on_you" : "in_progress";
+      return awaitingClient ? "waiting_on_you" : "in_progress";
     case "accounting":
     case "preparation":
       return "in_progress";
@@ -336,8 +385,24 @@ export type AdvanceInput = {
   findings?: Finding[];
   /** The filing and payment dimensions, needed to gate delivery. */
   filing?: Pick<ComplianceCase, "filing_status" | "payment_evidence_status">;
-  /** The requests attached to this case, needed to gate leaving `documents`. */
-  requests?: Pick<CaseRequest, "status">[];
+  /**
+   * The requests attached to this case.
+   *
+   * Required in practice for `documents -> accounting`, which refuses rather
+   * than skips when it is missing. Whole rows, not just statuses, because the
+   * event builder derives what the client is told from the same input.
+   */
+  requests?: CaseRequest[];
+  /**
+   * The outcome of `canApproveReview()`, required for `review -> filing`.
+   *
+   * A DECISION, not the facts to decide from. The separation-of-duties rule
+   * lives in `lib/permissions.ts` and is stated once; this gate consumes its
+   * verdict rather than re-deriving it, so the two cannot drift apart. And
+   * because the gate refuses when it is absent, a caller cannot skip the
+   * control by forgetting it.
+   */
+  approval?: ApprovalDecision;
   at?: string;
 };
 
@@ -349,6 +414,9 @@ export type AdvanceResult =
         | "not_allowed"
         | "blocked_by_findings"
         | "documents_outstanding"
+        | "documents_not_checked"
+        | "approval_not_checked"
+        | "self_approval_refused"
         | "owner_required"
         | "filing_not_verified";
     };
@@ -369,25 +437,35 @@ const FILING_UNKNOWN = {
  * is internal, and everything after it has left the building.
  */
 export function advance(
-  current: Pick<ComplianceCase, "stage" | "owner">,
+  current: Pick<ComplianceCase, "stage" | "owner" | "prepared_by">,
   input: AdvanceInput,
 ): AdvanceResult {
   if (!canAdvance(current.stage, input.to)) return { ok: false, reason: "not_allowed" };
 
   if (current.stage === "review" && input.to === "filing") {
     if (hasBlocking(input.findings ?? [])) return { ok: false, reason: "blocked_by_findings" };
+
+    // SEPARATION OF DUTIES. The oldest control in the trade: whoever prepared
+    // the work should not be the one who passes it. Checked here because this
+    // is already the one transition that decides whether work leaves the
+    // building, and a second place deciding it is a second place to disagree.
+    if (!input.approval) return { ok: false, reason: "approval_not_checked" };
+    if (!input.approval.ok) return { ok: false, reason: "self_approval_refused" };
   }
 
   // THE SECOND GATE: the accounts are not started on documents nobody has
   // accepted. `submitted` is not `accepted`, and the difference is the whole
   // point of reviewing a piece before it reaches the ledger.
   //
-  // Note the asymmetry with delivery below. Here, requests nobody supplied mean
-  // no gate; there, filing information nobody supplied means refusal. The rule
-  // is which way the mistake points: this move is internal and reversible, and
-  // refusing it on absent information would stop work for no reason. Delivery
-  // asserts an outcome to a client, so its safe default is "we do not know".
-  if (current.stage === "documents" && input.to === "accounting" && input.requests) {
+  // ABSENT INFORMATION NEVER PERMITS A GATED MOVE — the same rule as delivery
+  // below, and now the only rule. This gate used to skip itself when no
+  // requests were supplied, on the argument that the move is internal and
+  // reversible. That was true and still a mistake: a caller that simply forgot
+  // the argument got no gate and no warning, which is the exact shape of the
+  // delivery bug already fixed once. A refusal naming what is missing is loud,
+  // and loud is what a developer needs.
+  if (current.stage === "documents" && input.to === "accounting") {
+    if (!input.requests) return { ok: false, reason: "documents_not_checked" };
     if (openRequests(input.requests).length > 0) {
       return { ok: false, reason: "documents_outstanding" };
     }
@@ -409,6 +487,24 @@ export function advance(
 
   const at = input.at ?? new Date().toISOString();
   const patch: Partial<ComplianceCase> = { stage: input.to };
+
+  // Entering review records who prepared the work. Not overwritten if already
+  // set: a case that goes round the review loop twice was still prepared by
+  // whoever first put it up, and letting the second pass rewrite that would
+  // quietly launder a self-approval.
+  if (input.to === "review" && !current.prepared_by) {
+    patch.prepared_by = input.by.trim();
+    patch.prepared_at = at;
+  }
+
+  // Leaving review records who passed it, and whether that was the same
+  // person. The database holds the same rule as a CHECK constraint, so a
+  // direct write cannot record an undisclosed self-approval either.
+  if (current.stage === "review" && input.to === "filing" && input.approval?.ok) {
+    patch.approved_by = input.by.trim();
+    patch.approved_at = at;
+    patch.self_approved = input.approval.selfApproved;
+  }
 
   if (!current.owner) patch.owner = input.by.trim();
   // Moving a case asserts that the previous blocker is gone. Carrying it
@@ -538,8 +634,9 @@ export const billingLabel = (s: BillingStatus, locale: "fr" | "en") =>
 export function statusSummary(
   c: Pick<
     ComplianceCase,
-    "stage" | "blocker" | "filing_status" | "payment_evidence_status" | "billing_status"
+    "stage" | "filing_status" | "payment_evidence_status" | "billing_status"
   >,
+  awaitsClient: boolean,
   locale: "fr" | "en",
 ) {
   return {
@@ -547,7 +644,7 @@ export function statusSummary(
     filing: filingLabel(c.filing_status, locale),
     payment: paymentLabel(c.payment_evidence_status, locale),
     billing: billingLabel(c.billing_status, locale),
-    clientFacing: clientStatusLabel(clientStatus(c), locale),
+    clientFacing: clientStatusLabel(clientStatus(c, awaitsClient), locale),
   };
 }
 
@@ -793,9 +890,7 @@ export function deriveBlocker(input: {
     const back = r.status === "returned";
     candidates.push({
       source: "request",
-      // Once it has been submitted it is ours to review, whoever was asked for
-      // it. Before that, whoever is responsible still owes it.
-      waiting_on: r.status === "submitted" ? "firm" : r.responsible === "taxpayer" ? "client" : "firm",
+      waiting_on: waitsOn(r),
       due_on: r.due_on,
       fr: back ? "À reprendre : " + r.label_fr : r.label_fr,
       en: back ? "Needs redoing: " + r.label_en : r.label_en,
