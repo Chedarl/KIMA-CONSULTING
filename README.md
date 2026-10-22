@@ -282,10 +282,11 @@ that is worth catching before a client is told their declaration was accepted.
 A dimension the log is silent about is *not* drift; silence is missing
 coverage, not a contradiction.
 
-**The migrations live in Supabase, not in this repo.** Export them into
-`supabase/migrations/` before anyone else needs to review the policies: a
-policy that is not in version control cannot be reviewed in a pull request.
-This is the most important piece of open housekeeping.
+**Migration export is partial — see `supabase/migrations/README.md`**, which
+lists all 20 applied migrations and marks which four are in the repo. The rest
+exist only in `supabase_migrations.schema_migrations`, and a policy that is not
+in version control cannot be reviewed in a pull request. That README carries the
+query to finish the export and two cautions about replaying these files.
 
 ---
 
