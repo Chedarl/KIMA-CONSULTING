@@ -3,7 +3,13 @@
 import { useMemo, useState } from "react";
 import { audit, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
-import { ORGANIZER, deriveRequests, reviewerFlags } from "@/lib/organizer";
+import {
+  clientRequests,
+  deriveRequests,
+  firmRetrievals,
+  questionsFor,
+  reviewerFlags,
+} from "@/lib/organizer";
 
 /**
  * Client onboarding — Intuit Link's organizer, remodelled for Cameroon.
@@ -33,6 +39,8 @@ export type WizardLabels = {
   cancel: string;
   derived: string;
   derivedHint: string;
+  firmRetrieved: string;
+  firmRetrievedHint: string;
   reviewer: string;
   reviewerHint: string;
   required: string;
@@ -41,7 +49,27 @@ export type WizardLabels = {
   nothingYet: string;
 };
 
-const PAGES = [ORGANIZER.slice(0, 4), ORGANIZER.slice(4, 7), ORGANIZER.slice(7)];
+/**
+ * Paging by question key, not by index.
+ *
+ * This was `ORGANIZER.slice(0, 4)` and friends, which silently reshuffled the
+ * wizard the moment a question was inserted — and the practitioner session added
+ * five. Keys are declarative: a question absent for this taxpayer simply drops
+ * out of its page, and a page left empty is skipped.
+ */
+const PAGE_KEYS: string[][] = [
+  ["taxpayer_type", "legal_name", "full_name", "contact_name", "contact_email"],
+  ["niu", "tax_centre", "tax_regime", "accounting_framework", "dpr_access"],
+  [
+    "has_bank",
+    "issues_invoices",
+    "has_suppliers",
+    "has_payroll",
+    "uses_sage",
+    "employer_name",
+    "other_income",
+  ],
+];
 
 export function OnboardingWizard({
   locale,
@@ -62,8 +90,32 @@ export function OnboardingWizard({
   const derived = useMemo(() => deriveRequests(answers), [answers]);
   const flags = useMemo(() => reviewerFlags(answers), [answers]);
 
-  const current = PAGES[page];
-  const canAdvance = current.every((q) => !q.required || Boolean(answers[q.key]?.trim()));
+  // What the client is actually asked for, and what we fetch ourselves from the
+  // DGI's Harmony 2 portals. Keeping them apart on screen is the point: the
+  // client should see that two items are being handled, not be asked for them.
+  const asked = useMemo(() => clientRequests(derived), [derived]);
+  const retrieved = useMemo(() => firmRetrievals(derived), [derived]);
+
+  // Only the questions that apply to this kind of taxpayer. A student is never
+  // asked for a registered business name.
+  const applicable = useMemo(() => questionsFor(answers), [answers]);
+  const pages = useMemo(
+    () =>
+      PAGE_KEYS.map((keys) =>
+        keys
+          .map((k) => applicable.find((q) => q.key === k))
+          .filter((q): q is NonNullable<typeof q> => Boolean(q)),
+      ).filter((p) => p.length > 0),
+    [applicable],
+  );
+
+  // The family can change mid-wizard if someone goes back and re-answers, which
+  // can shrink the page count under the current index.
+  const safePage = Math.min(page, Math.max(pages.length - 1, 0));
+  const current = pages[safePage] ?? [];
+  const canAdvance =
+    current.length > 0 &&
+    current.every((q) => !q.required || Boolean(answers[q.key]?.trim()));
 
   const set = (key: string, value: string) => setAnswers((prev) => ({ ...prev, [key]: value }));
 
@@ -73,6 +125,9 @@ export function OnboardingWizard({
     setAnswers({});
     setTouched(false);
   }
+
+  // The name on the file, whichever kind of taxpayer this is.
+  const displayName = answers.legal_name || answers.full_name || "";
 
   async function submit() {
     setBusy(true);
@@ -84,12 +139,17 @@ export function OnboardingWizard({
       const { data: taxpayer, error: tpErr } = await db
         .from("taxpayers")
         .insert({
-          legal_name: answers.legal_name,
+          // An individual has no registered business name. `legal_name` is the
+          // taxpayer's name on the file, whichever kind of taxpayer they are.
+          legal_name: answers.legal_name || answers.full_name,
+          taxpayer_type: answers.taxpayer_type || null,
           contact_name: answers.contact_name,
           contact_email: answers.contact_email,
           niu: answers.niu || null,
-          tax_centre: answers.tax_centre === "unknown" ? null : answers.tax_centre,
-          tax_regime: answers.tax_regime === "unknown" ? null : answers.tax_regime,
+          // Both stay null for an individual: neither question was asked, and a
+          // blank is not a classification.
+          tax_centre: answers.tax_centre === "unknown" ? null : answers.tax_centre || null,
+          tax_regime: answers.tax_regime === "unknown" ? null : answers.tax_regime || null,
           accounting_framework:
             answers.accounting_framework === "unknown" ? null : answers.accounting_framework,
           // Never true on creation: a profile is verified by a reviewer against
@@ -129,7 +189,10 @@ export function OnboardingWizard({
           reason_fr: d.reasonFr,
           reason_en: d.reasonEn,
           status: "requested",
-          responsible: "taxpayer",
+          // The work still exists and is still tracked — but a document we
+          // retrieve from Harmony 2 ourselves is the firm's responsibility, not
+          // the client's. The client is told it is being handled, not asked.
+          responsible: d.retrievedBy === "firm" ? "firm" : "taxpayer",
           due_on: dueOn,
         })),
       );
@@ -137,8 +200,8 @@ export function OnboardingWizard({
       await db.from("activity_events").insert({
         taxpayer_id: taxpayer.id,
         actor: "firm",
-        text_fr: `Dossier ouvert pour ${answers.legal_name}. ${derived.length} pièces demandées.`,
-        text_en: `File opened for ${answers.legal_name}. ${derived.length} documents requested.`,
+        text_fr: `Dossier ouvert pour ${displayName}. ${asked.length} pièces demandées, ${retrieved.length} récupérées par le cabinet.`,
+        text_en: `File opened for ${displayName}. ${asked.length} documents requested, ${retrieved.length} retrieved by the firm.`,
       });
 
       await audit({
@@ -151,7 +214,7 @@ export function OnboardingWizard({
         after: { answers, derived: derived.map((d) => d.key) },
       });
 
-      toast(`${labels.created} — ${answers.legal_name}`);
+      toast(`${labels.created} — ${displayName}`);
       reset();
       onCreated?.();
     } catch {
@@ -202,7 +265,7 @@ export function OnboardingWizard({
       <div className="grid gap-5 p-5 lg:grid-cols-[1.3fr_1fr]">
         <div className="flex flex-col gap-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-            {labels.step} {page + 1} {labels.of} {PAGES.length}
+            {labels.step} {safePage + 1} {labels.of} {pages.length}
           </p>
 
           {current.map((q) => {
@@ -256,23 +319,23 @@ export function OnboardingWizard({
           })}
 
           <div className="mt-2 flex flex-wrap gap-2">
-            {page > 0 && (
+            {safePage > 0 && (
               <button
                 type="button"
-                onClick={() => setPage((p) => p - 1)}
+                onClick={() => setPage(safePage - 1)}
                 className="min-h-[44px] rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg"
               >
                 {labels.back}
               </button>
             )}
-            {page < PAGES.length - 1 ? (
+            {safePage < pages.length - 1 ? (
               <button
                 type="button"
                 onClick={() => {
                   setTouched(true);
                   if (canAdvance) {
                     setTouched(false);
-                    setPage((p) => p + 1);
+                    setPage(safePage + 1);
                   }
                 }}
                 className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-surface hover:bg-navy-strong"
@@ -306,7 +369,7 @@ export function OnboardingWizard({
               <p className="mt-3 text-sm text-fg-muted">{labels.nothingYet}</p>
             ) : (
               <ul className="mt-3 flex flex-col gap-2">
-                {derived.map((d) => (
+                {asked.map((d) => (
                   <li key={d.key} className="rise-in rounded-lg bg-surface px-3 py-2">
                     <p className="text-sm font-medium text-fg">{locale === "fr" ? d.fr : d.en}</p>
                     <p className="mt-0.5 text-xs text-fg-subtle">
@@ -317,6 +380,31 @@ export function OnboardingWizard({
               </ul>
             )}
           </div>
+
+          {/* What we fetch from the DGI ourselves. Shown to the client so they
+              can see it is being handled, and shown separately so nobody reads
+              it as something they have to find. */}
+          {retrieved.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-text">
+                {labels.firmRetrieved}
+              </p>
+              <p className="mt-1 text-xs text-fg-subtle">{labels.firmRetrievedHint}</p>
+              <ul className="mt-2 flex flex-col gap-2">
+                {retrieved.map((d) => (
+                  <li
+                    key={d.key}
+                    className="rise-in rounded-lg border border-teal/40 bg-surface px-3 py-2"
+                  >
+                    <p className="text-sm font-medium text-fg">{locale === "fr" ? d.fr : d.en}</p>
+                    <p className="mt-0.5 text-xs text-fg-subtle">
+                      {locale === "fr" ? d.reasonFr : d.reasonEn}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="border-t border-border pt-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-text">

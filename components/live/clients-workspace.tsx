@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/toast";
 import { OnboardingWizard, type WizardLabels } from "@/components/live/onboarding-wizard";
+import {
+  deriveSegments,
+  segmentLabel,
+  type AccountProfile,
+  type Segment,
+} from "@/lib/crm";
 
 /**
  * The firm's client list, with onboarding attached.
@@ -18,9 +25,36 @@ type TaxpayerRow = {
   contact_name: string | null;
   contact_email: string | null;
   tax_centre: string | null;
+  taxpayer_type: string | null;
+  tax_regime: string | null;
+  accounting_framework: string | null;
   profile_verified: boolean;
   onboarded_at: string | null;
 };
+
+/**
+ * Tone classes for a derived segment. Design tokens, never raw hex, so a
+ * segment stays legible when the theme flips.
+ */
+const TONE: Record<Segment["tone"], string> = {
+  navy: "border-navy/30 bg-navy-soft text-navy",
+  teal: "border-teal/40 bg-teal-soft text-teal-text",
+  amber: "border-amber/40 bg-amber-soft text-amber-text",
+  danger: "border-danger-text/40 bg-danger-soft text-danger-text",
+  neutral: "border-border bg-surface-sunken text-fg-muted",
+};
+
+const segmentsOf = (c: TaxpayerRow): Segment[] =>
+  deriveSegments({
+    id: c.id,
+    legal_name: c.legal_name,
+    taxpayer_type: (c.taxpayer_type as AccountProfile["taxpayer_type"]) ?? null,
+    tax_regime: (c.tax_regime as AccountProfile["tax_regime"]) ?? null,
+    tax_centre: (c.tax_centre as AccountProfile["tax_centre"]) ?? null,
+    accounting_framework:
+      (c.accounting_framework as AccountProfile["accounting_framework"]) ?? null,
+    profile_verified: c.profile_verified,
+  });
 
 export function ClientsWorkspace({
   locale,
@@ -35,11 +69,49 @@ export function ClientsWorkspace({
     noCentre: string;
     connecting: string;
     offline: string;
+    emailClient: string;
+    emailSent: string;
+    emailNone: string;
+    emailNoAddress: string;
+    emailBlocked: string;
   };
+  locale2?: "fr" | "en";
 }) {
+  const toast = useToast();
   const [clients, setClients] = useState<TaxpayerRow[] | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState(false);
+  const [sending, setSending] = useState<string | null>(null);
+
+  /**
+   * Chase a client by email. The endpoint takes a taxpayer id, not an address,
+   * and reads the recipient from the database — so this button cannot be
+   * turned into a way to mail arbitrary people.
+   */
+  async function chase(id: string) {
+    setSending(id);
+    try {
+      const res = await fetch("/api/inquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taxpayerId: id, locale }),
+      });
+      const data = (await res.json()) as { error?: string; count?: number };
+      if (res.ok) {
+        toast(`${labels.emailSent} (${data.count})`);
+      } else if (data.error === "nothing_outstanding") {
+        toast(labels.emailNone, "info");
+      } else if (data.error === "no_contact_email") {
+        toast(labels.emailNoAddress, "error");
+      } else {
+        toast(labels.emailBlocked, "error");
+      }
+    } catch {
+      toast(labels.emailBlocked, "error");
+    } finally {
+      setSending(null);
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -47,7 +119,7 @@ export function ClientsWorkspace({
       const { data } = await db
         .from("taxpayers")
         .select(
-          "id, legal_name, contact_name, contact_email, tax_centre, profile_verified, onboarded_at",
+          "id, legal_name, contact_name, contact_email, tax_centre, taxpayer_type, tax_regime, accounting_framework, profile_verified, onboarded_at",
         )
         .order("legal_name");
       const { data: reqs } = await db.from("document_requests").select("taxpayer_id, status");
@@ -112,18 +184,50 @@ export function ClientsWorkspace({
                 </span>
               </div>
 
+              {/* Derived segments, not typed tags. The regime, the centre and
+                  the cadence all come from the verified profile through one
+                  function, so a card can never disagree with the rules — and a
+                  segment resting on an unverified field is drawn dashed, so
+                  reported information never reads as confirmed fact. */}
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                {!c.profile_verified && (
-                  <span className="rounded-full border border-dashed border-amber-text/40 bg-amber-soft px-2 py-0.5 text-xs font-semibold text-amber-text">
-                    {labels.unverified}
+                {segmentsOf(c).map((s) => (
+                  <span
+                    key={`${s.kind}:${s.code}`}
+                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${TONE[s.tone]} ${
+                      s.verified ? "" : "border-dashed"
+                    }`}
+                  >
+                    {segmentLabel(s, locale)}
                   </span>
-                )}
+                ))}
                 {(counts[c.id] ?? 0) > 0 && (
                   <span className="rounded-full bg-navy-soft px-2 py-0.5 text-xs font-semibold text-navy">
                     {counts[c.id]} {labels.openRequests}
                   </span>
                 )}
               </div>
+
+              {(counts[c.id] ?? 0) > 0 && c.contact_email && (
+                <button
+                  type="button"
+                  disabled={sending === c.id}
+                  onClick={() => void chase(c.id)}
+                  className="mt-3 inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg transition-colors hover:bg-surface-sunken disabled:opacity-60"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    aria-hidden="true"
+                  >
+                    <rect x="2" y="3.5" width="12" height="9" rx="1.5" />
+                    <path d="m2.5 4.5 5.5 4 5.5-4" />
+                  </svg>
+                  {labels.emailClient}
+                </button>
+              )}
             </li>
           ))}
         </ul>

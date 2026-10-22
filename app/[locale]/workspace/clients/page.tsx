@@ -36,6 +36,8 @@ export default function ClientsPage({ params }: { params: { locale: string } }) 
           cancel: o.cancel,
           derived: o.derived,
           derivedHint: o.derivedHint,
+          firmRetrieved: o.firmRetrieved,
+          firmRetrievedHint: o.firmRetrievedHint,
           reviewer: o.reviewer,
           reviewerHint: o.reviewerHint,
           required: o.required,
@@ -49,6 +51,11 @@ export default function ClientsPage({ params }: { params: { locale: string } }) 
           noCentre: o.noCentre,
           connecting: t.work.connecting,
           offline: t.work.offline,
+          emailClient: w.firm.inbox.emailClient,
+          emailSent: w.firm.inbox.emailSent,
+          emailNone: w.firm.inbox.emailNone,
+          emailNoAddress: w.firm.inbox.emailNoAddress,
+          emailBlocked: w.firm.inbox.emailBlocked,
         }}
       />
     </div>

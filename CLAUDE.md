@@ -30,11 +30,19 @@ Phase 1 deliverables live in `docs/foundation/`:
 - `sitemap.md` — deliverable C: every route, four trust boundaries, locale parity
 - `erd.md` — deliverable E: the thirty entities, the scoping model, the two-status decision
 - `permissions-matrix.md` — deliverable F: roles, conditions, required negative tests
-- `risk-register.md` — deliverable I: thirty-five risks with phase gates
+- `risk-register.md` — deliverable I: thirty-nine risks with phase gates
 - `portal-patterns-research.md` — how PwC Connect, Engagement Center, EY Canvas, KPMG
   Clara and the mid-market tools model client work, and what Kima adopts or rejects
 - `sage-dsf-ingestion-research.md` — Sage export formats, DSF workbooks, intake channels and
   parsing rules, with every claim labelled VERIFIED / INFERRED / UNKNOWN
+- `practitioner-notes-2026-10-21.md` — the second Irina session: document acceptance as
+  three verdicts, the regimes, the deadlines, and the client-portal structure. Every claim
+  labelled, and the four conflations it exposed
+- `cameroon-rule-corpus-research.md` — the rule corpus with legal sources, effective dates
+  and verification status. **Read before touching any rule.** Most of it is `inferred` and
+  therefore inactive, which is the constraint working, not a gap to fill
+- `harmony2-dgi-platform-research.md` — the DGI's Harmony 2 platform: the portal map, what
+  it streamlines, and the line between retrieving a document and claiming an integration
 
 Still outstanding from blueprint §20: A (software PRD), B (backlog with acceptance
 tests), D (journey diagrams), G (component UI/UX specification), H (technical
@@ -68,6 +76,22 @@ These come from the blueprint and are not negotiable for convenience:
 - **Never claim government integration.** No DGI API access, e-filing
   capability, authorization or partnership may be represented as established
   without written verification.
+- **Four axes, never collapsed:** taxpayer type (who they are — known at sign-up,
+  drives the portal), tax regime (réel or IGS — drives *which* obligations exist),
+  tax centre (DGE / CIME / CDI — drives *when* the DSF is due), accounting framework
+  (drives the DSF template). They correlate strongly. "IGS files on 15 May" is right
+  in practice and wrong in mechanism; the centre governs the date. See
+  `practitioner-notes-2026-10-21.md` §3.
+- **The impôt libératoire and the régime simplifié are abolished** — replaced by the
+  **IGS** (Impôt Général Synthétique) under the 2025 Finance Law. Never offer either as
+  a current choice. They stay selectable for historical periods only, via `effective_to`
+  in `lib/rules.ts`.
+- **A statutory deadline is not a fixed date.** Ministerial prorogations are routine
+  under art. 16 LF 2025. Resolve dates through `lib/rules.ts`, which reports whether a
+  date is statutory or prorogued and whether it can be relied on at all.
+- **A document carries three verdicts, not one** — accounting, charge deductibility, VAT
+  recovery — and they may disagree. A failed accounting verdict never discards the
+  document: it is recorded with its defect stated.
 - **Tax regime is not the DSF accounting format.** Model them separately. The
   system normal and the minimum cash-basis system (SMT) are not interchangeable
   labels for the real and simplified tax regimes. Do not infer a filing
