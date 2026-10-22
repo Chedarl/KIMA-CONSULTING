@@ -437,6 +437,36 @@ const fr = {
     haveAccount: "Vous avez déjà un dossier ?",
     signIn: "Accéder à votre espace",
   },
+
+  /** The work queue — the firm's spine. What is at risk, who owns it, what blocks it. */
+  queue: {
+    title: "File de travail",
+    subtitle: "Un dossier par obligation, par période. Le plus urgent en haut.",
+    openCases: "dossiers ouverts",
+    atRisk: "à risque",
+    unowned: "sans responsable",
+    riskOverdue: "En retard",
+    riskSoon: "Échéance proche",
+    riskUnknown: "Échéance à confirmer",
+    riskOnTrack: "Dans les temps",
+    dueOn: "Échéance",
+    provisional: "Date provisoire — règle non vérifiée",
+    owner: "Responsable",
+    noOwner: "Personne",
+    blocker: "Blocage",
+    noBlocker: "Aucun blocage signalé",
+    stage: "Étape",
+    clientSees: "Le client voit",
+    empty: "Aucun dossier ouvert.",
+    emptyHint:
+      "Les dossiers se génèrent à partir des obligations vérifiées du contribuable — il n'y a rien à configurer.",
+    generateTitle: "Dossiers proposés pour l'exercice",
+    generateHint:
+      "Déduits des obligations du client. Proposés, jamais créés automatiquement : un humain les ouvre.",
+    proposed: "proposés",
+    regime: "Régime",
+    offline: "Connexion indisponible.",
+  },
 };
 
 type WorkspaceDictionary = typeof fr;
@@ -848,6 +878,35 @@ const en: WorkspaceDictionary = {
       "Indicative only. An incomplete request is accepted: we will ask you for the rest.",
     haveAccount: "Already have a file with us?",
     signIn: "Go to your space",
+  },
+
+  queue: {
+    title: "Work queue",
+    subtitle: "One case per obligation, per period. The most urgent first.",
+    openCases: "open cases",
+    atRisk: "at risk",
+    unowned: "unowned",
+    riskOverdue: "Overdue",
+    riskSoon: "Due soon",
+    riskUnknown: "Deadline to confirm",
+    riskOnTrack: "On track",
+    dueOn: "Due",
+    provisional: "Provisional date — rule not verified",
+    owner: "Owner",
+    noOwner: "Nobody",
+    blocker: "Blocker",
+    noBlocker: "No blocker recorded",
+    stage: "Stage",
+    clientSees: "The client sees",
+    empty: "No open cases.",
+    emptyHint:
+      "Cases are generated from the taxpayer's verified obligations — there is nothing to configure.",
+    generateTitle: "Cases proposed for the year",
+    generateHint:
+      "Derived from the client's obligations. Proposed, never created automatically: a human opens them.",
+    proposed: "proposed",
+    regime: "Regime",
+    offline: "Connection unavailable.",
   },
 };
 
