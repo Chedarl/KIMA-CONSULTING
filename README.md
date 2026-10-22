@@ -429,9 +429,43 @@ The fourth tile reads **"At risk"**, not the boards' "Blocked cases": `risk()`
 already exists and is tested, while "blocked" would double-count the cases
 already in "waiting on clients".
 
+**Screen 08, the client dashboard, is built** (`components/live/client-dashboard.tsx`,
+mounted at `/[locale]/app`) and it is where the interaction rule is actually
+demonstrated rather than asserted. It reads the same rows the firm dashboard
+reads, and **it writes**: sending a document updates `document_requests.status`
+and records a `request_submitted` event with the CLIENT as actor.
+
+Verified in the browser with both screens open: clicking "Send this document"
+moved the request out of the client's action list (2 to 1), raised "documents
+sent" (2 to 3), and the firm's activity feed showed *"Document received: Bank
+statement — September · Mboa Traders SARL · Client sees this"* — with no
+refresh, and nobody re-keying anything.
+
+Three rules the screen enforces in its own right:
+
+- **Received is not accepted.** Sending moves a request to `submitted`, never
+  `accepted`. The client cannot approve their own document, the case stays
+  blocked, and the screen says so in words instead of letting a green tick
+  imply it.
+- **It shows the client vocabulary, not ours.** The boards draw the progress
+  tracker from the firm's internal stages (documents, preparation, review,
+  filing). Those are ours. The rail is built from the five client-facing
+  states: it looks the same and does not leak which draft went back to whom.
+- **The name comes from the record**, not from a translation file. The shell no
+  longer greets by name on every page — the same duplicate-greeting defect the
+  firm side had, where a static "Welcome back" fought a computed one.
+
+It subscribes to `document_requests`, `case_events` and `compliance_cases`, so
+an accountant's decision reaches the client without either of them pressing
+anything.
+
 **Remaining screens**: 01 registration · 02 business onboarding · 04 client 360
-· 05 document centre · 06 compliance case · 07 review and filing · 08 client
-dashboard · 09 mobile portal · 10 delivery and archive.
+· 05 document centre · 06 compliance case · 07 review and filing · 09 mobile
+portal · 10 delivery and archive.
+
+**Still missing on this screen**: "Send this document" records that a document
+was sent; it does not yet carry a file. Storage wiring and the assisted/paper
+intake path are their own piece of work.
 
 **Known open items**
 
