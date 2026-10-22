@@ -119,6 +119,78 @@ export type CaseTask = {
   completed_at: string | null;
 };
 
+/**
+ * The request lifecycle. `returned` is first-class: work comes back.
+ *
+ * Defined here, once. It previously existed three times -- in the seed data, in
+ * the Supabase row types, and implicitly in two components' hard-coded arrays --
+ * which is the same duplication that let display labels be stored where the
+ * engine expected codes. One vocabulary, one place.
+ */
+export type RequestStatus =
+  | "requested"
+  | "in_progress"
+  | "in_client_review"
+  | "returned"
+  | "submitted"
+  | "accepted";
+
+/**
+ * A request for one document, serving one case.
+ *
+ * A request carries NO period of its own. It inherits the period from the case
+ * it serves, which is why `case_id` matters beyond tidiness: an unattached
+ * request is a document nobody can say which return it belongs to. The database
+ * holds the same link as a composite foreign key on (case_id, taxpayer_id), so
+ * a request cannot attach to another taxpayer's case even by direct SQL.
+ */
+export type CaseRequest = {
+  id: string;
+  case_id: string | null;
+  taxpayer_id: string;
+  label_fr: string;
+  label_en: string;
+  status: RequestStatus;
+  responsible: "taxpayer" | "firm";
+  due_on: string;
+  returned_count: number;
+};
+
+export const REQUEST_STATUS_LABELS: Record<RequestStatus, { fr: string; en: string }> = {
+  requested: { fr: "Demandée", en: "Requested" },
+  in_progress: { fr: "En cours", en: "In progress" },
+  in_client_review: { fr: "À valider", en: "In client review" },
+  returned: { fr: "À reprendre", en: "Returned" },
+  submitted: { fr: "Reçue", en: "Submitted" },
+  accepted: { fr: "Acceptée", en: "Accepted" },
+};
+
+export const requestStatusLabel = (s: RequestStatus, locale: "fr" | "en") =>
+  locale === "fr" ? REQUEST_STATUS_LABELS[s].fr : REQUEST_STATUS_LABELS[s].en;
+
+/**
+ * Open means the document is not yet settled.
+ *
+ * `submitted` counts as open on purpose: a document has arrived but nobody has
+ * accepted it, and doing the accounts on unreviewed pieces is precisely the
+ * mistake the three-verdict review exists to prevent.
+ */
+export const requestIsOpen = (s: RequestStatus): boolean => s !== "accepted";
+
+/**
+ * Still owed by somebody -- as distinct from merely unsettled.
+ *
+ * A `submitted` document has arrived and is waiting on US to review it. It is
+ * open, but it is not outstanding, and a client count that conflates the two
+ * tells a client they owe something they already sent. The two notions are
+ * named apart because both are needed and neither is the other.
+ */
+export const requestIsOutstanding = (s: RequestStatus): boolean =>
+  s !== "accepted" && s !== "submitted";
+
+export const openRequests = <T extends Pick<CaseRequest, "status">>(requests: T[]): T[] =>
+  requests.filter((r) => requestIsOpen(r.status));
+
 export type ComplianceCase = {
   id: string;
   taxpayer_id: string;
@@ -225,9 +297,16 @@ export const CLIENT_STATUS_LABELS: Record<ClientStatus, { fr: string; en: string
  * not the client's fault and must not be shown as though it were — that is how
  * a portal quietly blames the customer for the firm's own backlog.
  */
-export function clientStatus(c: Pick<ComplianceCase, "stage" | "blocker">): ClientStatus {
+export function clientStatus(
+  c: Pick<ComplianceCase, "stage" | "blocker">,
+  blocker?: DerivedBlocker | null,
+): ClientStatus {
   switch (c.stage) {
     case "documents":
+      // When the structured blocker is available it decides, because it knows
+      // WHOSE court the ball is in; the free-text column only knows that
+      // something is wrong. Absent it, the old reading stands.
+      if (blocker !== undefined) return blocker?.waiting_on === "client" ? "waiting_on_you" : "in_progress";
       return c.blocker ? "waiting_on_you" : "in_progress";
     case "accounting":
     case "preparation":
@@ -257,6 +336,8 @@ export type AdvanceInput = {
   findings?: Finding[];
   /** The filing and payment dimensions, needed to gate delivery. */
   filing?: Pick<ComplianceCase, "filing_status" | "payment_evidence_status">;
+  /** The requests attached to this case, needed to gate leaving `documents`. */
+  requests?: Pick<CaseRequest, "status">[];
   at?: string;
 };
 
@@ -264,7 +345,12 @@ export type AdvanceResult =
   | { ok: true; patch: Partial<ComplianceCase> }
   | {
       ok: false;
-      reason: "not_allowed" | "blocked_by_findings" | "owner_required" | "filing_not_verified";
+      reason:
+        | "not_allowed"
+        | "blocked_by_findings"
+        | "documents_outstanding"
+        | "owner_required"
+        | "filing_not_verified";
     };
 
 /** The default when a caller supplies no filing information: assume nothing. */
@@ -290,6 +376,21 @@ export function advance(
 
   if (current.stage === "review" && input.to === "filing") {
     if (hasBlocking(input.findings ?? [])) return { ok: false, reason: "blocked_by_findings" };
+  }
+
+  // THE SECOND GATE: the accounts are not started on documents nobody has
+  // accepted. `submitted` is not `accepted`, and the difference is the whole
+  // point of reviewing a piece before it reaches the ledger.
+  //
+  // Note the asymmetry with delivery below. Here, requests nobody supplied mean
+  // no gate; there, filing information nobody supplied means refusal. The rule
+  // is which way the mistake points: this move is internal and reversible, and
+  // refusing it on absent information would stop work for no reason. Delivery
+  // asserts an outcome to a client, so its safe default is "we do not know".
+  if (current.stage === "documents" && input.to === "accounting" && input.requests) {
+    if (openRequests(input.requests).length > 0) {
+      return { ok: false, reason: "documents_outstanding" };
+    }
   }
 
   // Delivery asserts an outcome to the client, so it waits on the
@@ -633,19 +734,117 @@ export const AUTHORITY_LABELS: Record<AuthorityProblem, { fr: string; en: string
 export const authorityLabel = (p: AuthorityProblem, locale: "fr" | "en") =>
   locale === "fr" ? AUTHORITY_LABELS[p].fr : AUTHORITY_LABELS[p].en;
 
+export type BlockerSource = "task" | "request";
+
+export type DerivedBlocker = {
+  source: BlockerSource;
+  /**
+   * Whose court the ball is in.
+   *
+   * Load-bearing, not decorative: `clientStatus` reads it to decide whether to
+   * tell a client we are waiting for them. A document they have already sent
+   * still blocks the case -- but it blocks it on US, and saying otherwise in a
+   * portal is both wrong and insulting.
+   */
+  waiting_on: "client" | "firm";
+  due_on: string | null;
+  fr: string;
+  en: string;
+};
+
 /**
- * The case's blocker, derived from its open blocking tasks.
+ * The case's blocker, derived from its open blocking work.
  *
  * Derived rather than typed, so the queue's one-line reason cannot drift from
- * the task list it claims to summarise — the same mistake as a typed regime
- * tag beside a verified one. The earliest-due blocking task wins, because that
- * is the one actually holding things up.
+ * the list it claims to summarise -- the same mistake as a typed regime tag
+ * beside a verified one. The earliest-due item wins across BOTH tasks and
+ * outstanding requests, because a practitioner does not care which table a
+ * blocker lives in; they care what is holding the case up.
+ *
+ * Bilingual, because a request's label is bilingual and a blocker rendered in
+ * one language is a blocker half the users cannot read. A task's title is
+ * whatever the person typed, so it is reported unchanged in both.
  */
-export function deriveBlocker(tasks: CaseTask[]): string | null {
-  const blocking = tasks
-    .filter((t) => t.state === "open" && t.is_blocking)
-    .sort((a, b) => (a.due_on ?? "9999-12-31").localeCompare(b.due_on ?? "9999-12-31"));
-  return blocking[0]?.title ?? null;
+export function deriveBlocker(input: {
+  tasks?: CaseTask[];
+  requests?: CaseRequest[];
+}): DerivedBlocker | null {
+  const candidates: DerivedBlocker[] = [];
+
+  for (const t of input.tasks ?? []) {
+    if (t.state === "open" && t.is_blocking) {
+      // Tasks are the firm's own work. A task assigned to a client is not a
+      // thing this model has -- that is what a request is for.
+      candidates.push({
+        source: "task",
+        waiting_on: "firm",
+        due_on: t.due_on,
+        fr: t.title,
+        en: t.title,
+      });
+    }
+  }
+
+  for (const r of input.requests ?? []) {
+    if (!requestIsOpen(r.status)) continue;
+    // A returned document is named as such: the client has already sent
+    // something, and being told "we are waiting for X" with no mention that it
+    // came back is how a portal reads as indifferent.
+    const back = r.status === "returned";
+    candidates.push({
+      source: "request",
+      // Once it has been submitted it is ours to review, whoever was asked for
+      // it. Before that, whoever is responsible still owes it.
+      waiting_on: r.status === "submitted" ? "firm" : r.responsible === "taxpayer" ? "client" : "firm",
+      due_on: r.due_on,
+      fr: back ? "À reprendre : " + r.label_fr : r.label_fr,
+      en: back ? "Needs redoing: " + r.label_en : r.label_en,
+    });
+  }
+
+  candidates.sort((a, b) => (a.due_on ?? "9999-12-31").localeCompare(b.due_on ?? "9999-12-31"));
+  return candidates[0] ?? null;
+}
+
+/**
+ * What to show as the case's blocker, in one place.
+ *
+ * The derived blocker wins over the `blocker` column because a derived value
+ * cannot go stale, while a hand-written note survives long after the thing it
+ * described was resolved. The column remains the fallback for what is not yet
+ * modelled as a task -- it is a note, not a second source of truth.
+ */
+export function effectiveBlocker(
+  c: Pick<ComplianceCase, "blocker">,
+  work: { tasks?: CaseTask[]; requests?: CaseRequest[] },
+  locale: "fr" | "en",
+): string | null {
+  const derived = deriveBlocker(work);
+  if (derived) return locale === "fr" ? derived.fr : derived.en;
+  return c.blocker?.trim() || null;
+}
+
+export type AttachProblem = "wrong_taxpayer" | "case_closed" | "already_attached";
+
+/**
+ * Attach a request to the case it serves.
+ *
+ * The taxpayer check duplicates the composite foreign key on purpose: the
+ * database makes a cross-taxpayer attachment impossible, and this makes it
+ * explicable. A caller gets a named reason instead of a constraint violation.
+ *
+ * Re-attaching a request that already belongs to another case is refused rather
+ * than silently moved, because a document that quietly changes which period it
+ * supports is how a return ends up filed against evidence for a different one.
+ */
+export function attachRequest(
+  c: Pick<ComplianceCase, "id" | "taxpayer_id" | "stage" | "closed_at">,
+  r: Pick<CaseRequest, "id" | "case_id" | "taxpayer_id">,
+): { ok: true; patch: { case_id: string } } | { ok: false; reason: AttachProblem } {
+  if (r.taxpayer_id !== c.taxpayer_id) return { ok: false, reason: "wrong_taxpayer" };
+  if (c.closed_at || isClosed(c.stage)) return { ok: false, reason: "case_closed" };
+  if (r.case_id && r.case_id !== c.id) return { ok: false, reason: "already_attached" };
+  return { ok: true, patch: { case_id: c.id } };
 }
 
 /** Open cases with nobody's name on them. Work nobody owns does not happen. */

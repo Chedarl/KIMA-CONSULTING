@@ -196,16 +196,22 @@ There is no test runner yet. The engines are pure functions, verified by
 compiling to a scratch directory and asserting under `node`:
 
 ```bash
-npx tsc lib/document-naming.ts lib/rules.ts lib/document-review.ts \
-  --outDir /tmp/kima-check --module commonjs --target es2020 \
-  --moduleResolution node --skipLibCheck
-node /tmp/kima-check/<harness>.js
+npx tsc lib/cases.ts lib/events.ts lib/rules.ts lib/diagnostics.ts \
+  lib/document-naming.ts --outDir <scratch> --module commonjs \
+  --target es2020 --skipLibCheck --esModuleInterop --strict
+node <scratch>/cases-check.js   # 86 assertions
+node <scratch>/f3-check.js      # 89 assertions
 ```
 
-67 assertions currently cover the rule packs, deadline resolution,
-prorogations, the naming grammar and the three verdicts. The pattern has
-already caught two real defects, so keep it: **add assertions with every rule
-change.** Promoting these to a real runner is open work.
+**Pass `--strict`.** Without it `tsc` ignores `tsconfig.json` and the
+discriminated-union narrowing in `advance()` stops working, so the harness
+compile reports errors the project build does not have.
+
+175 assertions currently cover the rule packs, deadline resolution,
+prorogations, the naming grammar, the three verdicts, the case engine, the
+event log and the request chain. The pattern has caught five real defects, so
+keep it: **add assertions with every rule change.** Promoting these to a real
+runner is open work.
 
 ### Verifying UI
 
@@ -249,10 +255,32 @@ Supabase project `kima-consulting`, ref `vhrnrbnjhmxrygvyfirf`, eu-west-3.
 
 > **Synthetic data only** (risk R-32). Never write real taxpayer data.
 
-RLS is enabled on every table. The one structural guarantee is a CHECK
-constraint: a declaration cannot be recorded as `filed` without its evidence
-reference, capture date and source — enforced against a direct SQL write, not
-only through the interface.
+RLS is enabled on every table, and the rules that matter are CHECK
+constraints rather than application conventions — each one verified against a
+direct SQL write, not only through the interface:
+
+| Guarantee | Enforced by |
+|---|---|
+| A declaration is never `filed` without evidence reference, capture date and source | `declarations` CHECK |
+| A case's filing is never `verified` without an evidence reference | `filing_verified_requires_evidence` |
+| A case is never delivered without a filing outcome | `delivery_requires_filing_outcome` |
+| An engagement fee is whole XAF, never a float | `fee_xaf integer`, `>= 0` |
+| A request can never attach to another taxpayer's case | composite FK `(case_id, taxpayer_id)` |
+| An internal event can never be marked client-visible | `event_visibility_allowed` |
+| Billing never appears in a compliance history | `event_billing_never_client_facing` |
+| Every change carries a name unless the actor is `system` | `event_actor_named` |
+
+**`case_events` is append-only.** No UPDATE or DELETE policy exists, and
+UPDATE, DELETE and TRUNCATE are revoked from `anon` and `authenticated`. The
+guarantee is precise: *no client key can rewrite or erase a case history.* The
+service role keeps its privileges, as migrations need them.
+
+**The log is not the truth — the case row is.** The log records what happened
+to it. Keeping both is what makes `drift()` possible: if a row says `verified`
+and no verification was ever logged, something wrote around the engine, and
+that is worth catching before a client is told their declaration was accepted.
+A dimension the log is silent about is *not* drift; silence is missing
+coverage, not a contradiction.
 
 **The migrations live in Supabase, not in this repo.** Export them into
 `supabase/migrations/` before anyone else needs to review the policies: a
@@ -279,6 +307,18 @@ the owner's machine — ask for a copy if you do not have it.
 - **F1 Registration** — public application at `/register`, four intake paths,
   lifecycle + KPI timestamps, verified end-to-end through the anonymous insert
   policy (41 assertions)
+- **F2 Case engine** (`lib/cases.ts`) — a case is one obligation × one taxpayer
+  × one period, **generated** from verified obligations rather than configured.
+  Stage flow that models work going backwards; the review → filing gate; the
+  four status dimensions kept apart (work · filed · tax paid · our fee paid);
+  the authority chain taxpayer → engagement → case → request; tasks and a
+  derived blocker (86 assertions)
+- **F3 Activity log** (`lib/events.ts`) — one change recorded once, read by
+  every surface. 33 event kinds with visibility derived from the kind and
+  mirrored by a SQL CHECK; refusals at the gates are recorded, not silent;
+  `drift()` reports where a row and its own history disagree; the request →
+  case chain with a composite FK and a second gate (documents → accounting is
+  refused while any attached document is unaccepted) (89 assertions)
 
 ### How work is built now
 
@@ -298,14 +338,26 @@ be exercised.
 
 **Next**
 
-- **F2 Firm case-management engine** — the spine of MVP 1. Cases, stages, owners
-  and blockers, generated from verified obligations rather than configured
-- **F3 Triage queue** — the firm's side of registration, with the first-response
+- **F4 Roles and permissions** — the biggest remaining backend gap, and the one
+  that is painful to retrofit because it shapes every query. The `actor_role`
+  enum already exists (`client`, `firm_staff`, `firm_reviewer`, `firm_partner`,
+  `kima_admin`, `system`); permissions will reuse it rather than inventing a
+  second vocabulary
+- **F5 The seven error scenarios** (handoff spec §7) as real states rather than
+  as UI copy — DGI outage mid-submission, a document that arrives by WhatsApp
+  with no request, a revoked engagement mid-period, and the rest
+- **F6 Triage queue** — the firm's side of registration, with the first-response
   target shown at the point of work
-- **F4 KPI standard** — `docs/foundation/client-registration-standard.md`, each
+- **F7 KPI standard** — `docs/foundation/client-registration-standard.md`, each
   KPI defined once and computed once in the `registration_kpis` view
-- **F5 Status tracker and archive** · then mobile capture, Dossier fiscal,
-  correction cases, e-invoicing readiness, a Gabon rule pack
+
+**Then the front end**, rebuilt to the supplied mockup — deliberately after the
+engine, on the owner's instruction. Three conflicts in that mockup must be
+settled before it is built, not during: it uses gold/amber as the primary CTA
+while blueprint §9 reserves amber for warnings; "100+ Clients supported · 95%
+On-time filings" are unsubstantiated and must go or be sourced; and "Filed on
+DGI (Harmony)" reads as a government integration we do not have and must not
+claim.
 
 **Known open items**
 
@@ -316,3 +368,10 @@ be exercised.
   contact address, keeping the number as the identifier
 - No test runner; the scratch-compile harnesses above are the current net
 - `docs/design/.../MASTER.md` is stale and contradicts blueprint §9
+- **The work queue still renders the `blocker` column, not `effectiveBlocker()`.**
+  The engine now derives a blocker from open tasks and requests and knows whose
+  court the ball is in; the queue has not been pointed at it yet. One surface
+  change, left for the front-end phase
+- `registration_kpis` is a SECURITY DEFINER view and `demo_taxpayer_id()` is
+  executable by `anon`. Both are deliberate for the single-tenant demo and both
+  must be revisited before a second tenant exists

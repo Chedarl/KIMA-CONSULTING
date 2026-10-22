@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { audit, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { hasBlocking, runDiagnostics, type Finding } from "@/lib/diagnostics";
+import { requestIsOutstanding, type RequestStatus } from "@/lib/cases";
 
 /**
  * Reviews and approvals, gated by diagnostics.
@@ -89,7 +90,7 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
         returned_count: number;
       }[]) {
         const slot = (tally[r.taxpayer_id] ??= { open: 0, returned: 0 });
-        if (["requested", "in_progress", "in_client_review", "returned"].includes(r.status)) {
+        if (requestIsOutstanding(r.status as RequestStatus)) {
           slot.open += 1;
         }
         if (r.returned_count > 0) slot.returned += 1;

@@ -35,15 +35,13 @@ export function supabase(): SupabaseClient {
 export const isSupabaseConfigured = () =>
   Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
+import type { RequestStatus } from "./cases";
+
 /* ------------------------------------------------------------------ types */
 
-export type RequestStatusRow =
-  | "requested"
-  | "in_progress"
-  | "in_client_review"
-  | "returned"
-  | "submitted"
-  | "accepted";
+// One vocabulary. The row type is the engine's type; a redeclared union here
+// would let the database and the engine disagree about what a status is.
+export type RequestStatusRow = RequestStatus;
 
 export type DocumentRequestRow = {
   id: string;

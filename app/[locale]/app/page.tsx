@@ -24,8 +24,8 @@ import {
   pick,
   readinessCategories,
   readinessPercent,
-  requestIsOpen,
 } from "@/lib/demo-data";
+import { requestIsOutstanding } from "@/lib/cases";
 
 /**
  * The client dashboard — a compliance control centre, not an accounting tool.
@@ -44,7 +44,7 @@ export default function ClientDashboard({ params }: { params: { locale: string }
   const c = w.client;
 
   const openRequests = documentRequests.filter(
-    (d) => requestIsOpen(d.status) && d.responsible === "taxpayer",
+    (d) => requestIsOutstanding(d.status) && d.responsible === "taxpayer",
   );
   const nextObligation = [...obligations]
     .filter((o) => o.state.kind !== "filed")

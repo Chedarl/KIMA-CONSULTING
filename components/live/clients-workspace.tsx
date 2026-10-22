@@ -10,6 +10,7 @@ import {
   type AccountProfile,
   type Segment,
 } from "@/lib/crm";
+import { requestIsOutstanding, type RequestStatus } from "@/lib/cases";
 
 /**
  * The firm's client list, with onboarding attached.
@@ -126,7 +127,7 @@ export function ClientsWorkspace({
 
       const tally: Record<string, number> = {};
       for (const r of (reqs ?? []) as { taxpayer_id: string; status: string }[]) {
-        if (["requested", "in_progress", "returned", "in_client_review"].includes(r.status)) {
+        if (requestIsOutstanding(r.status as RequestStatus)) {
           tally[r.taxpayer_id] = (tally[r.taxpayer_id] ?? 0) + 1;
         }
       }

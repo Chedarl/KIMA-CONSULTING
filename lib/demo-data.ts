@@ -66,14 +66,12 @@ export type DeclarationState =
 /** Derived from DeclarationState so the two can never drift apart. */
 export type StatusKind = "confirmed" | DeclarationState["kind"];
 
-/** The request lifecycle. `returned` is first-class: work comes back. */
-export type RequestStatus =
-  | "requested"
-  | "in_progress"
-  | "in_client_review"
-  | "returned"
-  | "submitted"
-  | "accepted";
+// The request lifecycle now lives in lib/cases.ts, with the engine that acts
+// on it. Re-exported here so the seed data keeps its familiar import, but
+// defined once -- a second copy is how the vocabulary drifts.
+import type { RequestStatus } from "./cases";
+export type { RequestStatus };
+export { requestIsOutstanding } from "./cases";
 
 /* ------------------------------------------------------- taxpayer requests */
 
@@ -132,8 +130,10 @@ export const documentRequests: DocumentRequest[] = [
   },
 ];
 
-export const requestIsOpen = (s: RequestStatus) =>
-  s === "requested" || s === "in_progress" || s === "in_client_review" || s === "returned";
+// `requestIsOpen` used to live here and meant "not yet submitted or accepted".
+// That is `requestIsOutstanding` in lib/cases.ts -- still owed by somebody.
+// The name moved because `open` there means something slightly wider, and two
+// functions with one name is worse than two names.
 
 /* ------------------------------------------------------------- obligations */
 
