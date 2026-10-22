@@ -290,7 +290,7 @@ A dimension the log is silent about is *not* drift; silence is missing
 coverage, not a contradiction.
 
 **Migration export is partial — see `supabase/migrations/README.md`**, which
-lists all 27 applied migrations and marks which eleven are in the repo. The rest
+lists all 28 applied migrations and marks which twelve are in the repo. The rest
 exist only in `supabase_migrations.schema_migrations`, and a policy that is not
 in version control cannot be reviewed in a pull request. That README carries the
 query to finish the export and two cautions about replaying these files.
@@ -414,6 +414,24 @@ claim.
   contact address, keeping the number as the identifier
 - No test runner; the scratch-compile harnesses above are the current net
 - `docs/design/.../MASTER.md` is stale and contradicts blueprint §9
-- `registration_kpis` is a SECURITY DEFINER view and `demo_taxpayer_id()` is
-  executable by `anon`. Both are deliberate for the single-tenant demo and both
-  must be revisited before a second tenant exists
+- **`activity_events` is a second, unstructured event log, still live.** Seven
+  components write pre-rendered `text_fr`/`text_en` sentences to it — no kind,
+  no visibility, no case link. It is exactly the failure `case_events` was built
+  to prevent, which is to say the problem is fixed in one place and still
+  present in another. Fold it in: give `case_events` a `taxpayer_id` and a
+  nullable `case_id`, move the seven writers, drop the table
+- **A write that reads back its own row now fails for an anonymous caller.**
+  `.insert(...).select()` needs SELECT, and several tables no longer grant it.
+  Nothing in the codebase does this today — every insert uses the default
+  `return=minimal` — but it is a trap worth knowing before someone adds one
+- The RLS helper functions (`can_see_taxpayer`, `member_has`,
+  `current_firm_role`, `client_taxpayer_ids`) sit in `public`, so PostgREST
+  exposes them as RPC endpoints. They cannot simply be revoked, because a
+  policy expression runs as the calling role and needs EXECUTE. The proper fix
+  is to move them to a schema PostgREST does not expose; it touches every
+  policy, so it is deliberate work rather than a quick patch
+- `portal_sign_in` is still callable. It is marked DEPRECATED in the database
+  and is the only thing keeping the current demo login working; it goes when
+  the sign-in screens are rebuilt
+- `demo_taxpayer_id()` is executable by `anon` — deliberate for the
+  single-tenant demo, and part of the branch that must be removed
