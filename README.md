@@ -397,13 +397,41 @@ Still open, and it is the honest limit of this increment:
   task fetch returns empty and the derived blocker falls back to requests.
   Correct behaviour, and a visible consequence of the above.
 
-**Then the front end**, rebuilt to the supplied mockup — deliberately after the
-engine, on the owner's instruction. Three conflicts in that mockup must be
-settled before it is built, not during: it uses gold/amber as the primary CTA
-while blueprint §9 reserves amber for warnings; "100+ Clients supported · 95%
-On-time filings" are unsubstantiated and must go or be sourced; and "Filed on
-DGI (Harmony)" reads as a government integration we do not have and must not
-claim.
+### The front end, against the ten-screen handoff
+
+Three conflicts in the supplied boards were settled before building rather than
+during:
+
+| Conflict | Resolution |
+|---|---|
+| Gold/amber as the primary CTA, while blueprint §9 reserves amber for warnings | **Amber stays the warning colour; CTAs use teal.** Otherwise "Upload document" and "Action needed" are the same colour on the same screen |
+| "200+ clients", "95% on-time filings" | **Removed unless sourced.** We have no such figures |
+| "Filed on DGI (Harmony)" | **Never used.** It reads as a government integration we do not have and are forbidden to claim. "Filing evidence recorded" says what is true |
+
+**Screen 03/05, the firm dashboard, is built** (`components/live/firm-dashboard.tsx`,
+mounted at `/[locale]/workspace`). It replaced a page that rendered
+`lib/demo-data` — a hand-written array that looked like a practice and answered
+to nothing. Every figure now comes from `compliance_cases`,
+`document_requests`, `case_tasks` and `case_events` through the same engines
+the rest of the product uses, which is the handoff's non-negotiable rule: the
+request an accountant raises is the record the client's portal shows.
+
+Two things it deliberately does NOT do:
+
+- **It does not invent movement.** The boards show a trend beside every tile
+  ("+2 this week"). Only "open cases" has the history to support one
+  (`opened_at`); the rest are absent rather than fabricated.
+- **It shows nothing rather than stale numbers** when the data cannot be
+  reached. A dashboard still displaying last week's figure during an outage is
+  how a deadline gets missed.
+
+The fourth tile reads **"At risk"**, not the boards' "Blocked cases": `risk()`
+already exists and is tested, while "blocked" would double-count the cases
+already in "waiting on clients".
+
+**Remaining screens**: 01 registration · 02 business onboarding · 04 client 360
+· 05 document centre · 06 compliance case · 07 review and filing · 08 client
+dashboard · 09 mobile portal · 10 delivery and archive.
 
 **Known open items**
 
