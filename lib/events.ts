@@ -699,6 +699,12 @@ export const describe = (e: CaseEvent, locale: "fr" | "en") =>
  * `Tracks`. Returns null when the log has nothing to say, which is different
  * from the value being unknown: a case opened before the log existed has no
  * entries and is not therefore in a bad state.
+ *
+ * CALLER CONTRACT: pass events ordered by `(occurred_at, created_at)`, which is
+ * what `order by occurred_at, created_at` gives you. The sort below is stable
+ * and `occurred_at` alone is not a total order — two events written in the same
+ * millisecond would otherwise resolve by whatever order the query happened to
+ * return, and `drift()` would report a contradiction that depends on luck.
  */
 export function latestValue(events: CaseEvent[], tracks: Exclude<Tracks, null>): string | null {
   const relevant = events
