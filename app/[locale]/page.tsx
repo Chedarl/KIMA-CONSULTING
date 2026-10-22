@@ -61,12 +61,21 @@ export default function OverviewPage({ params }: { params: { locale: string } })
         {/* The real front door for an existing client: name plus taxpayer
             number. Kept quieter than the two entrances above, which walk
             straight into the portals without signing in. */}
-        {/* A real tap target, not a bare inline link: this is the front door
-            for an existing client, and at 17px tall it failed the 44px rule. */}
-        <p className="mt-4">
+        {/* Two real doors, both proper tap targets. Applying comes first: a
+            visitor who has never dealt with us cannot sign in to anything. */}
+        <p className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+          <a
+            href={`/${locale}/register`}
+            className="inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 text-sm font-semibold text-white underline underline-offset-4 transition-colors hover:bg-white/10"
+          >
+            {getWorkspaceDictionary(locale).register.title}
+          </a>
+          <span className="text-white/40" aria-hidden="true">
+            ·
+          </span>
           <a
             href={`/${locale}/login`}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 text-sm font-semibold text-white underline underline-offset-4 transition-colors hover:bg-white/10"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 text-sm font-semibold text-white/85 underline underline-offset-4 transition-colors hover:bg-white/10 hover:text-white"
           >
             {getWorkspaceDictionary(locale).login.title}
           </a>

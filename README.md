@@ -73,6 +73,7 @@ platforms are national. So: one engine, six thin rule packs.
 | `lib/document-review.ts` | Three independent verdicts per document — accounting, charge deductibility, VAT recovery — which may disagree. A verdict resting on an unverified rule escalates instead of deciding |
 | `lib/document-naming.ts` | The filing framework: one grammar read in two directions. Folders are generated from the client's obligations, and the folder a document lands in decides its name |
 | `lib/crm.ts` | People and files. Contacts are many-to-many with taxpayers, because the SARL owner who also files IRPP is one person with two files. **Segments are derived, tags are typed** — a segment is computed from the verified profile and carries whether it is confirmed; a tag is whatever the firm decides |
+| `lib/registration.ts` | How a person approaches Kima. Lifecycle state machine with the KPI timestamps set in one place, so "time to first response" means the same thing everywhere. Everything an applicant types is a `declared_` claim until a reviewer confirms it. Completeness scoring is **advisory, never a submit gate** |
 | `lib/organizer.ts` | The intake questionnaire. Derives **documents only**, never obligations |
 | `lib/diagnostics.ts` | Pre-approval gating on a declaration |
 | `lib/portal-auth.ts` | Demo portal sign-in. **Read the security note in its header before extending it** |
@@ -91,6 +92,7 @@ Every route is locale-prefixed; `/` redirects to `/fr`.
 | Route | Surface |
 |---|---|
 | `/fr`, `/en` | Public overview |
+| `/fr/register` | **Public application** — four intake paths (online / WhatsApp / agency / referral). The only anonymous write path in the system |
 | `/fr/login` | Portal sign-in — name plus taxpayer number (demo posture, see R-36) |
 | `/fr/app` | Taxpayer portal — one next action, checklist, progress |
 | `/fr/app/{compliance,declarations,documents,messages,payments,archive}` | Client surfaces |
@@ -272,17 +274,37 @@ the owner's machine — ask for a copy if you do not have it.
 - **Phase 1b** — landing page rebuilt in the Cruip "Open" idiom on the Kima
   palette, with the reusable effect utilities above
 
+- **Phase 2** — client layer: contacts ⟷ taxpayers, per-link access, derived segments
+- **F1 Registration** — public application at `/register`, four intake paths,
+  lifecycle + KPI timestamps, verified end-to-end through the anonymous insert
+  policy (41 assertions)
+
+### How work is built now
+
+**MVP 1 is the frame** — firm case-management engine, assisted onboarding,
+client profiles, document inbox, requests, status tracker, archive — and every
+feature passes the same seven-step gate before the next one starts:
+
+> plan (`/ecc:plan`) → design sketch → schema (RLS + constraints) → pure engine
+> with `node` assertions → surface → review + browser check at four widths →
+> commit with this README updated in the same commit
+
+A feature is not done until step 7. This exists because the alternative already
+bit us: engines shipped with no UI for several commits, and a client list
+rendering against seed data that stored display labels where the engine expected
+codes — a defect that survived three commits because nothing forced the join to
+be exercised.
+
 **Next**
 
-- **Phase 2** — CRM foundation: `contacts`, `contact_account_links`, `tags`.
-  Account type is our five `TAXPAYER_TYPES`, not TaxDome's Individual /
-  Company / Other. Linked accounts matter because the SARL owner who also files
-  IRPP is one contact with two accounts
-- **Phase 3** — obligation-driven work engine (pipelines → stages → jobs),
-  generated from the rules rather than configured by the user
-- **Phase 4** mobile capture PWA · **Phase 5** dispute-file export ·
-  **Phase 6** e-invoicing readiness · **Phase 7** a Gabon rule pack, to prove
-  a second country is a data exercise and not a fork
+- **F2 Firm case-management engine** — the spine of MVP 1. Cases, stages, owners
+  and blockers, generated from verified obligations rather than configured
+- **F3 Triage queue** — the firm's side of registration, with the first-response
+  target shown at the point of work
+- **F4 KPI standard** — `docs/foundation/client-registration-standard.md`, each
+  KPI defined once and computed once in the `registration_kpis` view
+- **F5 Status tracker and archive** · then mobile capture, Dossier fiscal,
+  correction cases, e-invoicing readiness, a Gabon rule pack
 
 **Known open items**
 
