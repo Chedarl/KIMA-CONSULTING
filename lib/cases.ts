@@ -84,9 +84,46 @@ export type BillingStatus =
   | "paid"
   | "outstanding";
 
+/**
+ * The authority the firm acts under.
+ *
+ * An engagement used to be a status and two timestamps — a record that somebody
+ * said yes, but not what they said yes TO. Scope matters beyond tidiness: work
+ * outside an engagement is work nobody agreed to, and a client asked to pay for
+ * it has a fair complaint.
+ */
+export type Engagement = {
+  id: string;
+  taxpayer_id: string;
+  status: string;
+  service_code: string | null;
+  scope_note: string | null;
+  /** Integer XAF. Zero-decimal currency, never a float. */
+  fee_xaf: number | null;
+  assigned_to: string | null;
+  authorized_at: string | null;
+  accepted_at: string | null;
+  revoked_at: string | null;
+};
+
+/** The unit a person actually picks up. */
+export type CaseTask = {
+  id: string;
+  case_id: string;
+  title: string;
+  detail: string | null;
+  assigned_to: string | null;
+  state: "open" | "done" | "cancelled";
+  is_blocking: boolean;
+  due_on: string | null;
+  completed_at: string | null;
+};
+
 export type ComplianceCase = {
   id: string;
   taxpayer_id: string;
+  /** The engagement authorising this work. Null means nobody authorised it. */
+  engagement_id: string | null;
   obligation_code: string;
   period_token: string;
   due_on: string | null;
@@ -535,6 +572,80 @@ export function queueOrder<T extends Parameters<typeof risk>[0]>(cases: T[], tod
     if (ra !== rb) return ra - rb;
     return (a.due_on ?? "9999-12-31").localeCompare(b.due_on ?? "9999-12-31");
   });
+}
+
+// ---------------------------------------------------------------------------
+// Authority and blockers
+// ---------------------------------------------------------------------------
+
+export type AuthorityProblem =
+  | "no_engagement"
+  | "engagement_revoked"
+  | "engagement_not_authorized"
+  | "out_of_scope";
+
+/**
+ * May the firm work this case at all?
+ *
+ * Checked separately from the stage flow, because "can this move forward" and
+ * "were we ever allowed to touch it" are different questions with different
+ * answers. A revoked engagement does not make the work invalid retroactively —
+ * it makes continuing it unauthorised, which is why this reports rather than
+ * mutating anything.
+ *
+ * Returns null when the work is properly authorised.
+ */
+export function authorityCheck(
+  c: Pick<ComplianceCase, "engagement_id" | "obligation_code">,
+  engagement: Engagement | null | undefined,
+): AuthorityProblem | null {
+  if (!c.engagement_id || !engagement) return "no_engagement";
+  if (engagement.revoked_at) return "engagement_revoked";
+  if (!engagement.authorized_at) return "engagement_not_authorized";
+  // Scope is only enforced where it was actually stated. An engagement with no
+  // service recorded is incomplete, not a licence to refuse all work — that
+  // gap is surfaced by `no_engagement`-adjacent review, not by blocking here.
+  if (engagement.service_code && engagement.service_code !== c.obligation_code) {
+    return "out_of_scope";
+  }
+  return null;
+}
+
+export const AUTHORITY_LABELS: Record<AuthorityProblem, { fr: string; en: string }> = {
+  no_engagement: {
+    fr: "Aucune lettre de mission : travail non autorisé.",
+    en: "No engagement on record: this work is unauthorised.",
+  },
+  engagement_revoked: {
+    fr: "Mission révoquée : ne pas poursuivre sans nouvelle autorisation.",
+    en: "Engagement revoked: do not continue without fresh authorisation.",
+  },
+  engagement_not_authorized: {
+    fr: "Mission non encore autorisée par le client.",
+    en: "Engagement not yet authorised by the client.",
+  },
+  out_of_scope: {
+    fr: "Hors du périmètre de la mission acceptée.",
+    en: "Outside the scope of the accepted engagement.",
+  },
+};
+
+export const authorityLabel = (p: AuthorityProblem, locale: "fr" | "en") =>
+  locale === "fr" ? AUTHORITY_LABELS[p].fr : AUTHORITY_LABELS[p].en;
+
+/**
+ * The case's blocker, derived from its open blocking tasks.
+ *
+ * Derived rather than typed, so the queue's one-line reason cannot drift from
+ * the task list it claims to summarise — the same mistake as a typed regime
+ * tag beside a verified one. The earliest-due blocking task wins, because that
+ * is the one actually holding things up.
+ */
+export function deriveBlocker(tasks: CaseTask[]): string | null {
+  const blocking = tasks
+    .filter((t) => t.state === "open" && t.is_blocking)
+    .sort((a, b) => (a.due_on ?? "9999-12-31").localeCompare(b.due_on ?? "9999-12-31"));
+  return blocking[0]?.title ?? null;
 }
 
 /** Open cases with nobody's name on them. Work nobody owns does not happen. */

@@ -57,7 +57,7 @@ export function WorkQueue({ locale, t }: { locale: "fr" | "en"; t: Dict["queue"]
       const { data, error } = await db
         .from("compliance_cases")
         .select(
-          "id, taxpayer_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at",
+          "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status",
         )
         .is("closed_at", null);
       if (error) throw error;
