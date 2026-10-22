@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Card, CardHeader } from "@/components/ui";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
@@ -198,9 +199,12 @@ export function WorkQueue({ locale, t }: { locale: "fr" | "en"; t: Dict["queue"]
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-display text-sm font-semibold text-fg">
+                        <Link
+                          href={`/${locale}/workspace/cases/${c.id}`}
+                          className="font-display text-sm font-semibold text-fg hover:text-navy hover:underline"
+                        >
                           {obligationLabel(c.obligation_code, locale)}
-                        </p>
+                        </Link>
                         <p className="mt-0.5 font-mono text-xs text-fg-subtle">
                           {c.period_token}
                           {c.taxpayer_name ? ` · ${c.taxpayer_name}` : ""}

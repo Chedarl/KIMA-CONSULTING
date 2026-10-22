@@ -516,6 +516,58 @@ export function advance(
   return { ok: true, patch };
 }
 
+/**
+ * Why a move was refused, in words a practitioner can act on.
+ *
+ * Here rather than in a component because two surfaces already need them and
+ * a refusal explained differently in two places is a refusal nobody trusts.
+ * `*_not_checked` reads as a fault in the application, which is exactly what it
+ * is: a caller that did not supply the facts the gate needs. Saying so is
+ * better than inventing a business reason for a programming slip.
+ */
+export const ADVANCE_REFUSAL_LABELS: Record<
+  Extract<AdvanceResult, { ok: false }>["reason"],
+  { fr: string; en: string }
+> = {
+  not_allowed: {
+    fr: "Ce mouvement n'existe pas depuis cette étape.",
+    en: "That move does not exist from this stage.",
+  },
+  blocked_by_findings: {
+    fr: "Un contrôle bloquant est ouvert : il doit être levé avant la revue.",
+    en: "A blocking check is open: it has to be cleared before review passes.",
+  },
+  documents_outstanding: {
+    fr: "Des pièces ne sont pas encore acceptées. Reçu ne veut pas dire accepté.",
+    en: "Documents are not yet accepted. Received does not mean accepted.",
+  },
+  documents_not_checked: {
+    fr: "Les pièces du dossier n'ont pas été consultées — anomalie technique.",
+    en: "The case's documents were not read — an application fault.",
+  },
+  approval_not_checked: {
+    fr: "Aucune décision de revue fournie — anomalie technique.",
+    en: "No review decision supplied — an application fault.",
+  },
+  self_approval_refused: {
+    fr: "Auto-validation refusée : une autre personne doit valider cette revue.",
+    en: "Self-approval refused: somebody else has to pass this review.",
+  },
+  owner_required: {
+    fr: "Ce dossier n'a pas de responsable.",
+    en: "This case has nobody responsible for it.",
+  },
+  filing_not_verified: {
+    fr: "Dépôt non vérifié : la livraison attend l'accusé de réception.",
+    en: "Filing not verified: delivery waits on the acknowledgment.",
+  },
+};
+
+export const advanceRefusalLabel = (
+  reason: Extract<AdvanceResult, { ok: false }>["reason"],
+  locale: "fr" | "en",
+) => (locale === "fr" ? ADVANCE_REFUSAL_LABELS[reason].fr : ADVANCE_REFUSAL_LABELS[reason].en);
+
 // ---------------------------------------------------------------------------
 // The other three dimensions
 // ---------------------------------------------------------------------------

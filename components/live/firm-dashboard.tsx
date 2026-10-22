@@ -300,7 +300,14 @@ export function FirmDashboard({
                         const r = risk(c, today);
                         return (
                           <tr key={c.id} className="border-b border-border/60 last:border-0">
-                            <td className="py-3 pr-3 font-medium text-fg align-top">{nameOf(c)}</td>
+                            <td className="py-3 pr-3 align-top font-medium">
+                              <Link
+                                href={`/${locale}/workspace/cases/${c.id}`}
+                                className="text-fg hover:text-navy hover:underline"
+                              >
+                                {nameOf(c)}
+                              </Link>
+                            </td>
                             <td className="py-3 pr-3 text-fg-muted">
                               {obligationLabel(c.obligation_code, locale)}
                               <span className="ml-1.5 font-mono text-xs text-fg-subtle">
@@ -343,7 +350,12 @@ export function FirmDashboard({
                     return (
                       <li key={c.id} className="rounded-card border border-border bg-surface p-3">
                         <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="font-medium text-fg">{nameOf(c)}</p>
+                          <Link
+                            href={`/${locale}/workspace/cases/${c.id}`}
+                            className="font-medium text-fg hover:text-navy hover:underline"
+                          >
+                            {nameOf(c)}
+                          </Link>
                           <span
                             className={`tnum shrink-0 rounded-full border px-2 py-0.5 font-mono text-xs font-semibold ${RISK_TONE[r]}`}
                           >
