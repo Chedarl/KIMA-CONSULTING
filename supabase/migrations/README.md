@@ -1,6 +1,6 @@
 # Migrations
 
-**Status: partial export (6 of 22). Do not treat this directory as the whole schema yet.**
+**Status: partial export (8 of 24). Do not treat this directory as the whole schema yet.**
 
 The database of record is the Supabase project `kima-consulting`
 (`vhrnrbnjhmxrygvyfirf`, eu-west-3). Migrations were applied through the
@@ -35,6 +35,8 @@ directory is closing.
 | 20261022134826 | `case_events_revoke_truncate` | ✅ |
 | 20261022142916 | `firm_members_and_separation_of_duties` | ✅ |
 | 20261022143324 | `event_kind_self_approval_disclosed` | ✅ |
+| 20261022150100 | `firm_members_hide_email_from_clients` | ✅ |
+| 20261022150200 | `firm_members_column_grants_for_email` | ✅ |
 
 ## Finishing the export
 
@@ -48,7 +50,7 @@ from supabase_migrations.schema_migrations
 order by version;
 ```
 
-Two cautions learned while exporting the six below:
+Three cautions learned while exporting the eight below:
 
 - `array_to_string(...) || ';'` appends a semicolon to statements that already
   end in one, producing a trailing `;;`. Strip it.
@@ -56,6 +58,10 @@ Two cautions learned while exporting the six below:
   Several use bare `create type` and would fail on a second run; the earlier
   ones wrap it in `do $$ ... exception when duplicate_object` and would not.
   Do not assume `supabase db reset` works until that has been tested.
+- `revoke select (column)` on a table that has a table-wide SELECT grant is
+  accepted and does nothing. Revoke the table grant, then grant the columns —
+  and check `information_schema.column_privileges` afterwards rather than
+  trusting the statement to have worked.
 
 ## Why it matters here
 
