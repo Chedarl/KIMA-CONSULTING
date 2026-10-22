@@ -7,24 +7,27 @@ coupled: Vercel deploys code, GitHub Actions applies database migrations.
 never applied a migration. Treat its behaviour as intended, not observed, until
 the first migration goes through it.
 
-**The database and the repository have diverged.** The Paris project already
-holds schema — six migrations, verified against the live database on
-2026-10-21:
+**The database and the repository have diverged, and the gap is widening.** The
+Paris project holds schema that `supabase/migrations/` does not: 6 migrations
+on 2026-10-21, 13 by 2026-10-22, against 0 `.sql` files in the repository
+throughout.
 
-```
-20261021031500  kima_core_schema
-20261021031559  demo_access_policies
-20261021031616  realtime_and_storage
-20261021032505  fix_policy_recursion
-20261021034146  onboarding_and_diagnostics
-20261021034903  harden_definer_function
+This document deliberately does not list them. At the rate they are being added
+the list would be wrong within a day, and there is an authoritative source:
+
+```bash
+supabase migration list --linked     # applied remotely vs. present locally
 ```
 
-None of that SQL is in `supabase/migrations/`. It was applied directly through
-the Supabase management tools, so it bypassed both workflows below — nothing
-replayed it on a clean database, and no pull request has ever shown the access
-policies it created. `supabase/README.md` records the same gap and asks for the
-export; this is not a disagreement between the two documents.
+Every one of them was applied directly through the Supabase management tools,
+so all of it bypassed both workflows below. Nothing replayed any of it on a
+clean database, and no pull request has ever shown the access policies it
+created. `supabase/README.md` records the same gap and asks for the export;
+the two documents agree.
+
+The practical cost compounds: each migration applied this way is one more that
+has to be reconstructed later, and the longer it runs the more the eventual
+export is archaeology rather than a dump.
 
 **When that SQL is exported, keep these exact version numbers as the filenames.**
 `supabase db push` decides what to apply by comparing local filenames against
