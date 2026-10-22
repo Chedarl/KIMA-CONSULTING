@@ -1,6 +1,6 @@
 # Migrations
 
-**Status: partial export (8 of 24). Do not treat this directory as the whole schema yet.**
+**Status: partial export (11 of 27). Do not treat this directory as the whole schema yet.**
 
 The database of record is the Supabase project `kima-consulting`
 (`vhrnrbnjhmxrygvyfirf`, eu-west-3). Migrations were applied through the
@@ -35,8 +35,11 @@ directory is closing.
 | 20261022134826 | `case_events_revoke_truncate` | ✅ |
 | 20261022142916 | `firm_members_and_separation_of_duties` | ✅ |
 | 20261022143324 | `event_kind_self_approval_disclosed` | ✅ |
-| 20261022150100 | `firm_members_hide_email_from_clients` | ✅ |
-| 20261022150200 | `firm_members_column_grants_for_email` | ✅ |
+| 20261022163432 | `firm_members_hide_email_from_clients` | ✅ |
+| 20261022163452 | `firm_members_column_grants_for_email` | ✅ |
+| 20261022180415 | `auth_identities_and_structural_permissions` | ✅ |
+| 20261022181457 | `scope_every_policy_to_the_caller` | ✅ |
+| 20261022181734 | `portal_one_time_code_replaces_niu_password` | ✅ |
 
 ## Finishing the export
 
@@ -50,7 +53,7 @@ from supabase_migrations.schema_migrations
 order by version;
 ```
 
-Three cautions learned while exporting the eight below:
+Four cautions learned while exporting the eleven below:
 
 - `array_to_string(...) || ';'` appends a semicolon to statements that already
   end in one, producing a trailing `;;`. Strip it.
@@ -62,6 +65,11 @@ Three cautions learned while exporting the eight below:
   accepted and does nothing. Revoke the table grant, then grant the columns —
   and check `information_schema.column_privileges` afterwards rather than
   trusting the statement to have worked.
+- **The server assigns the version, not you.** Two files here were first
+  written under guessed timestamps and had to be renamed. Read the version
+  back from `supabase_migrations.schema_migrations` before naming the file:
+  a filename that disagrees with the recorded version is worse than no file,
+  because it looks authoritative.
 
 ## Why it matters here
 

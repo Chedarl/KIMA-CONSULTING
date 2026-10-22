@@ -201,14 +201,14 @@ npx tsc lib/cases.ts lib/events.ts lib/rules.ts lib/diagnostics.ts \
   --target es2020 --skipLibCheck --esModuleInterop --strict
 node <scratch>/cases-check.js   # 86 assertions
 node <scratch>/f3-check.js      # 95 assertions
-node <scratch>/f4-check.js      # 81 assertions
+node <scratch>/f4-check.js      # 86 assertions
 ```
 
 **Pass `--strict`.** Without it `tsc` ignores `tsconfig.json` and the
 discriminated-union narrowing in `advance()` stops working, so the harness
 compile reports errors the project build does not have.
 
-262 assertions currently cover the rule packs, deadline resolution,
+267 assertions currently cover the rule packs, deadline resolution,
 prorogations, the naming grammar, the three verdicts, the case engine, the
 event log, the request chain, and roles, permissions and separation of duties.
 The pattern has caught eight real defects, so keep it: **add assertions with
@@ -290,7 +290,7 @@ A dimension the log is silent about is *not* drift; silence is missing
 coverage, not a contradiction.
 
 **Migration export is partial — see `supabase/migrations/README.md`**, which
-lists all 20 applied migrations and marks which four are in the repo. The rest
+lists all 27 applied migrations and marks which eleven are in the repo. The rest
 exist only in `supabase_migrations.schema_migrations`, and a policy that is not
 in version control cannot be reviewed in a pull request. That README carries the
 query to finish the export and two cautions about replaying these files.
@@ -366,14 +366,36 @@ be exercised.
 - **F7 KPI standard** — `docs/foundation/client-registration-standard.md`, each
   KPI defined once and computed once in the `registration_kpis` view
 
-**Authentication is the gap F4 leaves.** `firm_members.person_label` is the
-join, because there is no auth provider yet: a member is identified by the same
-label that appears in `compliance_cases.owner` and `case_events.actor_label`,
-which is why it carries a unique index. When auth arrives that column becomes a
-foreign key, and the RLS policies can start reading the capability matrix
-instead of `demo_taxpayer_id()`. Until then **the permission engine is advisory
-at the surface and only the CHECK constraints are structural** — worth knowing
-before anyone calls this multi-tenant.
+**Where authentication now stands (F5).** The capability matrix exists twice
+on purpose — in `lib/permissions.ts` so the interface can reason about it, and
+in `public.role_capabilities` so RLS can enforce it — and the harness asserts
+the two are the same set. `can_see_taxpayer()` is the single question every
+tenant-scoped policy asks, and an audit of all 41 policies found **eleven
+reading `using (true)`**, including `taxpayers` UPDATE, which let any caller
+rewrite any taxpayer's NIU, regime or tax centre. All are scoped now, and the
+four that still read `true` are reference data: the firm roster, the
+organisation, the capability matrix and tags.
+
+Still open, and it is the honest limit of this increment:
+
+- **Nobody can sign in as a firm member yet.** `firm_members.auth_user_id` and
+  `contacts.auth_user_id` exist and the policies read them, but no sign-in
+  screen fills them. Until one does, firm capabilities evaluate to false for
+  every caller and the interface runs on the anonymous demo branch.
+- **`can_see_taxpayer()` has a third branch**: with no session, the caller sees
+  the demo taxpayer. That is what keeps the current interface working. It is
+  one line, written on its own line, and **must be deleted before real taxpayer
+  data exists** (R-32).
+- **R-36 is half closed.** The NIU is no longer a password: `portal_request_code`
+  issues a six-digit code, stores only a salted hash, expires it in ten minutes,
+  dies after five wrong attempts and is single-use, and the destination comes
+  back masked (`j*****o@example.cm`). What is missing is *delivery* — no mail is
+  sent yet, because no Kima domain is verified with Resend — and a real session.
+  `portal_sign_in` is still present for the synthetic demo and is marked
+  DEPRECATED in the database itself.
+- **`case_tasks` is now firm-only**, so with no firm session the work queue's
+  task fetch returns empty and the derived blocker falls back to requests.
+  Correct behaviour, and a visible consequence of the above.
 
 **Then the front end**, rebuilt to the supplied mockup — deliberately after the
 engine, on the owner's instruction. Three conflicts in that mockup must be
