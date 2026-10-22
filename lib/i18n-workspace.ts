@@ -398,6 +398,45 @@ const fr = {
     sourceInferred: "À valider",
     sourceUnverified: "Non tracée",
   },
+
+  /**
+   * The public registration form. Plain language: the person reading this has
+   * not decided to trust us yet, and may be doing it on a phone.
+   */
+  register: {
+    title: "Rejoindre Kima",
+    intro: "Dites-nous qui vous êtes. Nous revenons vers vous sous un jour ouvré.",
+    whoTitle: "Qui déclare ?",
+    howTitle: "Comment souhaitez-vous commencer ?",
+    detailsTitle: "Vos coordonnées",
+    name: "Nom et prénoms",
+    nameBusiness: "Votre nom",
+    legalName: "Raison sociale de l'entreprise",
+    phone: "Téléphone",
+    phoneHint: "Numéro WhatsApp de préférence.",
+    email: "Adresse e-mail",
+    emailHint: "Facultatif. Le téléphone suffit.",
+    niu: "Numéro de contribuable (NIU)",
+    niuHint: "Si vous l'avez sous la main. Sinon, laissez vide : nous pouvons vous aider à l'obtenir.",
+    language: "Langue de correspondance",
+    unverified:
+      "Ce que vous saisissez ici est une déclaration, pas une vérification. Un réviseur confirmera votre profil auprès de vos documents officiels avant l'ouverture du dossier.",
+    noRegimeAsked:
+      "Nous ne vous demandons ni votre régime fiscal ni votre centre des impôts : c'est à nous de les établir.",
+    submit: "Envoyer ma demande",
+    submitting: "Envoi…",
+    needName: "Indiquez au moins votre nom et un moyen de vous joindre.",
+    failed: "Envoi impossible pour le moment. Réessayez dans un instant.",
+    doneTitle: "Demande reçue",
+    doneBody:
+      "Nous vous répondons sous un jour ouvré. Gardez votre téléphone à portée : c'est par là que nous commencerons.",
+    doneAgain: "Envoyer une autre demande",
+    completeness: "Dossier complété",
+    completenessHint:
+      "Indicatif seulement. Une demande incomplète est acceptée : nous vous demanderons le reste.",
+    haveAccount: "Vous avez déjà un dossier ?",
+    signIn: "Accéder à votre espace",
+  },
 };
 
 type WorkspaceDictionary = typeof fr;
@@ -774,6 +813,41 @@ const en: WorkspaceDictionary = {
     sourceVerified: "Verified rule",
     sourceInferred: "To be validated",
     sourceUnverified: "Not traced",
+  },
+
+  register: {
+    title: "Join Kima",
+    intro: "Tell us who you are. We reply within one working day.",
+    whoTitle: "Who is declaring?",
+    howTitle: "How would you like to start?",
+    detailsTitle: "Your details",
+    name: "Full name",
+    nameBusiness: "Your name",
+    legalName: "Registered business name",
+    phone: "Phone",
+    phoneHint: "A WhatsApp number is best.",
+    email: "Email address",
+    emailHint: "Optional. A phone number is enough.",
+    niu: "Taxpayer number (NIU)",
+    niuHint: "If you have it to hand. If not, leave it blank: we can help you get one.",
+    language: "Language for correspondence",
+    unverified:
+      "What you enter here is a statement, not a verification. A reviewer will confirm your profile against your official documents before the file is opened.",
+    noRegimeAsked:
+      "We do not ask for your tax regime or your tax centre: establishing those is our job.",
+    submit: "Send my request",
+    submitting: "Sending…",
+    needName: "Give us at least your name and one way to reach you.",
+    failed: "Could not send just now. Try again in a moment.",
+    doneTitle: "Request received",
+    doneBody:
+      "We reply within one working day. Keep your phone to hand: that is where we will start.",
+    doneAgain: "Send another request",
+    completeness: "Application completeness",
+    completenessHint:
+      "Indicative only. An incomplete request is accepted: we will ask you for the rest.",
+    haveAccount: "Already have a file with us?",
+    signIn: "Go to your space",
   },
 };
 
