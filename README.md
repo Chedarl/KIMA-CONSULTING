@@ -131,9 +131,61 @@ in `tailwind.config.ts` first.
 
 ### Environment
 
-`.env.local` holds the Supabase URL and publishable key. It is gitignored and
-deliberately not reproduced here — copy it from the project owner, or read the
-values from the Supabase dashboard.
+Copy `.env.example` to `.env.local` and fill it in. Four variables:
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (read in
+`lib/supabase.ts`, which **throws** without them), plus `RESEND_API_KEY` and
+`KIMA_MAIL_FROM` for outbound inquiries. `.env.local` is gitignored and its
+values are deliberately not reproduced anywhere in the repo.
+
+---
+
+## Working from a phone or browser
+
+This repo is set up for **Claude Code cloud sessions**, so the work can
+continue from claude.ai/code or the **Code** tab in the Claude mobile app. The
+session runs on a cloud VM that clones this repository, so everything it needs
+must be either committed here or set on the cloud environment.
+
+**One-time setup** (account-level — only the repo owner can do these):
+
+1. **Connect GitHub.** Easiest path if you have the GitHub CLI authenticated:
+   run `/web-setup` inside the Claude Code CLI. It sends your `gh` token to
+   your Claude account and creates a cloud environment. Otherwise go to
+   [claude.ai/code](https://claude.ai/code), sign in with GitHub, and install
+   the Claude GitHub App on the account that owns this repository — a private
+   repo is invisible to cloud sessions until that app is installed on it.
+2. **Add the environment variables.** At claude.ai/code, open the environment
+   selector → edit → **Environment variables**, and add the four from
+   `.env.example`. The repo is cloned fresh each session, so `.env.local` is
+   never present and anything not set here does not exist.
+3. **Set the setup script.** Paste `scripts/cloud-setup.sh` into the
+   environment's **Setup script** field. It runs `npm ci` and a typecheck
+   before the session starts, and the result is cached — keep it under the
+   ~5-minute budget or the cache is skipped.
+4. **Install the app.** iOS or Android, then open the **Code** tab. Running
+   `/mobile` in the CLI shows a QR code for the right store.
+
+**What is already committed for this**
+
+| File | Purpose |
+|---|---|
+| `.env.example` | Names the required variables. No values. |
+| `scripts/cloud-setup.sh` | The cloud environment's setup script |
+| `.claude/settings.json` | Allowlists routine commands so a phone session is not a wall of approval prompts, and **denies reading `.env*`** so secrets cannot be printed into a synced transcript |
+| `CLAUDE.md` | Loads automatically every session, cloud included |
+
+**Worth knowing**
+
+- Cloud sessions offer **Accept edits**, **Plan** and **Auto** permission
+  modes. There is no Manual or Bypass.
+- A cloud session pushes a branch and you review the diff; it does not commit
+  to `main` behind your back.
+- `claude --cloud "<task>"` starts one from the terminal; `claude --teleport`
+  pulls a cloud session back into your terminal to continue locally.
+- The cloud VM clones **the GitHub remote at your current branch**, not your
+  local working tree. Push first, or local commits will not be there.
+- Plan locally, execute in the cloud: agree an approach in plan mode, commit
+  the plan, then hand the execution to a cloud session.
 
 ### Testing the pure engines
 
