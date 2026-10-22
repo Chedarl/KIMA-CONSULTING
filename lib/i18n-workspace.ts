@@ -271,12 +271,28 @@ const fr = {
     numberHint:
       "Il figure sur vos documents fiscaux et sur vos factures. Les espaces et tirets n'ont pas d'importance.",
     submit: "Accéder à mon espace",
+    requestCode: "Recevoir un code",
+    verifyCode: "Valider le code",
     submitting: "Vérification…",
     signOut: "Se déconnecter",
     incomplete: "Renseignez les deux champs.",
+    codeIncomplete: "Saisissez le code reçu.",
     noMatch:
       "Ces informations ne correspondent à aucun dossier. Vérifiez l'orthographe du nom et le numéro, puis réessayez.",
     error: "Connexion impossible pour le moment. Réessayez dans un instant.",
+    notConfigured:
+      "La connexion sécurisée n'est pas encore configurée sur cet environnement (clé service manquante).",
+    wrongCode: "Code incorrect. Réessayez.",
+    codeExpired: "Ce code a expiré. Demandez-en un nouveau.",
+    tooManyAttempts: "Trop d'essais. Demandez un nouveau code.",
+    codeSentBlind:
+      "Si ces informations correspondent à un dossier, un code a été envoyé à l'adresse de contact enregistrée.",
+    codeTitle: "Entrez le code reçu",
+    codeIntro: "Un code à usage unique a été envoyé à {destination}.",
+    codeIntroBlind: "Un code à usage unique a été envoyé à votre adresse de contact.",
+    codeLabel: "Code à 8 chiffres",
+    demoCodeLabel: "Code de démonstration (e-mail non configuré)",
+    back: "Retour",
     mismatch:
       "Ce dossier est enregistré dans l'autre catégorie. Vous êtes bien connecté ; utilisez l'autre onglet la prochaine fois.",
     welcome: "Bienvenue",
@@ -293,7 +309,33 @@ const fr = {
     verified: "Profil vérifié par un réviseur.",
     continueToPortal: "Continuer vers mon espace",
     demoNotice:
-      "Démonstration : le numéro de contribuable n'est pas un mot de passe secret. En production, un code à usage unique sera envoyé à votre adresse de contact.",
+      "Le numéro de contribuable identifie votre dossier. Le secret est un code à usage unique envoyé à votre adresse de contact.",
+  },
+
+  firmLogin: {
+    title: "Accès cabinet",
+    intro: "Connectez-vous avec l'e-mail enregistré pour votre membre du cabinet.",
+    email: "E-mail professionnel",
+    emailHint: "Celui enregistré sur votre fiche membre (démonstration : irina@demo.kima.cm).",
+    requestCode: "Recevoir un code",
+    codeTitle: "Entrez le code reçu",
+    codeIntro: "Un code à usage unique a été envoyé à {destination}.",
+    codeLabel: "Code à 8 chiffres",
+    verifyCode: "Valider le code",
+    back: "Retour",
+    submitting: "Vérification…",
+    incomplete: "Saisissez votre e-mail.",
+    notConfigured:
+      "La connexion sécurisée n'est pas encore configurée sur cet environnement (clé service manquante).",
+    error: "Connexion impossible pour le moment. Réessayez dans un instant.",
+    wrongCode: "Code incorrect. Réessayez.",
+    codeExpired: "Ce code a expiré. Demandez-en un nouveau.",
+    tooManyAttempts: "Trop d'essais. Demandez un nouveau code.",
+    demoCodeLabel: "Code de démonstration (e-mail non configuré)",
+    welcome: "Bienvenue",
+    signOut: "Se déconnecter",
+    continueToWorkspace: "Continuer vers l'espace cabinet",
+    role: "Rôle",
   },
 
   /**
@@ -873,12 +915,28 @@ const en: WorkspaceDictionary = {
     numberHint:
       "It appears on your tax documents and on your invoices. Spaces and hyphens do not matter.",
     submit: "Go to my space",
+    requestCode: "Send me a code",
+    verifyCode: "Verify code",
     submitting: "Checking…",
     signOut: "Sign out",
     incomplete: "Fill in both fields.",
+    codeIncomplete: "Enter the code you received.",
     noMatch:
       "These details do not match any file. Check the spelling of the name and the number, then try again.",
     error: "Cannot sign in at the moment. Try again shortly.",
+    notConfigured:
+      "Secure sign-in is not configured in this environment (service role key missing).",
+    wrongCode: "Incorrect code. Try again.",
+    codeExpired: "This code has expired. Request a new one.",
+    tooManyAttempts: "Too many attempts. Request a new code.",
+    codeSentBlind:
+      "If these details match a file, a code was sent to the contact address on record.",
+    codeTitle: "Enter the code you received",
+    codeIntro: "A one-time code was sent to {destination}.",
+    codeIntroBlind: "A one-time code was sent to your contact address.",
+    codeLabel: "8-digit code",
+    demoCodeLabel: "Demonstration code (email not configured)",
+    back: "Back",
     mismatch:
       "This file is recorded under the other category. You are signed in; use the other tab next time.",
     welcome: "Welcome",
@@ -895,7 +953,33 @@ const en: WorkspaceDictionary = {
     verified: "Profile verified by a reviewer.",
     continueToPortal: "Continue to my space",
     demoNotice:
-      "Demonstration: the taxpayer number is not a secret password. In production a one-time code will be sent to your contact address.",
+      "Your taxpayer number identifies your file. The secret is a one-time code sent to your contact address.",
+  },
+
+  firmLogin: {
+    title: "Firm access",
+    intro: "Sign in with the email recorded on your firm membership.",
+    email: "Work email",
+    emailHint: "The address on your member record (demo: irina@demo.kima.cm).",
+    requestCode: "Send me a code",
+    codeTitle: "Enter the code you received",
+    codeIntro: "A one-time code was sent to {destination}.",
+    codeLabel: "8-digit code",
+    verifyCode: "Verify code",
+    back: "Back",
+    submitting: "Checking…",
+    incomplete: "Enter your email.",
+    notConfigured:
+      "Secure sign-in is not configured in this environment (service role key missing).",
+    error: "Cannot sign in at the moment. Try again shortly.",
+    wrongCode: "Incorrect code. Try again.",
+    codeExpired: "This code has expired. Request a new one.",
+    tooManyAttempts: "Too many attempts. Request a new code.",
+    demoCodeLabel: "Demonstration code (email not configured)",
+    welcome: "Welcome",
+    signOut: "Sign out",
+    continueToWorkspace: "Continue to the firm workspace",
+    role: "Role",
   },
 
   filing: {

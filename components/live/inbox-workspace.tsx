@@ -157,11 +157,13 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
       const byTaxpayer = new Set(ids.map((id) => docs?.find((d) => d.id === id)?.taxpayer_id));
       for (const tid of byTaxpayer) {
         if (!tid) continue;
-        await db.from("activity_events").insert({
-          taxpayer_id: tid,
-          actor: "firm",
-          text_fr: decision === "accepted" ? "Kima a accepté vos pièces." : `Une pièce a été retournée. ${why ?? ""}`.trim(),
-          text_en: decision === "accepted" ? "Kima accepted your documents." : `A document was returned. ${why ?? ""}`.trim(),
+        const { recordCaseEvent } = await import("@/lib/record-event");
+        await recordCaseEvent({
+          taxpayerId: tid,
+          actor: { role: "firm_staff", label: "Firm" },
+          kind: decision === "accepted" ? "request_accepted" : "request_returned",
+          to: decision === "accepted" ? "accepted" : "returned",
+          reason: why ?? null,
         });
       }
 

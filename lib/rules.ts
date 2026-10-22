@@ -671,10 +671,17 @@ export function obligationsFor(input: {
   type: TaxpayerType;
   regime: Regime | null;
   jurisdiction?: Jurisdiction;
+  /**
+   * When true, include inferred/inactive rules for corpus review only.
+   * Default false — unverified rules stay inactive and must not drive live
+   * obligations, folders, or proposed cases.
+   */
+  includeInactive?: boolean;
 }): Obligation[] {
   const j = input.jurisdiction ?? DEFAULT_JURISDICTION;
   return OBLIGATIONS.filter((o) => {
     if (o.source.jurisdiction !== j) return false;
+    if (!input.includeInactive && !isActive(o.source)) return false;
     if (o.taxpayerTypes.length && !o.taxpayerTypes.includes(input.type)) return false;
     if (o.regimes.length) {
       if (!input.regime) return false;

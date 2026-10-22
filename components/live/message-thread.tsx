@@ -205,11 +205,16 @@ export function MessageThread({
       const { error: e } = await db.from("messages").insert(optimistic);
       if (e) throw e;
 
-      await db.from("activity_events").insert({
-        taxpayer_id: taxpayerId,
-        actor: side,
-        text_fr: side === "firm" ? "Nouveau message de Kima" : "Vous avez envoyé un message",
-        text_en: side === "firm" ? "New message from Kima" : "You sent a message",
+      const { recordCaseEvent } = await import("@/lib/record-event");
+      await recordCaseEvent({
+        taxpayerId,
+        organizationId: orgId,
+        actor:
+          side === "firm"
+            ? { role: "firm_staff", label: "Firm" }
+            : { role: "client", label: "Client" },
+        kind: "note_added",
+        reason: side === "firm" ? "Nouveau message de Kima / New message from Kima" : "Message envoyé / Message sent",
       });
       // Length only — the body itself never enters the audit trail.
       await audit({

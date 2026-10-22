@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { isSupabaseAdminConfigured, supabaseAdmin } from "@/lib/supabase-admin";
 
 /**
  * Outbound document inquiry.
  *
- * Runs on the server because the Resend key must never reach the browser.
- * The caller supplies a taxpayer id, not an address: the recipient is read
- * from the database, so this endpoint cannot be used to mail an arbitrary
- * address. That matters — an open "email anyone" endpoint on a public site is
- * a spam relay.
- *
- * DELIVERY LIMIT: the sender is `onboarding@resend.dev` until a Kima domain is
- * verified in Resend, and that sender only delivers to the Resend account
- * owner's own address. Mail to a client address will be accepted by the API
- * and never arrive. Verifying a Kima domain lifts this.
+ * Requires a firm Auth bearer token. The recipient is always read from the
+ * database for the authorised taxpayer — never an arbitrary address.
  */
 export const runtime = "nodejs";
 
@@ -22,10 +16,29 @@ export async function POST(request: Request) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.KIMA_MAIL_FROM ?? "Kima Consulting <onboarding@resend.dev>";
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!apiKey || !supabaseUrl || !supabaseKey) {
+  if (!apiKey || !supabaseUrl || !anonKey || !isSupabaseAdminConfigured()) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
+  }
+
+  const auth = request.headers.get("authorization");
+  if (!auth?.toLowerCase().startsWith("bearer ")) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: auth } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData.user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const { data: firmAllowed } = await userClient.rpc("member_has", { cap: "note.write_client" });
+  if (!firmAllowed) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   let body: Body;
@@ -43,41 +56,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "note_too_long" }, { status: 400 });
   }
 
-  const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+  const { data: canSee } = await userClient.rpc("can_see_taxpayer", { tp: taxpayerId });
+  if (!canSee) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
-  const tpRes = await fetch(
-    `${supabaseUrl}/rest/v1/taxpayers?id=eq.${taxpayerId}&select=legal_name,contact_name,contact_email`,
-    { headers, cache: "no-store" },
-  );
-  const taxpayers = (await tpRes.json()) as {
-    legal_name: string;
-    contact_name: string | null;
-    contact_email: string | null;
-  }[];
-  const taxpayer = taxpayers?.[0];
+  const admin = supabaseAdmin();
+  const { data: taxpayers, error: tpErr } = await admin
+    .from("taxpayers")
+    .select("legal_name, contact_name, contact_email")
+    .eq("id", taxpayerId)
+    .limit(1);
+  if (tpErr) {
+    return NextResponse.json({ error: "lookup_failed" }, { status: 502 });
+  }
+  const taxpayer = taxpayers?.[0] as
+    | { legal_name: string; contact_name: string | null; contact_email: string | null }
+    | undefined;
   if (!taxpayer?.contact_email) {
     return NextResponse.json({ error: "no_contact_email" }, { status: 422 });
   }
 
-  const reqRes = await fetch(
-    `${supabaseUrl}/rest/v1/document_requests?taxpayer_id=eq.${taxpayerId}` +
-      `&status=in.(requested,returned,in_progress,in_client_review)` +
-      `&select=label_fr,label_en,reason_fr,reason_en,due_on&order=due_on`,
-    { headers, cache: "no-store" },
-  );
-  const outstanding = (await reqRes.json()) as {
-    label_fr: string;
-    label_en: string;
-    reason_fr: string | null;
-    reason_en: string | null;
-    due_on: string;
-  }[];
+  const { data: outstanding } = await admin
+    .from("document_requests")
+    .select("label_fr, label_en, reason_fr, reason_en, due_on")
+    .eq("taxpayer_id", taxpayerId)
+    .in("status", ["requested", "returned", "in_progress", "in_client_review"])
+    .order("due_on");
 
   if (!outstanding || outstanding.length === 0) {
     return NextResponse.json({ error: "nothing_outstanding" }, { status: 422 });
   }
 
   const fr = locale === "fr";
+  const safeNote = note ? note.replace(/[\r\n]+/g, " ").slice(0, 2000) : "";
   const items = outstanding
     .map((r) => {
       const label = fr ? r.label_fr : r.label_en;
@@ -99,7 +111,7 @@ export async function POST(request: Request) {
     "",
     items,
     "",
-    note ? `${note}\n` : "",
+    safeNote ? `${safeNote}\n` : "",
     fr
       ? "Vous pouvez les déposer directement dans votre espace Kima."
       : "You can upload them directly in your Kima portal.",
@@ -120,23 +132,26 @@ export async function POST(request: Request) {
   });
 
   if (!send.ok) {
-    // Surface Resend's own reason — most often the resend.dev sender
-    // restriction — without leaking the key or the raw response.
     const detail = (await send.text()).slice(0, 300);
     return NextResponse.json({ error: "send_failed", detail }, { status: 502 });
   }
 
   const sent = (await send.json()) as { id?: string };
 
-  await fetch(`${supabaseUrl}/rest/v1/activity_events`, {
-    method: "POST",
-    headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      taxpayer_id: taxpayerId,
-      actor: "firm",
-      text_fr: `Kima vous a écrit au sujet de ${outstanding.length} pièce(s) manquante(s).`,
-      text_en: `Kima emailed you about ${outstanding.length} missing document(s).`,
-    }),
+  await admin.from("case_events").insert({
+    case_id: null,
+    taxpayer_id: taxpayerId,
+    dimension: "note",
+    kind: "note_added",
+    actor_role: "firm_staff",
+    actor_label: "Firm",
+    from_value: null,
+    to_value: null,
+    subject_ref: null,
+    reason: fr
+      ? `Kima vous a écrit au sujet de ${outstanding.length} pièce(s) manquante(s).`
+      : `Kima emailed you about ${outstanding.length} missing document(s).`,
+    visibility: "client",
   });
 
   return NextResponse.json({ ok: true, id: sent.id ?? null, count: outstanding.length });

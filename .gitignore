@@ -33,3 +33,6 @@ yarn-error.log*
 
 # client fixtures — real taxpayer data must never be committed (risk R-32)
 /fixtures/real/
+
+# ECC / local agent tooling — install into the project, do not commit
+.cursor/

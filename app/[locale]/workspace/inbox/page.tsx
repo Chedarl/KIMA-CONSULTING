@@ -22,6 +22,10 @@ export default function InboxPage({ params }: { params: { locale: string } }) {
         <p className="text-sm text-fg-muted">{i.subtitle}</p>
       </div>
 
+      {/* Three verdicts first — the live acceptance model. Binary bulk actions
+          below remain for triage speed and must not be mistaken for the full review. */}
+      <DocumentVerdicts locale={locale} t={w.verdicts} />
+
       <InboxWorkspace
         locale={locale}
         labels={{
@@ -57,11 +61,6 @@ export default function InboxPage({ params }: { params: { locale: string } }) {
           live: t.work.live,
         }}
       />
-
-      {/* The panel above still accepts or returns a document in one move. This
-          one is what that move loses: three verdicts that may disagree, each
-          carrying the rule it rests on. */}
-      <DocumentVerdicts locale={locale} t={w.verdicts} />
     </div>
   );
 }

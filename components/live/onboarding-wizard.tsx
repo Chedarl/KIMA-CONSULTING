@@ -197,11 +197,13 @@ export function OnboardingWizard({
         })),
       );
 
-      await db.from("activity_events").insert({
-        taxpayer_id: taxpayer.id,
-        actor: "firm",
-        text_fr: `Dossier ouvert pour ${displayName}. ${asked.length} pièces demandées, ${retrieved.length} récupérées par le cabinet.`,
-        text_en: `File opened for ${displayName}. ${asked.length} documents requested, ${retrieved.length} retrieved by the firm.`,
+      const { recordCaseEvent } = await import("@/lib/record-event");
+      await recordCaseEvent({
+        taxpayerId: taxpayer.id,
+        organizationId: org.id,
+        actor: { role: "firm_partner", label: "Firm" },
+        kind: "note_added",
+        reason: `Dossier ouvert pour ${displayName}. ${asked.length} pièces demandées / File opened for ${displayName}. ${asked.length} documents requested.`,
       });
 
       await audit({

@@ -92,9 +92,18 @@ export function ClientsWorkspace({
   async function chase(id: string) {
     setSending(id);
     try {
+      const { data: sessionData } = await supabase().auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        toast(labels.emailBlocked, "error");
+        return;
+      }
       const res = await fetch("/api/inquiry", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ taxpayerId: id, locale }),
       });
       const data = (await res.json()) as { error?: string; count?: number };

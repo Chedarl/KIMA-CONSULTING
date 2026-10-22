@@ -159,11 +159,15 @@ export function DocumentsPanel({
           .eq("id", requestId);
         if (reqErr) throw reqErr;
 
-        await db.from("activity_events").insert({
-          taxpayer_id: ids.taxpayerId,
-          actor: "taxpayer",
-          text_fr: `Vous avez transmis : ${req.label_fr}`,
-          text_en: `You sent: ${req.label_en}`,
+        const { recordCaseEvent } = await import("@/lib/record-event");
+        await recordCaseEvent({
+          taxpayerId: ids.taxpayerId,
+          organizationId: ids.organizationId,
+          caseId: req.case_id ?? null,
+          actor: { role: "client", label: "Client" },
+          kind: "document_uploaded",
+          to: "submitted",
+          subject: locale === "fr" ? req.label_fr : req.label_en,
         });
         await audit({
           taxpayerId: ids.taxpayerId,

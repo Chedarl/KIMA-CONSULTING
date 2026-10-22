@@ -9,28 +9,14 @@ import {
   formatTaxNumber,
   readSession,
   rememberSession,
-  signIn,
+  requestPortalCode,
+  verifyPortalCode,
   type PortalAudience,
   type PortalSession,
 } from "@/lib/portal-auth";
 
 /**
- * Portal sign-in — name plus taxpayer number.
- *
- * Two doors, because the two audiences do not call the same number by the same
- * name: an individual knows it as their NIU, a business owner says "numéro de
- * contribuable". It is one number; the label follows the person.
- *
- * The part that matters most is what happens AFTER a successful sign-in. The
- * owner asked for this so that clients learn their own details, so the landing
- * state is a details card they are told to write down — name on file, taxpayer
- * number grouped in fours, tax centre, regime — with the verification status
- * shown plainly, because an unverified regime is something the client reported
- * to us, not something we have confirmed.
- *
- * The demo notice is not decoration. The taxpayer number is printed on every
- * invoice this client issues; saying so is more honest than implying the field
- * is a secret. See `lib/portal-auth.ts` for the full posture.
+ * Portal sign-in — name + taxpayer number identify; a one-time code authenticates.
  */
 type Dict = ReturnType<typeof getWorkspaceDictionary>;
 
@@ -46,28 +32,61 @@ export function PortalLogin({
   const [audience, setAudience] = useState<PortalAudience>("individual");
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
+  const [code, setCode] = useState("");
+  const [reference, setReference] = useState<string | null>(null);
+  const [masked, setMasked] = useState<string | null>(null);
+  const [demoCode, setDemoCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<PortalSession | null>(null);
 
-  // Restore an existing tab session, so a refresh does not look like a logout.
   useEffect(() => {
     const existing = readSession();
     if (existing) setSession(existing);
   }, []);
 
-  async function submit() {
+  async function requestCode() {
     setBusy(true);
     setError(null);
-    const result = await signIn(audience, name, number);
+    const result = await requestPortalCode(name, number, locale);
     setBusy(false);
     if (!result.ok) {
       setError(
         result.reason === "incomplete"
           ? t.incomplete
-          : result.reason === "no_match"
-            ? t.noMatch
+          : result.reason === "not_configured"
+            ? t.notConfigured
             : t.error,
+      );
+      return;
+    }
+    // Uniform UX whether or not the account exists — never say "unknown NIU".
+    if (!result.reference) {
+      setError(t.codeSentBlind);
+      return;
+    }
+    setReference(result.reference);
+    setMasked(result.maskedDestination);
+    setDemoCode(result.demoCode);
+  }
+
+  async function submitCode() {
+    if (!reference) return;
+    setBusy(true);
+    setError(null);
+    const result = await verifyPortalCode(audience, reference, code);
+    setBusy(false);
+    if (!result.ok) {
+      setError(
+        result.reason === "incomplete"
+          ? t.codeIncomplete
+          : result.reason === "wrong_code"
+            ? t.wrongCode
+            : result.reason === "expired"
+              ? t.codeExpired
+              : result.reason === "too_many_attempts"
+                ? t.tooManyAttempts
+                : t.error,
       );
       return;
     }
@@ -75,10 +94,13 @@ export function PortalLogin({
     setSession(result.session);
     setName("");
     setNumber("");
+    setCode("");
+    setReference(null);
+    setDemoCode(null);
   }
 
-  function out() {
-    clearSession();
+  async function out() {
+    await clearSession();
     setSession(null);
   }
 
@@ -111,7 +133,7 @@ export function PortalLogin({
           </div>
           <button
             type="button"
-            onClick={out}
+            onClick={() => void out()}
             className="min-h-[44px] rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken"
           >
             {t.signOut}
@@ -139,8 +161,6 @@ export function PortalLogin({
           </dl>
         </div>
 
-        {/* Confirmed fact and client-reported information must look different —
-            a UI non-negotiable, and nowhere more than on the regime. */}
         <p className={`text-sm ${session.profileVerified ? "text-teal-text" : "text-amber-text"}`}>
           {session.profileVerified ? t.verified : t.unverified}
         </p>
@@ -158,6 +178,73 @@ export function PortalLogin({
   const nameLabel = audience === "individual" ? t.nameIndividual : t.nameBusiness;
   const nameHint = audience === "individual" ? t.nameHintIndividual : t.nameHintBusiness;
   const numberLabel = audience === "individual" ? t.numberIndividual : t.numberBusiness;
+
+  if (reference) {
+    return (
+      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-raised sm:p-6">
+        <div>
+          <h2 className="font-display text-xl font-semibold text-fg">{t.codeTitle}</h2>
+          <p className="mt-1 text-sm text-fg-muted">
+            {masked ? t.codeIntro.replace("{destination}", masked) : t.codeIntroBlind}
+          </p>
+        </div>
+
+        {demoCode && (
+          <p className="rounded-lg border border-amber/50 bg-amber-soft px-3 py-2 font-mono text-sm text-amber-text">
+            {t.demoCodeLabel}: {demoCode}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="portal-code" className="text-sm font-medium text-fg">
+            {t.codeLabel}
+          </label>
+          <input
+            id="portal-code"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !busy) void submitCode();
+            }}
+            className="min-h-[44px] rounded-lg border border-border bg-surface px-3 font-mono text-sm tracking-widest text-fg"
+          />
+        </div>
+
+        {error && (
+          <p role="alert" className="text-sm text-danger-text">
+            {error}
+          </p>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void submitCode()}
+            className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-surface hover:bg-navy-strong disabled:opacity-60"
+          >
+            {busy ? t.submitting : t.verifyCode}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setReference(null);
+              setCode("");
+              setDemoCode(null);
+              setError(null);
+            }}
+            className="min-h-[44px] rounded-lg border border-border px-4 text-sm font-semibold text-fg hover:bg-surface-sunken"
+          >
+            {t.back}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-raised sm:p-6">
@@ -213,8 +300,6 @@ export function PortalLogin({
         <p className="text-xs text-fg-subtle">{t.numberHint}</p>
         <input
           id="portal-number"
-          // Not a masked field. It is printed on the client's own invoices, and
-          // masking it would teach them it is a secret when it is not.
           type="text"
           inputMode="text"
           autoCapitalize="characters"
@@ -222,7 +307,7 @@ export function PortalLogin({
           value={number}
           onChange={(e) => setNumber(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !busy) void submit();
+            if (e.key === "Enter" && !busy) void requestCode();
           }}
           className="min-h-[44px] rounded-lg border border-border bg-surface px-3 font-mono text-sm tracking-wide text-fg"
         />
@@ -237,10 +322,10 @@ export function PortalLogin({
       <button
         type="button"
         disabled={busy}
-        onClick={() => void submit()}
+        onClick={() => void requestCode()}
         className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-surface hover:bg-navy-strong disabled:opacity-60"
       >
-        {busy ? t.submitting : t.submit}
+        {busy ? t.submitting : t.requestCode}
       </button>
 
       <p className="border-t border-border pt-3 text-xs text-fg-subtle">{t.demoNotice}</p>

@@ -3,16 +3,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 /**
  * Browser Supabase client.
  *
- * The publishable key is public by design. Every table has RLS enabled, but
- * READ THIS HONESTLY: the demo policies are permissive, not tenant-scoped.
- * Onboarding has to create taxpayers, so anon can read and write the working
- * tables across the whole project. With synthetic data that is vandalism at
- * worst; with real data it would be a breach.
+ * The publishable key is public by design. RLS is the boundary:
+ * - With a real Auth session, `can_see_taxpayer` / `member_has` scope access.
+ * - The temporary anon demo branch only runs when Postgres
+ *   `app.allow_demo_anon = on` (default off after the auth-closeout migration).
  *
- * This is NOT the production access model. Production requires authenticated
- * users, membership-based tenant scoping and the engagement check in
- * docs/foundation/permissions-matrix.md. Real taxpayer data must never be
- * written to this project (risk R-32).
+ * Real taxpayer data must never be written while the demo branch is enabled
+ * (risk R-32).
  */
 let client: SupabaseClient | null = null;
 
@@ -26,7 +23,8 @@ export function supabase(): SupabaseClient {
     );
   }
   client = createClient(url, key, {
-    auth: { persistSession: false },
+    // Persist Auth so RLS can see auth.uid() after portal/firm OTP verify.
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     realtime: { params: { eventsPerSecond: 5 } },
   });
   return client;
@@ -47,6 +45,7 @@ export type DocumentRequestRow = {
   id: string;
   taxpayer_id: string;
   organization_id: string;
+  case_id?: string | null;
   label_fr: string;
   label_en: string;
   status: RequestStatusRow;
@@ -82,17 +81,45 @@ export type ActivityRow = {
 };
 
 /**
- * The demo tenant: the seeded taxpayer, which is the OLDEST row.
+ * Resolve the active taxpayer / organisation for client surfaces.
  *
- * Ordering matters now that onboarding creates taxpayers — an unordered
- * limit(1) would bind the client portal to whichever row Postgres returned
- * first, and uploads would land under the wrong tenant.
+ * Prefer the portal session's taxpayer. Fall back to the oldest seeded row only
+ * when the demo anon branch is still enabled — never invent a cross-tenant bind.
  */
 export async function demoIds(): Promise<{ taxpayerId: string; organizationId: string } | null> {
   const db = supabase();
+
+  let sessionTaxpayerId: string | null = null;
+  try {
+    const raw = sessionStorage.getItem("kima.portal.session");
+    if (raw) {
+      const parsed = JSON.parse(raw) as { taxpayerId?: string };
+      sessionTaxpayerId = parsed.taxpayerId ?? null;
+    }
+  } catch {
+    sessionTaxpayerId = null;
+  }
+
+  const orgQuery = db
+    .from("organizations")
+    .select("id")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (sessionTaxpayerId) {
+    const [{ data: tp }, { data: org }] = await Promise.all([
+      db.from("taxpayers").select("id").eq("id", sessionTaxpayerId).maybeSingle(),
+      orgQuery,
+    ]);
+    if (tp?.id && org?.id) {
+      return { taxpayerId: tp.id as string, organizationId: org.id as string };
+    }
+  }
+
   const [{ data: tp }, { data: org }] = await Promise.all([
     db.from("taxpayers").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle(),
-    db.from("organizations").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle(),
+    orgQuery,
   ]);
   if (!tp?.id || !org?.id) return null;
   return { taxpayerId: tp.id as string, organizationId: org.id as string };
