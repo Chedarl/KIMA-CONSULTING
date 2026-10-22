@@ -53,6 +53,37 @@ export type CaseStage =
   | "delivered"
   | "abandoned";
 
+/**
+ * What the administration acknowledged — NOT what we did.
+ *
+ * `attempted` exists because the DGI's platforms go down. A submission tried
+ * during an outage is neither "not submitted" nor "filed"; it is an attempt
+ * whose outcome nobody knows, and the case has to be able to say so. Pretending
+ * otherwise is the failure this whole product is built against.
+ */
+export type FilingStatus =
+  | "not_submitted"
+  | "attempted"
+  | "awaiting_verification"
+  | "verified"
+  | "correction_required";
+
+/** Whether the TAX was paid. Nothing to do with whether KIMA was paid. */
+export type PaymentEvidenceStatus =
+  | "not_applicable"
+  | "unknown"
+  | "requested"
+  | "received"
+  | "verified";
+
+/** Whether KIMA's own fee was settled. Never a compliance state. */
+export type BillingStatus =
+  | "quotation_pending"
+  | "accepted"
+  | "invoiced"
+  | "paid"
+  | "outstanding";
+
 export type ComplianceCase = {
   id: string;
   taxpayer_id: string;
@@ -66,6 +97,15 @@ export type ComplianceCase = {
   blocker: string | null;
   opened_at: string;
   closed_at: string | null;
+
+  // The three dimensions the stage must never be allowed to swallow.
+  filing_status: FilingStatus;
+  filing_reference: string | null;
+  filing_evidence_ref: string | null;
+  filing_attempted_at: string | null;
+  filing_verified_at: string | null;
+  payment_evidence_status: PaymentEvidenceStatus;
+  billing_status: BillingStatus;
 };
 
 // ---------------------------------------------------------------------------
@@ -178,12 +218,23 @@ export type AdvanceInput = {
   by: string;
   blocker?: string | null;
   findings?: Finding[];
+  /** The filing and payment dimensions, needed to gate delivery. */
+  filing?: Pick<ComplianceCase, "filing_status" | "payment_evidence_status">;
   at?: string;
 };
 
 export type AdvanceResult =
   | { ok: true; patch: Partial<ComplianceCase> }
-  | { ok: false; reason: "not_allowed" | "blocked_by_findings" | "owner_required" };
+  | {
+      ok: false;
+      reason: "not_allowed" | "blocked_by_findings" | "owner_required" | "filing_not_verified";
+    };
+
+/** The default when a caller supplies no filing information: assume nothing. */
+const FILING_UNKNOWN = {
+  filing_status: "not_submitted" as FilingStatus,
+  payment_evidence_status: "unknown" as PaymentEvidenceStatus,
+};
 
 /**
  * Move a case, or refuse and say why.
@@ -204,6 +255,15 @@ export function advance(
     if (hasBlocking(input.findings ?? [])) return { ok: false, reason: "blocked_by_findings" };
   }
 
+  // Delivery asserts an outcome to the client, so it waits on the
+  // administration rather than on us. Checked here and in the database, because
+  // a rule that lives only in TypeScript is one SQL write from being untrue.
+  // Absent filing information the move is refused rather than assumed: the
+  // safe default for a claim about the state is "we do not know".
+  if (input.to === "delivered" && !canDeliver(input.filing ?? FILING_UNKNOWN)) {
+    return { ok: false, reason: "filing_not_verified" };
+  }
+
   // Work that nobody owns is work that does not happen.
   if (input.to !== "abandoned" && !current.owner && !input.by.trim()) {
     return { ok: false, reason: "owner_required" };
@@ -220,6 +280,137 @@ export function advance(
   if (isClosed(input.to)) patch.closed_at = at;
 
   return { ok: true, patch };
+}
+
+// ---------------------------------------------------------------------------
+// The other three dimensions
+// ---------------------------------------------------------------------------
+
+/**
+ * Filing moves on EVIDENCE, not on effort.
+ *
+ * `verified` is the only value that asserts something about the outside world,
+ * so it is the only one that demands proof: a reference AND an evidence
+ * document. The database enforces the same thing, because a rule that lives
+ * only in TypeScript is one direct SQL write away from being untrue.
+ *
+ * An attempt can fail back to `not_submitted` — the DGI's platforms go down
+ * mid-submission, and a case has to be able to record that nothing landed.
+ */
+const FILING_FLOW: Record<FilingStatus, FilingStatus[]> = {
+  not_submitted: ["attempted"],
+  attempted: ["awaiting_verification", "not_submitted"],
+  awaiting_verification: ["verified", "correction_required", "attempted"],
+  verified: ["correction_required"],
+  correction_required: ["attempted"],
+};
+
+export type RecordFilingInput = {
+  to: FilingStatus;
+  reference?: string | null;
+  evidenceRef?: string | null;
+  at?: string;
+};
+
+export type FilingResult =
+  | { ok: true; patch: Partial<ComplianceCase> }
+  | { ok: false; reason: "not_allowed" | "evidence_required" };
+
+export function recordFiling(
+  current: Pick<ComplianceCase, "filing_status">,
+  input: RecordFilingInput,
+): FilingResult {
+  if (!FILING_FLOW[current.filing_status]?.includes(input.to)) {
+    return { ok: false, reason: "not_allowed" };
+  }
+
+  // The whole constraint, in one branch: a declaration is never "filed"
+  // because somebody clicked a button.
+  if (input.to === "verified" && !input.evidenceRef?.trim()) {
+    return { ok: false, reason: "evidence_required" };
+  }
+
+  const at = input.at ?? new Date().toISOString();
+  const patch: Partial<ComplianceCase> = { filing_status: input.to };
+
+  if (input.reference?.trim()) patch.filing_reference = input.reference.trim();
+  if (input.to === "attempted") patch.filing_attempted_at = at;
+  if (input.to === "verified") {
+    patch.filing_evidence_ref = input.evidenceRef!.trim();
+    patch.filing_verified_at = at;
+  }
+
+  return { ok: true, patch };
+}
+
+/**
+ * Can this case be delivered to the client?
+ *
+ * Delivering before the administration has acknowledged the filing hands over
+ * a pack that implies an outcome nobody has confirmed. The exception is an
+ * obligation with nothing to file, which is why `not_applicable` exists on the
+ * payment dimension rather than being faked on the filing one.
+ */
+export function canDeliver(
+  c: Pick<ComplianceCase, "filing_status" | "payment_evidence_status">,
+): boolean {
+  if (c.payment_evidence_status === "not_applicable") return true;
+  return c.filing_status === "verified" || c.filing_status === "correction_required";
+}
+
+export const FILING_LABELS: Record<FilingStatus, { fr: string; en: string }> = {
+  not_submitted: { fr: "Non déposée", en: "Not submitted" },
+  attempted: { fr: "Dépôt tenté — issue inconnue", en: "Submission attempted — outcome unknown" },
+  awaiting_verification: { fr: "En attente de vérification", en: "Awaiting verification" },
+  verified: { fr: "Dépôt vérifié", en: "Filing verified" },
+  correction_required: { fr: "Correction requise", en: "Correction required" },
+};
+
+export const PAYMENT_LABELS: Record<PaymentEvidenceStatus, { fr: string; en: string }> = {
+  not_applicable: { fr: "Sans objet", en: "Not applicable" },
+  unknown: { fr: "Inconnu", en: "Unknown" },
+  requested: { fr: "Preuve demandée", en: "Evidence requested" },
+  received: { fr: "Preuve reçue", en: "Evidence received" },
+  verified: { fr: "Paiement vérifié", en: "Payment verified" },
+};
+
+export const BILLING_LABELS: Record<BillingStatus, { fr: string; en: string }> = {
+  quotation_pending: { fr: "Devis en attente", en: "Quotation pending" },
+  accepted: { fr: "Devis accepté", en: "Quotation accepted" },
+  invoiced: { fr: "Facturé", en: "Invoiced" },
+  paid: { fr: "Réglé", en: "Paid" },
+  outstanding: { fr: "Impayé", en: "Outstanding" },
+};
+
+export const filingLabel = (s: FilingStatus, locale: "fr" | "en") =>
+  locale === "fr" ? FILING_LABELS[s].fr : FILING_LABELS[s].en;
+export const paymentLabel = (s: PaymentEvidenceStatus, locale: "fr" | "en") =>
+  locale === "fr" ? PAYMENT_LABELS[s].fr : PAYMENT_LABELS[s].en;
+export const billingLabel = (s: BillingStatus, locale: "fr" | "en") =>
+  locale === "fr" ? BILLING_LABELS[s].fr : BILLING_LABELS[s].en;
+
+/**
+ * The four dimensions, for display, with the one rule that governs them.
+ *
+ * Billing is excluded from anything the client reads as compliance. Whether
+ * KIMA has been paid is a commercial matter between us and them; showing it
+ * beside "filing verified" invites the reading that an unpaid invoice makes
+ * someone non-compliant, which is false and would be an ugly thing to imply.
+ */
+export function statusSummary(
+  c: Pick<
+    ComplianceCase,
+    "stage" | "blocker" | "filing_status" | "payment_evidence_status" | "billing_status"
+  >,
+  locale: "fr" | "en",
+) {
+  return {
+    work: stageLabel(c.stage, locale),
+    filing: filingLabel(c.filing_status, locale),
+    payment: paymentLabel(c.payment_evidence_status, locale),
+    billing: billingLabel(c.billing_status, locale),
+    clientFacing: clientStatusLabel(clientStatus(c), locale),
+  };
 }
 
 // ---------------------------------------------------------------------------
