@@ -72,6 +72,7 @@ platforms are national. So: one engine, six thin rule packs.
 | `lib/rules.ts` | The rule registry. Every rule carries citation, authority, jurisdiction, effective dates and a `VerificationStatus`. **Unverified rules are inactive by construction** — `isActive()` is derived from provenance, never set by hand. Also regimes, tax centres, obligations, prorogations and the Harmony 2 portal map |
 | `lib/document-review.ts` | Three independent verdicts per document — accounting, charge deductibility, VAT recovery — which may disagree. A verdict resting on an unverified rule escalates instead of deciding |
 | `lib/document-naming.ts` | The filing framework: one grammar read in two directions. Folders are generated from the client's obligations, and the folder a document lands in decides its name |
+| `lib/crm.ts` | People and files. Contacts are many-to-many with taxpayers, because the SARL owner who also files IRPP is one person with two files. **Segments are derived, tags are typed** — a segment is computed from the verified profile and carries whether it is confirmed; a tag is whatever the firm decides |
 | `lib/organizer.ts` | The intake questionnaire. Derives **documents only**, never obligations |
 | `lib/diagnostics.ts` | Pre-approval gating on a declaration |
 | `lib/portal-auth.ts` | Demo portal sign-in. **Read the security note in its header before extending it** |
