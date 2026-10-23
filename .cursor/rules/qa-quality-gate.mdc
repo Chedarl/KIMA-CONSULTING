@@ -1,0 +1,77 @@
+---
+description: Quality gate — no feature is done until kima-qa-auditor has evidence-gated the change
+alwaysApply: true
+---
+
+# QA Quality Gate
+
+A feature, screen, API, schema change, or workflow is **not done** until it
+passes this gate. Attractive UI and compiling code are not evidence.
+
+## Mandatory auditor
+
+Before marking work complete, or before the final commit of a coherent unit
+that changes product behaviour, invoke the **kima-qa-auditor** agent
+(`.cursor/agents/kima-qa-auditor.md`) as a **read-only** pass.
+
+The implementing agent must not audit its own work as a substitute. Treat the
+auditor as independent: do not assume prior work is correct; do not equate
+screens with working features.
+
+## Source of truth (read in order)
+
+1. `docs/PRODUCT_REQUIREMENTS.md` when present; otherwise the blueprint
+   (`docs/blueprint/kima-compliance-os-blueprint-v1.0.md`) and
+   `docs/foundation/*`
+2. `docs/foundation/frontend-backend-coverage.md` for surface ↔ engine mapping
+3. `CLAUDE.md` hard constraints
+4. Relevant code, schemas, migrations, and tests
+
+If requirements conflict, stop and report the conflict. If requirements are
+missing, mark them UNDEFINED — never invent regulatory rules or imply unverified
+tax rules are legally correct. Never claim DGI / Harmony integration.
+
+## Gate criteria (all required)
+
+A unit may only be marked done when the auditor's verdict is **PASS** or
+**PASS WITH NOTES** with **no open P0 or P1**, and each of the following holds:
+
+| Area | Required evidence |
+|---|---|
+| Product alignment | Business problem → user → feature → acceptance criteria mapped; FAIL/UNDEFINED called out |
+| Frontend | Navigation, forms, validation, errors, loading, empty/offline, a11y, responsive (375/768/1024/1440), FR+EN parity; no decorative or misleading UI |
+| Backend | Every user action traced through API / engine / storage / response; refusals surfaced with engine reasons |
+| Data & security | Constraints, RLS, tenant isolation, roles, audit/events; no secrets; filing evidence-gated |
+| End-to-end | Intended user can complete the task, or workflow marked **NOT TESTED** (code inspection alone is never PASS) |
+| Coverage matrix | Updated in the same change when a surface is added or its backend binding changes |
+
+## Severity → release
+
+- **P0** — block commit of the unit to `main` until fixed (security, data loss, integrity, tenant leak)
+- **P1** — block "done"; core workflow broken or high-risk defect
+- **P2** — fix in the same unit when practical; otherwise track with owner and do not call release-ready
+- **P3** — polish; may ship with notes
+
+Never conceal blockers. Never approve unverified critical functionality.
+
+## Verdict vocabulary
+
+Every requirement under audit: `PASS` | `FAIL` | `PARTIAL` | `NOT TESTED` | `UNDEFINED`.
+
+Do not mark PASS solely because code or a screen exists. Separate confirmed
+findings from hypotheses. Do not fabricate tests, screenshots, files, or line
+numbers.
+
+## Remediation loop
+
+For each confirmed FAIL/PARTIAL:
+
+1. Implement the recommended correction (implementing agent — not the auditor)
+2. Re-run **kima-qa-auditor** on the same scope
+3. Only then commit and push (see always-commit-push)
+
+## Out of scope for this gate
+
+Docs-only typos, pure tooling under `.cursor/` that does not change product
+behaviour, and explicitly labelled spikes may skip the full six-phase report —
+still respect `CLAUDE.md` hard constraints and never invent tax/DGI claims.
