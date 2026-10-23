@@ -57,6 +57,7 @@ export default function InboxPage({ params }: { params: { locale: string } }) {
           live: t.work.live,
           verdictsRecorded: i.verdictsRecorded,
           verdictsRequired: i.verdictsRequired,
+          needFile: i.needFile,
           awaitingVerdicts: i.awaitingVerdicts,
           signInRequired: i.signInRequired,
         }}

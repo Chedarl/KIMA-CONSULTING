@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { OnboardingWizard, type WizardLabels } from "@/components/live/onboarding-wizard";
@@ -179,9 +180,12 @@ export function ClientsWorkspace({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-display text-base font-semibold text-fg">
+                  <Link
+                    href={`/${locale}/workspace/clients/${c.id}`}
+                    className="truncate font-display text-base font-semibold text-fg underline-offset-2 hover:underline"
+                  >
                     {c.legal_name}
-                  </p>
+                  </Link>
                   {c.contact_name && (
                     <p className="truncate text-xs text-fg-muted">{c.contact_name}</p>
                   )}

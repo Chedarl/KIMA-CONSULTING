@@ -4,7 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { audit, supabase, type DocumentRow } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { updateById, updateManyById } from "@/lib/db-write";
-import { readFirmSession, type FirmSession } from "@/lib/firm-auth";
+import {
+  memberFromSession,
+  subscribeFirmSession,
+  type FirmSession,
+} from "@/lib/firm-auth";
+import { can, denialLabel, type Actor, type Capability } from "@/lib/permissions";
 import { valueLabel, verdictLabel, type AcceptanceRecord } from "@/lib/document-review";
 import { DocumentVerdicts } from "@/components/live/document-verdicts";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
@@ -53,6 +58,7 @@ export type InboxLabels = {
   live: string;
   verdictsRecorded: string;
   verdictsRequired: string;
+  needFile: string;
   awaitingVerdicts: string;
   signInRequired: string;
 };
@@ -84,29 +90,68 @@ export function InboxWorkspace({
   const [live, setLive] = useState(false);
   const [error, setError] = useState(false);
   const [session, setSession] = useState<FirmSession | null>(null);
+  const [assignments, setAssignments] = useState<
+    { taxpayer_id: string; assigned_to: string | null }[]
+  >([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      const [{ data: d }, { data: tp }, { data: r }] = await Promise.all([
+      const [{ data: d }, { data: tp }, { data: r }, { data: eng }] = await Promise.all([
         db.from("documents").select("*").order("created_at", { ascending: false }).limit(200),
         db.from("taxpayers").select("id, legal_name"),
         db.from("document_requests").select("id, taxpayer_id, label_fr, label_en"),
+        db.from("engagements").select("taxpayer_id, assigned_to"),
       ]);
       const map: Record<string, Client> = {};
       for (const c of (tp ?? []) as Client[]) map[c.id] = c;
       setClients(map);
       setReqs((r ?? []) as Req[]);
       setDocs((d ?? []) as DocumentRow[]);
+      setAssignments((eng ?? []) as { taxpayer_id: string; assigned_to: string | null }[]);
     } catch {
       setError(true);
     }
   }, []);
 
-  useEffect(() => {
-    setSession(readFirmSession());
-  }, []);
+  useEffect(() => subscribeFirmSession(setSession), []);
+
+  const actor = useMemo<Actor | null>(() => {
+    if (!session) return null;
+    const member = memberFromSession(session);
+    return {
+      kind: "firm",
+      member,
+      assignedTaxpayerIds: assignments
+        .filter((e) => e.assigned_to && e.assigned_to === member.person_label)
+        .map((e) => e.taxpayer_id),
+    };
+  }, [session, assignments]);
+
+  const permittedIds = useCallback(
+    (ids: string[], capability: Capability) => {
+      if (!actor || !docs) return [];
+      return ids.filter((id) => {
+        const doc = docs.find((d) => d.id === id);
+        return !!doc && can(actor, capability, doc.taxpayer_id).ok;
+      });
+    },
+    [actor, docs],
+  );
+
+  function refuse(capability: Capability, taxpayerId: string): boolean {
+    if (!actor) {
+      toast(labels.signInRequired, "error");
+      return true;
+    }
+    const verdict = can(actor, capability, taxpayerId);
+    if (!verdict.ok) {
+      toast(denialLabel(verdict.reason, locale), "error");
+      return true;
+    }
+    return false;
+  }
 
   useEffect(() => {
     void load();
@@ -146,10 +191,7 @@ export function InboxWorkspace({
   }, [docs, clientFilter, statusFilter]);
 
   async function recordAcceptance(doc: DocumentRow, record: AcceptanceRecord) {
-    if (!session) {
-      toast(labels.signInRequired, "error");
-      return;
-    }
+    if (refuse("document.review", doc.taxpayer_id)) return;
     setBusy(true);
     try {
       const written = await updateById("documents", doc.id, { acceptance: record });
@@ -176,20 +218,30 @@ export function InboxWorkspace({
   }
 
   async function decide(decision: "accepted" | "returned", why?: string) {
-    const ids = [...sel];
-    if (ids.length === 0) return;
-    if (!session) {
-      toast(labels.signInRequired, "error");
+    const capability = decision === "accepted" ? "document.review" : "request.return";
+    const ids = permittedIds([...sel], capability);
+    if (ids.length === 0) {
+      const sample = docs?.find((d) => sel.has(d.id));
+      if (!actor || !sample) toast(labels.signInRequired, "error");
+      else {
+        const verdict = can(actor, capability, sample.taxpayer_id);
+        toast(verdict.ok ? labels.signInRequired : denialLabel(verdict.reason, locale), "error");
+      }
       return;
     }
     if (decision === "accepted" && ids.some((id) => !docs?.find((d) => d.id === id)?.acceptance)) {
       toast(labels.verdictsRequired, "error");
       return;
     }
+    if (decision === "accepted" && ids.some((id) => !docs?.find((d) => d.id === id)?.storage_path)) {
+      toast(labels.needFile, "error");
+      return;
+    }
     setBusy(true);
     const snapshot = new Map(docs?.map((d) => [d.id, d.review_status]) ?? []);
+    const idSet = new Set(ids);
     setDocs((prev) =>
-      prev ? prev.map((d) => (sel.has(d.id) ? { ...d, review_status: decision } : d)) : prev,
+      prev ? prev.map((d) => (idSet.has(d.id) ? { ...d, review_status: decision } : d)) : prev,
     );
 
     const failed: string[] = [];
@@ -228,7 +280,7 @@ export function InboxWorkspace({
         const { recordCaseEvent } = await import("@/lib/record-event");
         await recordCaseEvent({
           taxpayerId: tid,
-          actor: { role: "firm_staff", label: "Firm" },
+          actor: { role: session?.role ?? "firm_staff", label: session?.personLabel ?? "Firm" },
           kind: decision === "accepted" ? "request_accepted" : "request_returned",
           to: decision === "accepted" ? "accepted" : "returned",
           reason: why ?? null,
@@ -263,6 +315,7 @@ export function InboxWorkspace({
   /** Duplicate the stored object, so the copies are independent. */
   async function copyTo(doc: DocumentRow, requestId: string) {
     if (!doc.storage_path) return;
+    if (refuse("document.review", doc.taxpayer_id)) return;
     setBusy(true);
     try {
       const db = supabase();
@@ -304,6 +357,7 @@ export function InboxWorkspace({
   }
 
   async function rename(doc: DocumentRow) {
+    if (refuse("document.review", doc.taxpayer_id)) return;
     const next = window.prompt(labels.newName, doc.file_name);
     if (!next || next.trim() === doc.file_name) return;
     setBusy(true);
@@ -411,9 +465,9 @@ export function InboxWorkspace({
           </span>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || permittedIds([...sel], "document.review").length === 0}
             onClick={() => void decide("accepted")}
-            className="min-h-[44px] rounded-lg bg-navy px-3 text-sm font-semibold text-surface disabled:opacity-60"
+            className="min-h-[44px] rounded-lg bg-teal-text px-3 text-sm font-semibold text-surface hover:opacity-90 disabled:opacity-60"
           >
             {labels.acceptSelected}
           </button>

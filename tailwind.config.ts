@@ -24,6 +24,11 @@ const config: Config = {
           strong: "rgb(var(--navy-strong) / <alpha-value>)",
           soft: "rgb(var(--navy-soft) / <alpha-value>)",
         },
+        rail: {
+          DEFAULT: "rgb(var(--rail) / <alpha-value>)",
+          fg: "rgb(var(--rail-fg) / <alpha-value>)",
+          muted: "rgb(var(--rail-muted) / <alpha-value>)",
+        },
         teal: {
           DEFAULT: "rgb(var(--teal) / <alpha-value>)",
           text: "rgb(var(--teal-text) / <alpha-value>)",

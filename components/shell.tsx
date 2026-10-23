@@ -47,6 +47,8 @@ export function Shell({
   subtitle,
   soonLabel,
   menuLabel,
+  tone = "light",
+  hideMobileMenu = false,
   children,
 }: {
   nav: NavItem[];
@@ -54,6 +56,10 @@ export function Shell({
   subtitle: string;
   soonLabel: string;
   menuLabel: string;
+  /** Firm workspace uses the brand navy rail. Client stays on the light rail. */
+  tone?: "light" | "navy";
+  /** Client phones use a bottom bar instead of opening this rail. */
+  hideMobileMenu?: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname() || "";
@@ -68,6 +74,7 @@ export function Shell({
     <div className="flex flex-col gap-5 lg:flex-row lg:gap-7">
       {/* On a phone the rail collapses behind a disclosure rather than
           shrinking a desktop layout, so the work itself stays the priority. */}
+      {!hideMobileMenu && (
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -85,14 +92,32 @@ export function Shell({
           <path d="M4 6l4 4 4-4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
+      )}
 
       <nav
         aria-label={menuLabel}
-        className={`${open ? "block" : "hidden"} shrink-0 lg:block lg:w-56`}
+        className={`${open ? "block" : "hidden"} shrink-0 lg:block ${tone === "navy" ? "lg:w-60" : "lg:w-56"}`}
       >
-        <ul className="flex flex-col gap-0.5">
+        <ul
+          className={`flex flex-col gap-0.5 ${
+            tone === "navy" ? "rounded-card bg-rail p-2 text-rail-fg" : ""
+          }`}
+        >
+          {tone === "navy" && (
+            <li className="px-3 pb-2 pt-2">
+              <p className="font-display text-sm font-bold tracking-wide text-rail-fg">KIMA OS</p>
+              <p className="text-xs text-rail-muted">{title}</p>
+            </li>
+          )}
           {nav.map((item) => {
-            const active = pathname === item.href;
+            // Overview is a prefix of every firm route, so only an exact
+            // match counts. A section lights up on its own detail routes.
+            const isPrefix = nav.some(
+              (other) => other.href !== item.href && other.href.startsWith(`${item.href}/`),
+            );
+            const active = isPrefix
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
             if (!item.ready) {
               return (
                 <li key={item.label}>
@@ -100,11 +125,19 @@ export function Shell({
                       bare span is not a supported pattern and most screen
                       readers ignore it. The "soon" text carries the meaning,
                       separated so it is not read as one run-on phrase. */}
-                  <span className="rail-item flex min-h-[40px] cursor-default items-center gap-2.5 px-3 text-sm text-fg-subtle">
+                  <span
+                    className={`rail-item flex min-h-[44px] cursor-default items-center gap-2.5 px-3 text-sm ${
+                      tone === "navy" ? "text-rail-muted" : "text-fg-subtle"
+                    }`}
+                  >
                     <Icon name={item.icon} />
                     <span className="flex-1 break-words">{item.label}</span>
                     <span className="sr-only">, </span>
-                    <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-xs font-semibold">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-xs font-semibold ${
+                        tone === "navy" ? "bg-white/15 text-rail-muted" : "bg-surface-sunken"
+                      }`}
+                    >
                       {soonLabel}
                     </span>
                   </span>
@@ -116,10 +149,14 @@ export function Shell({
                 <Link
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={`rail-item flex min-h-[44px] items-center gap-2.5 px-3 text-sm transition-colors ${
-                    active
-                      ? "bg-navy font-semibold text-surface"
-                      : "text-fg-muted hover:bg-surface-sunken hover:text-fg"
+                  className={`rail-item flex min-h-[44px] items-center gap-2.5 px-3 text-sm transition-colors focus-visible:outline-white ${
+                    tone === "navy"
+                      ? active
+                        ? "bg-rail-fg font-semibold text-rail"
+                        : "text-rail-muted hover:bg-white/10 hover:text-rail-fg"
+                      : active
+                        ? "bg-navy font-semibold text-surface"
+                        : "text-fg-muted hover:bg-surface-sunken hover:text-fg"
                   }`}
                 >
                   <Icon name={item.icon} />
@@ -131,11 +168,14 @@ export function Shell({
         </ul>
       </nav>
 
-      <div className="min-w-0 flex-1">
-        <header className="mb-5">
-          <h1 className="font-display text-2xl font-bold tracking-tight text-fg">{title}</h1>
-          <p className="mt-1 text-sm text-fg-muted">{subtitle}</p>
-        </header>
+      <div className={`min-w-0 flex-1 ${hideMobileMenu ? "pb-24 lg:pb-0" : ""}`}>
+        {tone === "light" && (
+          <header className="mb-5">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-fg">{title}</h1>
+            <p className="mt-1 text-sm text-fg-muted">{subtitle}</p>
+          </header>
+        )}
+        {tone === "navy" && <p className="sr-only">{subtitle}</p>}
         {children}
       </div>
     </div>

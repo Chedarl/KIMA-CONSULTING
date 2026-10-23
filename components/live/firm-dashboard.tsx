@@ -9,8 +9,10 @@ import {
   awaitingClient,
   clientStatus,
   clientStatusLabel,
+  deriveBlocker,
   effectiveBlocker,
   obligationLabel,
+  stageLabel,
   queueOrder,
   risk,
   type CaseRequest,
@@ -180,11 +182,20 @@ export function FirmDashboard({
     const open = rows ?? [];
     const waiting = open.filter((c) => awaitingClient(requests[c.id] ?? [])).length;
     const review = open.filter((c) => c.stage === "review").length;
-    const atRisk = open.filter((c) => ["overdue", "due_soon"].includes(risk(c, today))).length;
+    // Firm-side holds only. A request still with the client is the waiting
+    // tile, not this one — the two questions stay apart.
+    const blocked = open.filter((c) => {
+      const derived = deriveBlocker({
+        tasks: tasks[c.id] ?? [],
+        requests: requests[c.id] ?? [],
+      });
+      if (derived?.waiting_on === "firm") return true;
+      return !derived && Boolean(c.blocker?.trim());
+    }).length;
     const weekAgo = daysAgoISO(7);
     const openedThisWeek = open.filter((c) => (c.opened_at ?? "") >= weekAgo).length;
-    return { active: open.length, waiting, review, atRisk, openedThisWeek };
-  }, [rows, requests, today]);
+    return { active: open.length, waiting, review, blocked, openedThisWeek };
+  }, [rows, requests, tasks, today]);
 
   const ordered = useMemo(() => queueOrder(rows ?? [], today).slice(0, 5), [rows, today]);
 
@@ -239,10 +250,10 @@ export function FirmDashboard({
           <Tile label={t.waitingOnClients} value={metrics.waiting} tone="amber" />
           <Tile label={t.pendingReview} value={metrics.review} tone="neutral" />
           <Tile
-            label={t.atRisk}
-            value={metrics.atRisk}
-            hint={t.atRiskHint}
-            tone={metrics.atRisk > 0 ? "danger" : "teal"}
+            label={t.blocked}
+            value={metrics.blocked}
+            hint={t.blockedHint}
+            tone={metrics.blocked > 0 ? "danger" : "teal"}
           />
         </div>
       )}
@@ -315,7 +326,10 @@ export function FirmDashboard({
                               </span>
                             </td>
                             <td className="py-3 pr-3">
-                              <span className="rounded-full border border-border bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg-muted">
+                              <span className="rounded-full border border-border bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg">
+                                {stageLabel(c.stage, locale)}
+                              </span>
+                              <span className="mt-1 block text-xs text-fg-subtle">
                                 {clientStatusLabel(clientStatus(c, awaitingClient(reqs)), locale)}
                               </span>
                             </td>

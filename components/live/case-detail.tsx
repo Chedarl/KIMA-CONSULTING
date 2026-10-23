@@ -36,7 +36,11 @@ import {
 import { caseFindings, type CaseTaxpayer } from "@/lib/case-diagnostics";
 import { commandAdvanceCase } from "@/lib/commands";
 import { updateById } from "@/lib/db-write";
-import { readFirmSession, type FirmSession } from "@/lib/firm-auth";
+import {
+  memberFromSession,
+  subscribeFirmSession,
+  type FirmSession,
+} from "@/lib/firm-auth";
 import type { Finding } from "@/lib/diagnostics";
 import {
   describe,
@@ -102,7 +106,7 @@ const STAGE_RAIL: CaseStage[] = [
 
 const btn =
   "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
-const btnPrimary = `${btn} bg-navy text-surface hover:bg-navy-strong`;
+const btnPrimary = `${btn} bg-teal-text text-surface hover:opacity-90`;
 const btnSecondary = `${btn} border border-border-strong bg-surface text-fg hover:bg-surface-sunken`;
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -204,13 +208,16 @@ export function CaseDetail({
   const [tasks, setTasks] = useState<CaseTask[]>([]);
   const [events, setEvents] = useState<CaseEvent[]>([]);
   const [members, setMembers] = useState<FirmMember[]>([]);
-  const [memberId, setMemberId] = useState("");
   const [session, setSession] = useState<FirmSession | null>(null);
   const [disclose, setDisclose] = useState(false);
   const [tab, setTab] = useState<"firm" | "client">("firm");
   const [note, setNote] = useState("");
   const [noteClient, setNoteClient] = useState(false);
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [askFr, setAskFr] = useState("");
+  const [askEn, setAskEn] = useState("");
+  const [askWho, setAskWho] = useState<"taxpayer" | "firm">("taxpayer");
+  const [askDue, setAskDue] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [refusedBy, setRefusedBy] = useState<string | null>(null);
@@ -282,7 +289,6 @@ export function CaseDetail({
         email: null,
       }));
       setMembers(roster);
-      setMemberId((prev) => prev || roster.find((m) => m.active)?.id || "");
     } catch {
       // Nothing rather than something stale: this is the screen where somebody
       // decides whether work leaves the building.
@@ -294,12 +300,8 @@ export function CaseDetail({
     void load();
   }, [load]);
 
-  // A signed-in member is who you ARE; the selector below is only for when
-  // nobody is signed in. Reading it here rather than in the loader keeps the
-  // session out of the data path.
-  useEffect(() => {
-    setSession(readFirmSession());
-  }, []);
+  // The signed-in member is who you are. There is no stand-in selector.
+  useEffect(() => subscribeFirmSession(setSession), []);
 
   // The client acts on these same rows. A document arriving while an accountant
   // has the case open should appear without a refresh.
@@ -331,14 +333,13 @@ export function CaseDetail({
   }, [caseId, load]);
 
   const member = useMemo(() => {
-    if (session) {
-      const signedIn = members.find((m) => m.id === session.memberId);
-      // The roster is the authority on the role; the stored session only says
-      // who signed in. A role changed since sign-in must not be the stale one.
-      if (signedIn) return signedIn;
-    }
-    return members.find((m) => m.id === memberId) ?? null;
-  }, [session, members, memberId]);
+    if (!session) return null;
+    const signedIn = members.find((m) => m.id === session.memberId);
+    // The roster is the authority on the role. Until it loads, the OTP
+    // session is the member — never a colleague picked from a dropdown.
+    if (signedIn) return signedIn.active ? signedIn : null;
+    return memberFromSession(session);
+  }, [session, members]);
 
   /**
    * A staff member's reach comes from the engagements assigned to them, not
@@ -506,6 +507,68 @@ export function CaseDetail({
     }
   }
 
+  async function createRequest() {
+    if (!row || !member) return;
+    if (!askFr.trim() || !askEn.trim()) {
+      setFailed("new-request");
+      setRefusedBy(t.requestNeedLabel);
+      return;
+    }
+    const gate = allowed("request.create");
+    if (!gate.ok) {
+      setFailed("new-request");
+      setRefusedBy(denialLabel(gate.reason, locale));
+      return;
+    }
+    setBusy("new-request");
+    setFailed(null);
+    setRefusedBy(null);
+    try {
+      const db = supabase();
+      const { data: org } = await db.from("organizations").select("id").limit(1).maybeSingle();
+      if (!org?.id) throw new Error("no organization");
+      const due =
+        askDue ||
+        (() => {
+          const d = new Date();
+          d.setDate(d.getDate() + 14);
+          return d.toISOString().slice(0, 10);
+        })();
+      const { error } = await db.from("document_requests").insert({
+        taxpayer_id: row.taxpayer_id,
+        organization_id: org.id,
+        case_id: row.id,
+        label_fr: askFr.trim(),
+        label_en: askEn.trim(),
+        status: "requested",
+        responsible: askWho,
+        due_on: due,
+        returned_count: 0,
+      });
+      if (error) throw error;
+      const event = eventFromRequest(
+        row.id,
+        {
+          from: null,
+          to: "requested",
+          label: locale === "fr" ? askFr.trim() : askEn.trim(),
+        },
+        { role: member.role, label: member.person_label },
+      );
+      if (event) {
+        const { error: logError } = await db.from("case_events").insert(event);
+        if (logError) throw logError;
+      }
+      setAskFr("");
+      setAskEn("");
+      await load();
+    } catch {
+      setFailed("new-request");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function toggleTask(task: CaseTask) {
     setBusy(task.id);
     setFailed(null);
@@ -600,31 +663,12 @@ export function CaseDetail({
           </p>
         </div>
         <div className="flex flex-col items-start gap-1 sm:items-end">
-          {session && member ? (
+          {session && (
             <p className="text-xs text-fg-subtle">
               {t.signedInAs}{" "}
-              <span className="font-medium text-fg">{member.person_label}</span> ·{" "}
-              {member.role.replace("firm_", "").replace("kima_", "")}
+              <span className="font-medium text-fg">{session.personLabel}</span> ·{" "}
+              {session.role.replace("firm_", "").replace("kima_", "")}
             </p>
-          ) : (
-            <label className="flex items-center gap-2 text-xs text-fg-subtle">
-              {t.actingAs}
-              <select
-                value={memberId}
-                onChange={(e) => {
-                  setMemberId(e.target.value);
-                  setDisclose(false);
-                }}
-                className="min-h-[44px] rounded-lg border border-border-strong bg-surface px-2 text-sm font-medium text-fg"
-              >
-                {members.length === 0 && <option value="">{t.noMembers}</option>}
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.person_label} · {m.role.replace("firm_", "").replace("kima_", "")}
-                  </option>
-                ))}
-              </select>
-            </label>
           )}
           {live && (
             <span className="inline-flex items-center gap-1.5 text-xs text-teal-text">
@@ -636,9 +680,9 @@ export function CaseDetail({
       </div>
 
       {!session && (
-        <p className="-mt-3 max-w-2xl text-xs leading-relaxed text-fg-subtle">
+        <p className="rounded-card border border-amber/50 bg-amber-soft px-4 py-3 text-sm text-amber-text">
           {t.actingAsHint}{" "}
-          <Link href={signInHref} className="font-medium text-navy hover:underline">
+          <Link href={signInHref} className="font-semibold text-teal-text underline-offset-2 hover:underline">
             {t.signIn}
           </Link>
         </p>
@@ -852,6 +896,64 @@ export function CaseDetail({
                   </div>
                 ))
               )}
+              <form
+                className="flex flex-col gap-2 border-t border-border p-4 sm:p-5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void createRequest();
+                }}
+              >
+                <p className="text-sm font-semibold text-fg">{t.requestNew}</p>
+                <p className="text-xs text-fg-subtle">{t.requestHint}</p>
+                <label className="text-xs font-medium text-fg-muted">
+                  {t.requestLabelFr}
+                  <input
+                    value={askFr}
+                    onChange={(e) => setAskFr(e.target.value)}
+                    className="mt-1 min-h-[44px] w-full rounded-lg border border-border-strong bg-surface px-3 text-sm text-fg"
+                  />
+                </label>
+                <label className="text-xs font-medium text-fg-muted">
+                  {t.requestLabelEn}
+                  <input
+                    value={askEn}
+                    onChange={(e) => setAskEn(e.target.value)}
+                    className="mt-1 min-h-[44px] w-full rounded-lg border border-border-strong bg-surface px-3 text-sm text-fg"
+                  />
+                </label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="text-xs font-medium text-fg-muted">
+                    {t.requestWho}
+                    <select
+                      value={askWho}
+                      onChange={(e) => setAskWho(e.target.value as "taxpayer" | "firm")}
+                      className="mt-1 min-h-[44px] w-full rounded-lg border border-border-strong bg-surface px-3 text-sm text-fg"
+                    >
+                      <option value="taxpayer">{t.requestWhoClient}</option>
+                      <option value="firm">{t.requestWhoFirm}</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-medium text-fg-muted">
+                    {t.requestDue}
+                    <input
+                      type="date"
+                      value={askDue}
+                      onChange={(e) => setAskDue(e.target.value)}
+                      className="mt-1 min-h-[44px] w-full rounded-lg border border-border-strong bg-surface px-3 text-sm text-fg"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="submit"
+                  disabled={busy === "new-request" || !allowed("request.create").ok}
+                  className="inline-flex min-h-[44px] w-fit items-center rounded-lg bg-teal px-4 text-sm font-semibold text-surface disabled:opacity-50"
+                >
+                  {busy === "new-request" ? t.requestSaving : t.requestSave}
+                </button>
+                {failed === "new-request" && (
+                  <p className="text-xs text-danger-text">{refusedBy ?? t.moveFailed}</p>
+                )}
+              </form>
               <p className="px-4 py-3 text-xs text-fg-subtle sm:px-5">{t.acceptHint}</p>
             </div>
           </Card>

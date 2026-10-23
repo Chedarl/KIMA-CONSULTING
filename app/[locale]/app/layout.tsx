@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import { Shell, type NavItem } from "@/components/shell";
+import { ClientMobileNav } from "@/components/live/client-mobile-nav";
 
 /**
  * The client workspace shell. Modules that do not exist yet appear in the rail
@@ -38,8 +39,18 @@ export default function ClientLayout({
       subtitle={w.client.subtitle}
       soonLabel={w.soon}
       menuLabel={w.menu}
+      hideMobileMenu
     >
       {children}
+      <ClientMobileNav
+        locale={locale}
+        labels={{
+          home: w.client.nav.home,
+          documents: w.client.nav.documents,
+          messages: w.client.nav.messages,
+          more: w.client.nav.more,
+        }}
+      />
     </Shell>
   );
 }

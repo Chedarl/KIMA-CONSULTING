@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { audit, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
+import type { ActorRole } from "@/lib/events";
 
 /**
  * A two-sided message thread, live on both sides.
@@ -12,9 +13,8 @@ import { useToast } from "@/components/toast";
  * request it is about, and both parties see the same history.
  *
  * Bodies render as plain text with whitespace preserved — never as HTML, and
- * with no auto-linking. The demo has no authentication, so the sender is a
- * claim rather than a fact, and the UI says so rather than implying an
- * identity it cannot prove.
+ * with no auto-linking. A firm message is sent as the signed-in member.
+ * Without that session the composer stays closed.
  */
 export type MessageLabels = {
   placeholder: string;
@@ -29,6 +29,7 @@ export type MessageLabels = {
   empty: string;
   tooLong: string;
   demoIdentity: string;
+  signInRequired?: string;
   connecting: string;
   offline: string;
   live: string;
@@ -103,12 +104,17 @@ export function MessageThread({
   taxpayerId,
   senderName,
   labels,
+  firmActor = null,
+  sendBlocked = null,
 }: {
   locale: "fr" | "en";
   side: "taxpayer" | "firm";
   taxpayerId: string | null;
   senderName: string;
   labels: MessageLabels;
+  /** Set on the firm side from the OTP session. Absent means the send is refused. */
+  firmActor?: { role: ActorRole; label: string } | null;
+  sendBlocked?: string | null;
 }) {
   const toast = useToast();
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
@@ -177,7 +183,8 @@ export function MessageThread({
 
   async function send() {
     const body = draft.trim();
-    if (!body || !taxpayerId || !orgId) return;
+    if (!body || !taxpayerId || !orgId || sendBlocked) return;
+    if (side === "firm" && !firmActor) return;
     if (body.length > MAX) {
       toast(labels.tooLong, "error");
       return;
@@ -210,9 +217,9 @@ export function MessageThread({
         taxpayerId,
         organizationId: orgId,
         actor:
-          side === "firm"
-            ? { role: "firm_staff", label: "Firm" }
-            : { role: "client", label: "Client" },
+          side === "firm" && firmActor
+            ? { role: firmActor.role, label: firmActor.label }
+            : { role: "client", label: senderName },
         kind: "note_added",
         reason: side === "firm" ? "Nouveau message de Kima / New message from Kima" : "Message envoyé / Message sent",
       });
@@ -261,7 +268,8 @@ export function MessageThread({
           className={`h-2 w-2 rounded-full ${live ? "pulse-dot bg-teal" : "bg-fg-subtle"}`}
           aria-hidden="true"
         />
-        {live ? labels.live : labels.connecting} · {labels.demoIdentity}
+        {live ? labels.live : labels.connecting}
+        {sendBlocked ? ` · ${sendBlocked}` : side === "taxpayer" ? ` · ${labels.demoIdentity}` : ""}
       </p>
 
       <ol className="flex max-h-[26rem] flex-col gap-2.5 overflow-y-auto rounded-card border border-border bg-surface p-4">
@@ -333,13 +341,16 @@ export function MessageThread({
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
             }}
             placeholder={labels.placeholder}
-            className="min-h-[52px] flex-1 resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg"
+            disabled={Boolean(sendBlocked)}
+            className="min-h-[52px] flex-1 resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg disabled:bg-surface-sunken"
           />
           <button
             type="button"
-            disabled={busy || draft.trim().length === 0}
+            disabled={busy || Boolean(sendBlocked) || draft.trim().length === 0}
             onClick={() => void send()}
-            className="inline-flex min-h-[44px] items-center rounded-lg bg-navy px-4 text-sm font-semibold text-surface disabled:opacity-50"
+            className={`inline-flex min-h-[44px] items-center rounded-lg px-4 text-sm font-semibold text-surface disabled:opacity-50 ${
+              side === "firm" ? "bg-teal-text hover:opacity-90" : "bg-navy"
+            }`}
           >
             {busy ? labels.sending : labels.send}
           </button>

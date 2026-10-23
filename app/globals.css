@@ -30,6 +30,11 @@
   --navy-strong: 15 42 74;
   --navy-soft: 232 238 246;
 
+  /* Firm rail stays brand navy in both themes. White on #163B66 is ~11:1. */
+  --rail: 22 59 102;
+  --rail-fg: 255 255 255;
+  --rail-muted: 213 226 242;
+
   --teal: 30 158 116; /* #1E9E74 — fills and graphics only */
   --teal-text: 15 107 79; /* 5.4:1 — type and icons */
   --teal-soft: 230 244 238;

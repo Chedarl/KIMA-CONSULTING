@@ -316,7 +316,7 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
                               type="button"
                               disabled={busy}
                               onClick={() => void report(inv)}
-                              className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-surface disabled:opacity-60"
+                              className="min-h-[44px] rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90 disabled:opacity-60"
                             >
                               {busy ? labels.submitting : labels.submit}
                             </button>

@@ -16,7 +16,9 @@ export default function DocumentsPage({ params }: { params: { locale: string } }
   if (!isLocale(params.locale)) notFound();
   const locale = params.locale;
   const t = getDictionary(locale);
-  const c = getWorkspaceDictionary(locale).client;
+  const w = getWorkspaceDictionary(locale);
+  const c = w.client;
+  const desk = w.requestDesk;
 
   return (
     <div className="flex flex-col gap-5">
@@ -43,6 +45,17 @@ export default function DocumentsPage({ params }: { params: { locale: string } }
           connecting: t.work.connecting,
           offline: t.work.offline,
           live: t.work.live,
+          all: desk.all,
+          overdue: desk.overdue,
+          today: desk.today,
+          soon: desk.soon,
+          waiting: desk.waiting,
+          received: desk.received,
+          accepted: desk.accepted,
+          receivedNotAccepted: desk.receivedNotAccepted,
+          noMatch: desk.empty,
+          forService: desk.forService,
+          returnedTimes: desk.returnedTimes,
         }}
       />
     </div>
