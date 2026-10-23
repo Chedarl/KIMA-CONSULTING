@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * KIMA Compliance OS tokens.
+ * KIMA OS tokens.
  *
  * The brand colours come from blueprint section 9: deep navy #163B66, teal
  * green #1E9E74, soft gray #E9EEF3, dark text #142235, with amber reserved for
@@ -48,6 +48,25 @@
   --danger-soft: 254 232 232;
 
   color-scheme: light;
+}
+
+/* Official mark: colour on light chrome, white when the chrome surface is dark. */
+.brand-mark-dark {
+  display: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .brand-mark-light {
+    display: none;
+  }
+  :root:not([data-theme="light"]) .brand-mark-dark {
+    display: block;
+  }
+}
+:root[data-theme="dark"] .brand-mark-light {
+  display: none;
+}
+:root[data-theme="dark"] .brand-mark-dark {
+  display: block;
 }
 
 @media (prefers-color-scheme: dark) {

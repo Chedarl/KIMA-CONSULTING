@@ -64,7 +64,7 @@ const fr = {
     ],
     aboutTitle: "À propos",
     aboutBody:
-      "Kima Consulting accompagne les particuliers, les entreprises et les cabinets au Cameroun et dans la CEMAC. Le produit tient les dossiers, les échéances et les pièces au même endroit.",
+      "KIMA CONSULTING accompagne les particuliers, les entreprises et les cabinets au Cameroun et dans la CEMAC. Le produit tient les dossiers, les échéances et les pièces au même endroit.",
     aboutTagline: "Vos comptes en ordre. Vos obligations maîtrisées.",
     aboutPoints: [
       "Un réviseur confirme le dossier avant qu'il ne devienne un espace ouvert.",
@@ -252,7 +252,7 @@ const fr = {
   },
   footer: {
     disclaimer:
-      "Kima Consulting prépare et suit les dossiers. Aucune autorisation, aucun partenariat et aucune intégration de télédéclaration avec l'administration fiscale n'est établi ou revendiqué.",
+      "KIMA CONSULTING prépare et suit les dossiers. Aucune autorisation, aucun partenariat et aucune intégration de télédéclaration avec l'administration fiscale n'est établi ou revendiqué.",
   },
 };
 
@@ -316,7 +316,7 @@ const en: PublicCopy = {
     ],
     aboutTitle: "About",
     aboutBody:
-      "Kima Consulting works with individuals, businesses and accounting firms in Cameroon and across CEMAC. The product keeps the file, the deadlines and the documents in one place.",
+      "KIMA CONSULTING works with individuals, businesses and accounting firms in Cameroon and across CEMAC. The product keeps the file, the deadlines and the documents in one place.",
     aboutTagline: "Clear Records. Confident Compliance.",
     aboutPoints: [
       "A reviewer confirms the file before it becomes an open workspace.",
@@ -503,7 +503,7 @@ const en: PublicCopy = {
   },
   footer: {
     disclaimer:
-      "Kima Consulting prepares and tracks files. No tax-authority authorization, partnership or e-filing integration is established or claimed.",
+      "KIMA CONSULTING prepares and tracks files. No tax-authority authorization, partnership or e-filing integration is established or claimed.",
   },
 };
 

@@ -406,7 +406,7 @@ export const intakeQueue: QueueItem[] = [
 export const demoAccountant = {
   initials: "AN",
   name: "A. Nkeng",
-  firm: "Kima Consulting",
+  firm: "KIMA CONSULTING",
 };
 
 export function pick<T>(value: { fr: T; en: T }, locale: Locale): T {

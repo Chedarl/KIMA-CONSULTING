@@ -55,52 +55,47 @@ export default function DesignPage({ params }: { params: { locale: string } }) {
     <div className="flex flex-col gap-8">
       <PageHeading eyebrow={t.common.prototype} title={t.design.title} lede={t.design.intro} />
 
-      {/* Brand — the four required lockups, each from its own file. */}
+      {/* Official lockups. Each one sits on the background it is for. */}
       <section>
         <h2 className="mb-1 text-lg font-semibold text-fg">
           {locale === "fr" ? "Identité" : "Brand"}
         </h2>
         <p className="mb-4 max-w-2xl text-sm text-fg-muted">
           {locale === "fr"
-            ? "Le « K intelligent » : une tranche de registre et deux panneaux documentaires qui s'en approchent sans le toucher. Le lien se lit dans l'espace négatif, pas dans un graphe de nœuds."
-            : "The “intelligent K”: a ledger spine and two document panels that approach it without touching. The connection reads in the negative space rather than as a node graph."}
+            ? "Signatures officielles. Couleur sur fond clair, blanc sur fond sombre, charbon avec l'accent or dans le A. Le produit dans l'interface est KIMA OS."
+            : "Official lockups. Colour on light, white on dark, charcoal with the gold accent in the A. The product name in the interface is KIMA OS."}
         </p>
         <div className="grid gap-4 lg:grid-cols-2">
-          {/* Each variant sits on the background it is actually for, not on the
-              current theme surface — navy on dark is unreadable, and showing it
-              that way would be presenting the lockup incorrectly. */}
           <Card className="flex flex-col gap-3 bg-white p-6">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#65748A]">
-              {locale === "fr" ? "Signature principale" : "Primary signature"}
+              {locale === "fr" ? "Couleur, fond clair" : "Colour, light background"}
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/logo-horizontal.svg" alt="KIMA CONSULTING" width={288} height={64} />
+            <img src="/brand/logo-color.svg" alt="KIMA CONSULTING" width={751} height={228} className="h-auto w-full max-w-md" />
             <code className="tnum font-mono text-[11px] text-[#65748A]">
-              public/brand/logo-horizontal.svg
+              public/brand/logo-color.svg
             </code>
           </Card>
 
-          <Card className="flex flex-col gap-3 bg-[#142235] p-6">
+          <Card className="flex flex-col gap-3 bg-[#0D1B2A] p-6">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#8496AD]">
-              {locale === "fr" ? "Fond sombre" : "Dark background"}
+              {locale === "fr" ? "Blanc, fond sombre" : "White, dark background"}
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/logo-dark.svg" alt="KIMA CONSULTING" width={288} height={64} />
+            <img src="/brand/logo-white.svg" alt="KIMA CONSULTING" width={751} height={228} className="h-auto w-full max-w-md" />
             <code className="tnum font-mono text-[11px] text-[#8496AD]">
-              public/brand/logo-dark.svg
+              public/brand/logo-white.svg
             </code>
           </Card>
 
-          {/* text-[#142235] pins currentColor: the mono mark inherits it, and on
-              a white card the theme's light foreground would be invisible. */}
-          <Card className="flex flex-col gap-3 bg-white p-6 text-[#142235]">
+          <Card className="flex flex-col gap-3 bg-white p-6">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#65748A]">
-              {locale === "fr" ? "Monochrome" : "Monochrome"}
+              {locale === "fr" ? "Charbon, fond clair" : "Charcoal, light background"}
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/logo-mono.svg" alt="KIMA CONSULTING" width={288} height={64} />
+            <img src="/brand/logo-charcoal.svg" alt="KIMA CONSULTING" width={751} height={228} className="h-auto w-full max-w-md" />
             <code className="tnum font-mono text-[11px] text-[#65748A]">
-              public/brand/logo-mono.svg
+              public/brand/logo-charcoal.svg
             </code>
           </Card>
 
@@ -113,7 +108,7 @@ export default function DesignPage({ params }: { params: { locale: string } }) {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={s}
-                  src="/icon.svg"
+                  src="/brand/app-icon.svg"
                   alt={`${s}px`}
                   width={s}
                   height={s}
@@ -122,7 +117,7 @@ export default function DesignPage({ params }: { params: { locale: string } }) {
               ))}
             </div>
             <code className="tnum font-mono text-[11px] text-fg-subtle">
-              app/icon.svg · public/logo.svg
+              app/icon.svg · public/brand/app-icon.svg
             </code>
           </Card>
         </div>
