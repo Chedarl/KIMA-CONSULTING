@@ -1,0 +1,108 @@
+name: Supabase migrations
+
+# Applies forward-only schema migrations to the production Supabase project.
+#
+# Vercel deployments are NOT handled here. Vercel's own Git integration already
+# deploys every push (main -> production, any other branch -> preview). Adding a
+# Vercel step to this workflow would deploy twice.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-migrations.yml'
+  workflow_dispatch:
+
+# Never cancel a migration mid-flight: a half-applied migration is worse than a
+# queued one.
+concurrency:
+  group: supabase-migrations-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Not a secret - this ref appears in every project URL.
+  SUPABASE_PROJECT_REF: vhrnrbnjhmxrygvyfirf
+
+jobs:
+  apply:
+    name: Apply migrations to production (eu-west-3)
+    runs-on: ubuntu-latest
+
+    # The approval gate lives in GitHub settings, not in this file. With no
+    # reviewer configured on the "production" environment this runs fully
+    # automatically. Adding a required reviewer turns it into an approval step
+    # with no code change. See docs/deployment.md.
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for migrations to apply
+        id: check
+        run: |
+          if [ -z "$(find supabase/migrations -name '*.sql' -print -quit 2>/dev/null)" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No .sql files in supabase/migrations - nothing to apply."
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "Migrations found:"
+            find supabase/migrations -name '*.sql' | sort
+          fi
+
+      - name: Verify required secrets are present
+        if: steps.check.outputs.present == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          missing=0
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::Secret SUPABASE_ACCESS_TOKEN is not set on this repository."
+            missing=1
+          fi
+          if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::error::Secret SUPABASE_DB_PASSWORD is not set on this repository."
+            missing=1
+          fi
+          if [ "$missing" -eq 1 ]; then
+            echo "Add them under Settings > Secrets and variables > Actions."
+            echo "See docs/deployment.md for where each value comes from."
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        if: steps.check.outputs.present == 'true'
+        with:
+          version: latest
+
+      - name: Link project
+        if: steps.check.outputs.present == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Show pending migrations
+        if: steps.check.outputs.present == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase migration list --linked
+
+      - name: Apply migrations
+        if: steps.check.outputs.present == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push
+
+      - name: Confirm applied state
+        if: steps.check.outputs.present == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase migration list --linked
