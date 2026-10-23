@@ -1,0 +1,12 @@
+# Minimal Supabase CLI config. The CLI supplies defaults for everything not set
+# here, so this file stays small on purpose - add keys when something actually
+# needs to differ from the default.
+#
+# Production project: kima-consulting, ref vhrnrbnjhmxrygvyfirf, region eu-west-3.
+
+project_id = "kima-consulting"
+
+[db]
+# Match production (Postgres 17) so local replay and CI exercise the same engine
+# the migrations will really run against.
+major_version = 17

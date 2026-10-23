@@ -1,0 +1,65 @@
+name: Verify migrations
+
+# Applies every migration from scratch against a throwaway local Postgres, so a
+# migration that cannot replay never reaches the production database.
+#
+# This is the guard that makes auto-applying migrations on main defensible:
+# nothing lands in Paris that has not already replayed cleanly here.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-verify.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    name: Replay migrations on a clean database
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for migrations to verify
+        id: check
+        run: |
+          if [ -z "$(find supabase/migrations -name '*.sql' -print -quit 2>/dev/null)" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No .sql files in supabase/migrations - nothing to verify."
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: supabase/setup-cli@v1
+        if: steps.check.outputs.present == 'true'
+        with:
+          version: latest
+
+      - name: Start local Supabase and replay all migrations
+        if: steps.check.outputs.present == 'true'
+        run: supabase db start
+
+      # A migration that applies once but not twice will eventually break a
+      # rebuild, a branch database, or a restore. Catch it now.
+      - name: Replay a second time from scratch
+        if: steps.check.outputs.present == 'true'
+        run: supabase db reset
+
+      - name: Check for schema drift against committed migrations
+        if: steps.check.outputs.present == 'true'
+        run: |
+          # If this prints a diff, the migrations do not fully describe the
+          # schema they produce.
+          supabase db diff --local --schema public
+
+      - name: Stop local Supabase
+        if: always() && steps.check.outputs.present == 'true'
+        run: supabase stop --no-backup || true

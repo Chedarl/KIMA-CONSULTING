@@ -1,0 +1,7 @@
+# Forward-only migrations live here, named <timestamp>_<description>.sql.
+#
+# Create one with:
+#   supabase migration new <description>
+#
+# Both workflows in .github/workflows/ skip cleanly while this directory holds
+# no .sql files, so they stay green until there is real schema to apply.
