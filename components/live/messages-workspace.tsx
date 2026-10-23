@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { MessageThread, type MessageLabels } from "@/components/live/message-thread";
+import {
+  memberFromSession,
+  subscribeFirmSession,
+  type FirmSession,
+} from "@/lib/firm-auth";
+import { can, denialLabel } from "@/lib/permissions";
 
 /**
  * The firm's side of messaging: every client conversation in one place, with
@@ -31,6 +37,21 @@ export function MessagesWorkspace({
   const [clients, setClients] = useState<Client[] | null>(null);
   const [previews, setPreviews] = useState<Record<string, Preview>>({});
   const [active, setActive] = useState<string | null>(null);
+  const [session, setSession] = useState<FirmSession | null>(null);
+  const [assignments, setAssignments] = useState<
+    { taxpayer_id: string; assigned_to: string | null }[]
+  >([]);
+
+  useEffect(() => subscribeFirmSession(setSession), []);
+
+  useEffect(() => {
+    void supabase()
+      .from("engagements")
+      .select("taxpayer_id, assigned_to")
+      .then(({ data }) =>
+        setAssignments((data ?? []) as { taxpayer_id: string; assigned_to: string | null }[]),
+      );
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,6 +127,24 @@ export function MessagesWorkspace({
     );
   }, [clients, previews]);
 
+  const sendBlocked = useMemo(() => {
+    if (!session) return labels.signInRequired ?? labels.demoIdentity;
+    if (!active) return null;
+    const member = memberFromSession(session);
+    const verdict = can(
+      {
+        kind: "firm",
+        member,
+        assignedTaxpayerIds: assignments
+          .filter((e) => e.assigned_to && e.assigned_to === member.person_label)
+          .map((e) => e.taxpayer_id),
+      },
+      "note.write_client",
+      active,
+    );
+    return verdict.ok ? null : denialLabel(verdict.reason, locale);
+  }, [session, active, assignments, labels.signInRequired, labels.demoIdentity, locale]);
+
   if (sorted === null) {
     return (
       <div className="flex flex-col gap-2" aria-busy="true">
@@ -161,8 +200,12 @@ export function MessagesWorkspace({
             locale={locale}
             side="firm"
             taxpayerId={active}
-            senderName={labels.firmName}
+            senderName={session?.personLabel ?? labels.firmName}
             labels={labels}
+            firmActor={
+              session ? { role: session.role, label: session.personLabel } : null
+            }
+            sendBlocked={sendBlocked}
           />
         ) : (
           <p className="text-sm text-fg-muted">{labels.select}</p>

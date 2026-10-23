@@ -362,7 +362,7 @@ export function DocumentVerdicts({
                     recorded_at: new Date().toISOString(),
                   })
                 }
-                className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-navy px-4 text-sm font-semibold text-surface disabled:opacity-60"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90 disabled:opacity-60"
               >
                 {t.recordOnFile}
               </button>

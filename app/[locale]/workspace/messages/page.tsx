@@ -36,6 +36,7 @@ export default function FirmMessagesPage({ params }: { params: { locale: string 
           empty: m.empty,
           tooLong: m.tooLong,
           demoIdentity: m.demoIdentity,
+          signInRequired: m.signInRequired,
           connecting: t.work.connecting,
           offline: t.work.offline,
           live: t.work.live,

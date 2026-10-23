@@ -43,14 +43,14 @@ RPC: `portal_sign_in` (DEPRECATED). API: `POST /api/inquiry` (Resend).
 |---|---|---|---|
 | Registration lifecycle + 4 intake channels | `IntakePanel` (dashboard widget) | `RegistrationForm` `/register` | PARTIAL — F6 triage queue missing; first-response breach not at point of work |
 | CRM: segments, links, per-link access | `ClientsWorkspace` `/workspace/clients` | — | PARTIAL — Client 360° (`/workspace/clients/[id]`) missing |
-| Cases: stages, 4 dimensions, blocker, risk | `FirmDashboard`, `WorkQueue` | `ClientDashboard` (5 client states) | PARTIAL — no single-case screen (`/workspace/declarations/[id]`) |
+| Cases: stages, 4 dimensions, blocker, risk | `FirmDashboard`, `WorkQueue`, `CaseDetail` `/workspace/cases/[id]` (`advance`, `recordFiling`, four dimensions) | `ClientDashboard` (5 client states) | REFLECTED on the firm case screen. Client service page is the next phase. |
 | Events: timeline, visibility, `drift()` | dashboard feed | dashboard feed (client-visible only) | PARTIAL — no audit/drift surface |
 | `activity_events` (legacy, 8 writers) | — | — | FAULT — fold into `case_events` (needs `taxpayer_id`, nullable `case_id`), then drop |
 | Document review: 3 verdicts | `InboxWorkspace` `/workspace/inbox` records `documents.acceptance` before accept | `DocumentsPanel` (send only) | REFLECTED on the firm inbox; upload still carries no file |
 | Document naming: buckets, references | `FilingFramework` `/workspace/filing` | — | PARTIAL — grammar not applied to document centre / archive |
 | Rules: obligations, deadlines, prorogations | queue dates carry `due_needs_confirmation` | `ClientCompliance/Declarations/Archive` (live, ex-`demo-data`) | REFLECTED on client portal as of this change; firm deadlines calendar missing |
 | Diagnostics (pre-approval gate) | `ReviewsPanel` `/workspace/reviews` | — | REFLECTED — queue is `compliance_cases`; approve calls `commandAdvanceCase` (SoD); filing evidence is one `commandRecordFiling` step |
-| Permissions: capabilities, SoD, denial reasons | — (no sign-in yet) | portal demo login | MISSING — shells must render `capabilitiesOf(actor)`; blocked by auth (R-36 delivery) |
+| Permissions: capabilities, SoD, denial reasons | Firm shell shows the OTP session and `capabilitiesOf()`. Case, inbox, reviews and messages refuse without that member. | portal OTP login | REFLECTED for the firm workspace. Writes still need the Auth session minted by `verifyFirmCode`. |
 | Payments / billing dimension | nav `ready:false` | `PaymentsPanel` `/app/payments` | PARTIAL — firm billing missing |
 | Messages | `MessagesWorkspace` | `MessageThread` | REFLECTED (realtime) |
 | Organizer (documents only) | `OnboardingWizard` | in registration flow | REFLECTED |

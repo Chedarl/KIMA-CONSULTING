@@ -231,7 +231,7 @@ export function OnboardingWizard({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-navy px-4 text-sm font-semibold text-surface transition-colors hover:bg-navy-strong"
+        className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface transition-colors hover:opacity-90"
       >
         <svg
           viewBox="0 0 16 16"
@@ -340,7 +340,7 @@ export function OnboardingWizard({
                     setPage(safePage + 1);
                   }
                 }}
-                className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-surface hover:bg-navy-strong"
+                className="min-h-[44px] rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90"
               >
                 {labels.next}
               </button>

@@ -18,7 +18,11 @@ import {
 } from "@/lib/cases";
 import { commandAdvanceCase, commandRecordFiling } from "@/lib/commands";
 import type { NewCaseEvent } from "@/lib/events";
-import { readFirmSession, type FirmSession } from "@/lib/firm-auth";
+import {
+  memberFromSession,
+  subscribeFirmSession,
+  type FirmSession,
+} from "@/lib/firm-auth";
 import {
   approvalLabel,
   can,
@@ -211,9 +215,7 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
     void load();
   }, [load]);
 
-  useEffect(() => {
-    setSession(readFirmSession());
-  }, []);
+  useEffect(() => subscribeFirmSession(setSession), []);
 
   useEffect(() => {
     let channel: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
@@ -238,7 +240,9 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
 
   const member = useMemo(() => {
     if (!session) return null;
-    return members.find((m) => m.id === session.memberId && m.active) ?? null;
+    const row = members.find((m) => m.id === session.memberId);
+    if (row) return row.active ? row : null;
+    return memberFromSession(session);
   }, [session, members]);
 
   const actor = useMemo<Actor | null>(() => {
@@ -616,7 +620,7 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
                 type="button"
                 disabled={blocked || !actor || (approval !== null && !approval.ok) || busy === selected.id}
                 onClick={() => void approve(selected, caseRequests)}
-                className={`${btn} bg-navy text-surface`}
+                className={`${btn} bg-teal-text text-surface hover:opacity-90`}
               >
                 {blocked ? labels.approveBlocked : labels.approve}
               </button>
@@ -643,7 +647,7 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
                   type="button"
                   disabled={!actor || (filingAllowed !== null && !filingAllowed.ok) || busy === selected.id}
                   onClick={() => void recordStep(selected, next)}
-                  className={`${btn} bg-navy text-surface`}
+                  className={`${btn} bg-teal-text text-surface hover:opacity-90`}
                 >
                   {filingButton(next, labels)}
                 </button>

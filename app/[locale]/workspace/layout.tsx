@@ -1,12 +1,17 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import { Shell, type NavItem } from "@/components/shell";
+import { FirmSearch } from "@/components/live/firm-search";
+import { FirmSessionBar } from "@/components/live/firm-session-bar";
 
 /**
- * The firm workspace shell — twelve modules, of which the first release builds
- * a few. The rest are visible but disabled, so the shape of the product stays
- * legible without pretending the modules exist.
+ * Firm workspace chrome.
+ *
+ * Modules without an engine stay visible and disabled. Leads, engagements,
+ * the vault and billing are named here so the map matches the product, and
+ * they do not open until the screen behind them exists.
  */
 export default function FirmLayout({
   children,
@@ -22,14 +27,17 @@ export default function FirmLayout({
 
   const nav: NavItem[] = [
     { href: base, label: w.firm.nav.overview, icon: "grid", ready: true },
+    { href: `${base}/leads`, label: w.firm.nav.leads, icon: "user", ready: false },
     { href: `${base}/clients`, label: w.firm.nav.clients, icon: "people", ready: true },
-    { href: `${base}/inbox`, label: w.firm.nav.inbox, icon: "inbox", ready: true },
-    { href: `${base}/filing`, label: w.firm.nav.filing, icon: "archive", ready: true },
+    { href: `${base}/engagements`, label: w.firm.nav.engagements, icon: "folder", ready: false },
     { href: `${base}/queue`, label: w.firm.nav.queue, icon: "queue", ready: true },
-    { href: `${base}/declarations`, label: w.firm.nav.declarations, icon: "file", ready: false },
-    { href: `${base}/calendar`, label: w.firm.nav.calendar, icon: "calendar", ready: false },
+    { href: `${base}/inbox`, label: w.firm.nav.inbox, icon: "inbox", ready: true },
+    { href: `${base}/cases`, label: w.firm.nav.cases, icon: "file", ready: true },
     { href: `${base}/reviews`, label: w.firm.nav.reviews, icon: "check", ready: true },
     { href: `${base}/messages`, label: w.firm.nav.messages, icon: "chat", ready: true },
+    { href: `${base}/filing`, label: w.firm.nav.filing, icon: "archive", ready: true },
+    { href: `${base}/declarations`, label: w.firm.nav.declarations, icon: "file", ready: false },
+    { href: `${base}/calendar`, label: w.firm.nav.calendar, icon: "calendar", ready: false },
     { href: `${base}/vault`, label: w.firm.nav.vault, icon: "archive", ready: false },
     { href: `${base}/billing`, label: w.firm.nav.billing, icon: "card", ready: false },
     { href: `${base}/reports`, label: w.firm.nav.reports, icon: "chart", ready: false },
@@ -43,14 +51,29 @@ export default function FirmLayout({
       subtitle={w.firm.subtitle}
       soonLabel={w.soon}
       menuLabel={w.menu}
+      tone="navy"
     >
-      <div className="mb-3 flex justify-end">
-        <a
-          href={`/${locale}/firm-login`}
-          className="min-h-[44px] inline-flex items-center text-sm font-semibold text-navy hover:underline"
-        >
-          {w.firmLogin.title}
-        </a>
+      <div className="mb-4 flex flex-col gap-3">
+        <FirmSessionBar locale={locale} t={w.firmLogin} />
+        <div className="flex flex-wrap items-center gap-3">
+          <FirmSearch
+            locale={locale}
+            labels={{
+              searchLabel: w.firm.searchLabel,
+              searchPlaceholder: w.firm.searchPlaceholder,
+              searchEmpty: w.firm.searchEmpty,
+              searchClients: w.firm.searchClients,
+              searchCases: w.firm.searchCases,
+              signedOut: w.firmLogin.signedOut,
+            }}
+          />
+          <Link
+            href={`${base}/clients`}
+            className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90"
+          >
+            + {w.firm.newClient}
+          </Link>
+        </div>
       </div>
       {children}
     </Shell>

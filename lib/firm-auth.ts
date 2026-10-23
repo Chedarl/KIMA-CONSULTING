@@ -6,7 +6,7 @@
  */
 
 import { supabase } from "./supabase";
-import type { FirmRole } from "./permissions";
+import type { FirmMember, FirmRole } from "./permissions";
 
 export type FirmSession = {
   memberId: string;
@@ -118,6 +118,7 @@ export async function verifyFirmCode(reference: string, code: string): Promise<F
 export function rememberFirmSession(session: FirmSession): void {
   try {
     sessionStorage.setItem(KEY, JSON.stringify(session));
+    notifyFirmSession();
   } catch {
     // Non-fatal.
   }
@@ -134,12 +135,41 @@ export function readFirmSession(): FirmSession | null {
   }
 }
 
+const SESSION_EVENT = "kima-firm-session";
+
+function notifyFirmSession(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
+
+/** The member the OTP flow recorded. The roster wins when it has loaded. */
+export function memberFromSession(session: FirmSession): FirmMember {
+  return {
+    id: session.memberId,
+    person_label: session.personLabel,
+    email: session.email,
+    role: session.role,
+    active: true,
+    deactivated_at: null,
+  };
+}
+
+export function subscribeFirmSession(
+  onChange: (session: FirmSession | null) => void,
+): () => void {
+  const sync = () => onChange(readFirmSession());
+  sync();
+  window.addEventListener(SESSION_EVENT, sync);
+  return () => window.removeEventListener(SESSION_EVENT, sync);
+}
+
 export async function clearFirmSession(): Promise<void> {
   try {
     sessionStorage.removeItem(KEY);
   } catch {
     // Nothing to clear.
   }
+  notifyFirmSession();
   try {
     await supabase().auth.signOut();
   } catch {

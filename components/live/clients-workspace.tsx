@@ -179,9 +179,7 @@ export function ClientsWorkspace({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-display text-base font-semibold text-fg">
-                    {c.legal_name}
-                  </p>
+                  <p className="truncate font-display text-base font-semibold text-fg">{c.legal_name}</p>
                   {c.contact_name && (
                     <p className="truncate text-xs text-fg-muted">{c.contact_name}</p>
                   )}
