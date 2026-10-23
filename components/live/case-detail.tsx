@@ -33,6 +33,8 @@ import {
   type Engagement,
 } from "@/lib/cases";
 import { caseFindings, type CaseTaxpayer } from "@/lib/case-diagnostics";
+import { updateById } from "@/lib/db-write";
+import { readFirmSession, type FirmSession } from "@/lib/firm-auth";
 import type { Finding } from "@/lib/diagnostics";
 import {
   describe,
@@ -173,6 +175,7 @@ export function CaseDetail({
   t: Dict["caseDetail"];
   queueHref: string;
 }) {
+  const signInHref = `/${locale}/firm-login`;
   const [row, setRow] = useState<ComplianceCase | null>(null);
   const [taxpayer, setTaxpayer] = useState<Taxpayer | null>(null);
   const [engagement, setEngagement] = useState<Engagement | null>(null);
@@ -184,6 +187,7 @@ export function CaseDetail({
   const [events, setEvents] = useState<CaseEvent[]>([]);
   const [members, setMembers] = useState<FirmMember[]>([]);
   const [memberId, setMemberId] = useState("");
+  const [session, setSession] = useState<FirmSession | null>(null);
   const [disclose, setDisclose] = useState(false);
   const [tab, setTab] = useState<"firm" | "client">("firm");
   const [note, setNote] = useState("");
@@ -191,6 +195,7 @@ export function CaseDetail({
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [refusedBy, setRefusedBy] = useState<string | null>(null);
   const [live, setLive] = useState(false);
   const [offline, setOffline] = useState(false);
   const [missing, setMissing] = useState(false);
@@ -271,6 +276,13 @@ export function CaseDetail({
     void load();
   }, [load]);
 
+  // A signed-in member is who you ARE; the selector below is only for when
+  // nobody is signed in. Reading it here rather than in the loader keeps the
+  // session out of the data path.
+  useEffect(() => {
+    setSession(readFirmSession());
+  }, []);
+
   // The client acts on these same rows. A document arriving while an accountant
   // has the case open should appear without a refresh.
   useEffect(() => {
@@ -300,7 +312,15 @@ export function CaseDetail({
     };
   }, [caseId, load]);
 
-  const member = useMemo(() => members.find((m) => m.id === memberId) ?? null, [members, memberId]);
+  const member = useMemo(() => {
+    if (session) {
+      const signedIn = members.find((m) => m.id === session.memberId);
+      // The roster is the authority on the role; the stored session only says
+      // who signed in. A role changed since sign-in must not be the stale one.
+      if (signedIn) return signedIn;
+    }
+    return members.find((m) => m.id === memberId) ?? null;
+  }, [session, members, memberId]);
 
   /**
    * A staff member's reach comes from the engagements assigned to them, not
@@ -346,7 +366,12 @@ export function CaseDetail({
   const blocker = useMemo(() => deriveBlocker({ tasks, requests }), [tasks, requests]);
   const drifts = useMemo(() => (row ? drift(row, events) : []), [row, events]);
 
-  const canSeeInternal = allowed("event.view_internal").ok;
+  // Two different questions, and the stricter one wins. The capability says
+  // whether this role MAY read internal events; the session says whether the
+  // server will serve any. Without a session the scoped-read policy returns
+  // client rows only, so a page claiming to show everything would be showing a
+  // filtered list under a label that says otherwise.
+  const canSeeInternal = allowed("event.view_internal").ok && Boolean(session);
   const shown = useMemo(
     () => timeline(events, tab === "client" || !canSeeInternal ? "client" : "firm"),
     [events, tab, canSeeInternal],
@@ -381,18 +406,23 @@ export function CaseDetail({
     if (!result.ok) return;
     setBusy(to);
     setFailed(null);
+    setRefusedBy(null);
     try {
+      const written = await updateById("compliance_cases", row.id, result.patch);
+      if (!written.ok) {
+        setFailed(to);
+        setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        return;
+      }
       const db = supabase();
-      const { error } = await db.from("compliance_cases").update(result.patch).eq("id", row.id);
-      if (error) throw error;
       // Written from the same input the gate judged, by the function that
       // re-runs that gate: the log cannot record a move the engine refused.
-      const written = eventsFromAdvance(row, input, {
+      const log = eventsFromAdvance(row, input, {
         role: member.role,
         label: member.person_label,
       });
-      if (written.length > 0) {
-        const { error: logError } = await db.from("case_events").insert(written);
+      if (log.length > 0) {
+        const { error: logError } = await db.from("case_events").insert(log);
         if (logError) throw logError;
       }
       await load();
@@ -420,12 +450,17 @@ export function CaseDetail({
     }
     setBusy(r.id);
     setFailed(null);
+    setRefusedBy(null);
     try {
-      const db = supabase();
       const patch =
         to === "returned" ? { status: to, returned_count: r.returned_count + 1 } : { status: to };
-      const { error } = await db.from("document_requests").update(patch).eq("id", r.id);
-      if (error) throw error;
+      const written = await updateById("document_requests", r.id, patch);
+      if (!written.ok) {
+        setFailed(r.id);
+        setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        return;
+      }
+      const db = supabase();
       const event = eventFromRequest(
         row.id,
         {
@@ -452,17 +487,19 @@ export function CaseDetail({
   async function toggleTask(task: CaseTask) {
     setBusy(task.id);
     setFailed(null);
+    setRefusedBy(null);
     try {
       const done = task.state === "done";
-      const { error } = await supabase()
-        .from("case_tasks")
-        .update({
-          state: done ? "open" : "done",
-          // The database refuses a done task with no time against it.
-          completed_at: done ? null : new Date().toISOString(),
-        })
-        .eq("id", task.id);
-      if (error) throw error;
+      const written = await updateById("case_tasks", task.id, {
+        state: done ? "open" : "done",
+        // The database refuses a done task with no time against it.
+        completed_at: done ? null : new Date().toISOString(),
+      });
+      if (!written.ok) {
+        setFailed(task.id);
+        setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        return;
+      }
       await load();
     } catch {
       setFailed(task.id);
@@ -541,24 +578,32 @@ export function CaseDetail({
           </p>
         </div>
         <div className="flex flex-col items-start gap-1 sm:items-end">
-          <label className="flex items-center gap-2 text-xs text-fg-subtle">
-            {t.actingAs}
-            <select
-              value={memberId}
-              onChange={(e) => {
-                setMemberId(e.target.value);
-                setDisclose(false);
-              }}
-              className="min-h-[44px] rounded-lg border border-border-strong bg-surface px-2 text-sm font-medium text-fg"
-            >
-              {members.length === 0 && <option value="">{t.noMembers}</option>}
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.person_label} · {m.role.replace("firm_", "").replace("kima_", "")}
-                </option>
-              ))}
-            </select>
-          </label>
+          {session && member ? (
+            <p className="text-xs text-fg-subtle">
+              {t.signedInAs}{" "}
+              <span className="font-medium text-fg">{member.person_label}</span> ·{" "}
+              {member.role.replace("firm_", "").replace("kima_", "")}
+            </p>
+          ) : (
+            <label className="flex items-center gap-2 text-xs text-fg-subtle">
+              {t.actingAs}
+              <select
+                value={memberId}
+                onChange={(e) => {
+                  setMemberId(e.target.value);
+                  setDisclose(false);
+                }}
+                className="min-h-[44px] rounded-lg border border-border-strong bg-surface px-2 text-sm font-medium text-fg"
+              >
+                {members.length === 0 && <option value="">{t.noMembers}</option>}
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.person_label} · {m.role.replace("firm_", "").replace("kima_", "")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {live && (
             <span className="inline-flex items-center gap-1.5 text-xs text-teal-text">
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-teal" />
@@ -568,7 +613,23 @@ export function CaseDetail({
         </div>
       </div>
 
-      <p className="-mt-3 max-w-2xl text-xs leading-relaxed text-fg-subtle">{t.actingAsHint}</p>
+      {!session && (
+        <p className="-mt-3 max-w-2xl text-xs leading-relaxed text-fg-subtle">
+          {t.actingAsHint}{" "}
+          <Link href={signInHref} className="font-medium text-navy hover:underline">
+            {t.signIn}
+          </Link>
+        </p>
+      )}
+
+      {refusedBy && (
+        <p
+          role="status"
+          className="rounded-card border border-danger-text/40 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-text"
+        >
+          {refusedBy}
+        </p>
+      )}
 
       {offline && (
         <p className="rounded-card border border-amber/50 bg-amber-soft px-4 py-3 text-sm text-amber-text">

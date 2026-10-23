@@ -446,20 +446,81 @@ It subscribes to `document_requests`, `case_events` and `compliance_cases`, so
 an accountant's decision reaches the client without either of them pressing
 anything.
 
-**Remaining screens**: 01 registration · 02 business onboarding · 04 client 360
-· 05 document centre · 06 compliance case · 07 review and filing · 09 mobile
-portal · 10 delivery and archive.
-
 **Still missing on this screen**: "Send this document" records that a document
 was sent; it does not yet carry a file. Storage wiring and the assisted/paper
 intake path are their own piece of work.
 
+### Screen 06 — the compliance case (firm side)
+
+`components/live/case-detail.tsx`, at `/[locale]/workspace/cases/[caseId]`,
+linked from both the queue and the dashboard. **This is where the engines stop
+being libraries and become a workflow.** A stage move is `advance()`; the review
+gate is `canApproveReview()`; the checks are `caseFindings()`; the history is
+`eventsFromAdvance()`. The page decides nothing itself.
+
+- **Refusals are shown before they are attempted.** The screen runs the gate for
+  every allowed move and prints why it is refused —
+  *"Documents are not yet accepted. Received does not mean accepted."*
+- **New engine piece**: `lib/case-diagnostics.ts` asks the existing diagnostics
+  about a case. An adapter, not a second rule set: `NO_REVIEWER` and
+  `SELF_APPROVAL` are dropped because for a case that decision belongs to
+  `canApproveReview()`, which knows about roles, disclosure and the sole
+  practitioner. 15 assertions.
+- Accept or return a document (accepting is a judgement, and only the firm's);
+  toggle a task; write a note whose audience is chosen; move the stage.
+- `drift()` is on the page: if the row and its own log disagree, the case says
+  so in red rather than quietly rendering the row.
+
+**Remaining screens**: 01 registration · 02 business onboarding · 04 client 360
+· 05 document centre · 07 review and filing · 09 mobile portal · 10 delivery
+and archive.
+
+### The auth close-out changed what works without signing in
+
+The fix-forward branch (`20261022213000` and the two corrections after it) is
+applied. **Seeing is no longer mutating**: every write names the capability it
+needs, from the same matrix `lib/permissions.ts` holds. Measured through the
+publishable key: an anonymous caller reads the 4 demo cases and 5 requests,
+sees **0 internal events** and **0 tasks**, is refused `portal_accounts.otp_hash`
+outright — and cannot change anything.
+
+Three things that cost real time, recorded so nobody pays twice:
+
+1. **A refused UPDATE is silent.** PostgREST answers a PATCH matching zero rows
+   with HTTP 200 and an empty body, and supabase-js reports no error. Every
+   update now goes through `lib/db-write.ts`, which asks for the changed rows
+   back and treats "no rows" as a refusal. Without it the client portal would
+   show a document as sent while the database ignored it.
+2. **The OTP hash was readable by anon** after a column revoke that was a
+   no-op under a table-wide grant. An 8-digit code behind `sha256(code || id)`
+   is recoverable offline in seconds. Fixed in `20261022214500`.
+3. **The demo switch had no handle.** The gate was a GUC to be set with
+   `alter database … set`, which managed Supabase roles may not do. Moved into
+   `app_flags` (`20261022215000`), default off. It is currently **true** on the
+   synthetic project so the demo can be read; **it must be false before any
+   real taxpayer data exists (R-32).**
+
+**To make the firm and portal screens writable you need `SUPABASE_SERVICE_ROLE_KEY`**
+in `.env.local` — it is not on Vercel either. Without it `/api/firm/request-code`
+answers 503, no session can be minted, and every write is correctly refused.
+`KIMA_DEMO_OTP_REVEAL=1` is already set locally, so the one-time code is shown
+in the browser while no mail domain is verified.
+
+Synthetic identities seeded for the controls to be visible rather than
+theoretical: `irina@demo.kima.cm` (partner), `paul@demo.kima.cm` (reviewer),
+`awa@demo.kima.cm` (staff) — three active professionals, so
+`requiresSecondReview()` is true and self-approval is refused outright. The
+portal contact is `jean.mbango@example.cm`. `taxpayers.niu` held a **masked
+display string** (`P0582 •••• 417K`) where a code belongs, so no client typing
+their own NIU could ever have matched; it now holds a synthetic
+structurally-valid value.
+
 **Known open items**
 
 - Export the Supabase migrations into this repo
-- Apply `20261022213000_auth_closeout_otp_and_capability_writes` on the live
-  Supabase project, set `SUPABASE_SERVICE_ROLE_KEY`, and seed firm/portal
-  contact emails before turning off any remaining demo escape hatches
+- `SUPABASE_SERVICE_ROLE_KEY` is still unset — the one thing standing between
+  the screens and a real session (the migration is applied and the emails are
+  seeded)
 - Expand `npm test` coverage toward the full F2–F4 engine suites
 - `docs/design/.../MASTER.md` is stale and contradicts blueprint §9
 - Drop the `activity_events` table once the live project has run long enough on

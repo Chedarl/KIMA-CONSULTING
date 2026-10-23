@@ -552,7 +552,11 @@ const fr = {
     back: "Retour à la file",
     actingAs: "J'agis en tant que",
     actingAsHint:
-      "Il n'existe pas encore d'authentification cabinet : ce choix tient lieu de session et sert à toutes les décisions de cette page.",
+      "Personne n'est connecté : ce choix tient lieu de session et sert à toutes les décisions de cette page. Connectez-vous pour pouvoir enregistrer quoi que ce soit.",
+    signedInAs: "Connecté :",
+    signIn: "Se connecter au cabinet",
+    notPermitted:
+      "La base a refusé : ce rôle n'a pas la capacité requise. Rien n'a été enregistré.",
     noMembers: "Aucun membre du cabinet enregistré.",
     period: "Période",
     due: "Échéance",
@@ -1181,7 +1185,11 @@ const en: WorkspaceDictionary = {
     back: "Back to the queue",
     actingAs: "Acting as",
     actingAsHint:
-      "There is no firm sign-in yet: this choice stands in for a session and drives every decision on this page.",
+      "Nobody is signed in: this choice stands in for a session and drives every decision on this page. Sign in before anything can be recorded.",
+    signedInAs: "Signed in:",
+    signIn: "Sign in to the firm",
+    notPermitted:
+      "The database refused: this role does not hold the capability. Nothing was recorded.",
     noMembers: "No firm member on record.",
     period: "Period",
     due: "Due",

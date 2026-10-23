@@ -55,7 +55,7 @@ from supabase_migrations.schema_migrations
 order by version;
 ```
 
-Four cautions learned while exporting the eleven below:
+Six cautions learned while exporting and applying the files below:
 
 - `array_to_string(...) || ';'` appends a semicolon to statements that already
   end in one, producing a trailing `;;`. Strip it.
@@ -67,11 +67,35 @@ Four cautions learned while exporting the eleven below:
   accepted and does nothing. Revoke the table grant, then grant the columns —
   and check `information_schema.column_privileges` afterwards rather than
   trusting the statement to have worked.
+- **A column revoke that was a no-op cost us the OTP hash.** It happened
+  again, for real, on `portal_accounts` in `20261022213000`: anon could still
+  read `otp_hash` after the revoke ran, and an 8-digit code behind
+  `sha256(code || id)` is recoverable offline in seconds. Fixed in
+  `20261022214500`. The caution above was written before this and was still
+  not enough — so: after any grant change, **query
+  `information_schema.column_privileges` and look**.
+- **`create or replace function` cannot widen OUT parameters** (42P13). Any
+  migration that adds a column to a function's returned TABLE must drop the
+  function first, or it fails on every database that ran the earlier version.
+- **A switch needs a handle.** `20261022213000` gated the demo-anon branch
+  behind a GUC to be set with `alter database … set`. Managed Supabase roles
+  may not set database or role parameters, so the gate could never be opened;
+  `20261022215000` moved the flag into a table. Prefer a row over a GUC for
+  anything an operator is expected to change.
 - **The server assigns the version, not you.** Two files here were first
   written under guessed timestamps and had to be renamed. Read the version
   back from `supabase_migrations.schema_migrations` before naming the file:
   a filename that disagrees with the recorded version is worse than no file,
   because it looks authoritative.
+
+## Applied, but in pieces
+
+`20261022213000` is recorded on the server as **seven** versions, not one:
+`auth_closeout_1a` … `1e`, `2a`, `2b` and `3`. The single call was refused
+twice by the tooling with `Invalid or expired requestState` — a payload-size
+limit, not a SQL error — and nothing had been applied either time. The file
+remains the readable unit; the server's own list is the record of execution.
+The two files after it were each applied as one version under their own name.
 
 ## Why it matters here
 

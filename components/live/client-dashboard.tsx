@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { updateById } from "@/lib/db-write";
 import { Card, CardHeader } from "@/components/ui";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
@@ -244,12 +245,15 @@ export function ClientDashboard({
     setBusy(r.id);
     setFailed(null);
     try {
+      // A zero-row update is how a refusal arrives under the capability
+      // policies, and it carries no error. Checked, or the client would be
+      // shown their document as sent while nothing moved.
+      const written = await updateById("document_requests", r.id, { status: "submitted" });
+      if (!written.ok) {
+        setFailed(r.id);
+        return;
+      }
       const db = supabase();
-      const { error } = await db
-        .from("document_requests")
-        .update({ status: "submitted" })
-        .eq("id", r.id);
-      if (error) throw error;
 
       if (r.case_id) {
         const event = buildEvent(

@@ -9,10 +9,23 @@
 create extension if not exists pgcrypto;
 
 -- -------------------------------------------------------------------------
+-- 0. Drop before create.
+-- -------------------------------------------------------------------------
+-- `create or replace function` CANNOT widen a function's OUT parameters, and
+-- portal_verify_code already exists from 20261022181734 returning
+-- (ok, reason, taxpayer_id, display_name). Without these drops this file fails
+-- with 42P13 on any database that ran that migration -- which is every one of
+-- them. Found by applying it: the first attempt rolled back here.
+drop function if exists portal_issue_code(text, text);
+drop function if exists portal_verify_code(uuid, text);
+drop function if exists firm_issue_code(text);
+drop function if exists firm_verify_code(uuid, text);
+
+-- -------------------------------------------------------------------------
 -- 1. Portal: issue code (server-only plaintext) + stronger verify
 -- -------------------------------------------------------------------------
 
-create or replace function portal_issue_code(p_name text, p_identifier text)
+create function portal_issue_code(p_name text, p_identifier text)
 returns table (ok boolean, masked_destination text, reference uuid, code text, destination text)
 language plpgsql volatile security definer set search_path = public, extensions as $$
 declare
@@ -58,7 +71,7 @@ end $$;
 revoke all on function portal_issue_code(text, text) from public, anon, authenticated;
 -- service_role bypasses RLS and owns privileged RPCs in Supabase.
 
-create or replace function portal_verify_code(p_reference uuid, p_code text)
+create function portal_verify_code(p_reference uuid, p_code text)
 returns table (
   ok boolean,
   reason text,
@@ -127,7 +140,7 @@ update firm_members
 set email = coalesce(email, 'irina@demo.kima.cm')
 where lower(btrim(person_label)) = 'irina' and active;
 
-create or replace function firm_issue_code(p_email text)
+create function firm_issue_code(p_email text)
 returns table (ok boolean, masked_destination text, reference uuid, code text, destination text)
 language plpgsql volatile security definer set search_path = public, extensions as $$
 declare
@@ -163,7 +176,7 @@ end $$;
 
 revoke all on function firm_issue_code(text) from public, anon, authenticated;
 
-create or replace function firm_verify_code(p_reference uuid, p_code text)
+create function firm_verify_code(p_reference uuid, p_code text)
 returns table (
   ok boolean,
   reason text,
@@ -230,6 +243,10 @@ $$;
 
 comment on function can_see_taxpayer(uuid) is
   'Tenant scoping. Demo anon branch requires app.allow_demo_anon=on and must stay off for real data (R-32).';
+
+-- SUPERSEDED by 20261022215000. `alter database … set` and `alter role … set`
+-- are both refused to the managed roles on Supabase, so this GUC could never
+-- be turned on: the switch had no handle. The flag moved into a table.
 
 -- -------------------------------------------------------------------------
 -- 4. Capability-scoped writes (replace blanket firm writes on scoped tables)
@@ -332,6 +349,11 @@ create policy "firm updates portal accounts" on portal_accounts for update
   using (member_has('member.manage') or member_has('case.advance'))
   with check (member_has('member.manage') or member_has('case.advance'));
 
+-- WARNING, and see 20261022214500: the portal_accounts line below is a SILENT
+-- NO-OP. A column revoke does nothing while a table-wide SELECT grant stands,
+-- and portal_accounts had one -- so anon could still read otp_hash after this
+-- ran. The firm_members line works only because that table was already moved
+-- to column grants in 20261022163452.
 revoke select (otp_hash, otp_expires_at, failed_attempts) on portal_accounts from anon, authenticated;
 revoke select (otp_hash, otp_expires_at, failed_attempts) on firm_members from anon, authenticated;
 
