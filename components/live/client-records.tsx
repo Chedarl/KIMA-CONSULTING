@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Card, CardHeader, Timeline } from "@/components/ui";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
@@ -286,7 +287,12 @@ export function ClientCompliance({
               return (
                 <li key={cs.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-fg">{obligationLabel(cs.obligation_code, locale)}</p>
+                    <Link
+                      href={`/${locale}/app/declarations/${cs.id}`}
+                      className="text-sm font-medium text-fg underline-offset-2 hover:underline"
+                    >
+                      {obligationLabel(cs.obligation_code, locale)}
+                    </Link>
                     <p className="tnum font-mono text-xs text-fg-subtle">{cs.period_token}</p>
                   </div>
                   <DueLine c={cs} dash={dash} />
@@ -346,7 +352,17 @@ export function ClientDeclarations({
               <Card key={cs.id} className="rise-in flex flex-col">
                 <CardHeader
                   title={`${obligationLabel(cs.obligation_code, locale)} — ${cs.period_token}`}
-                  action={<StatusPill label={clientStatusLabel(status, locale)} status={status} />}
+                  action={
+                    <span className="flex flex-wrap items-center gap-2">
+                      <StatusPill label={clientStatusLabel(status, locale)} status={status} />
+                      <Link
+                        href={`/${locale}/app/declarations/${cs.id}`}
+                        className="inline-flex min-h-[44px] items-center text-sm font-semibold text-teal-text"
+                      >
+                        {r.openCase}
+                      </Link>
+                    </span>
+                  }
                 />
                 <div className="flex flex-1 flex-col gap-4 px-5 py-4">
                   <div className="flex flex-wrap items-center gap-3">

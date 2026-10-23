@@ -167,7 +167,7 @@ export function PortalLogin({
 
         <a
           href={portalHref}
-          className="inline-flex min-h-[44px] w-fit items-center rounded-lg bg-navy px-4 text-sm font-semibold text-surface hover:bg-navy-strong"
+          className="inline-flex min-h-[44px] w-fit items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90"
         >
           {t.continueToPortal}
         </a>
@@ -224,7 +224,7 @@ export function PortalLogin({
             type="button"
             disabled={busy}
             onClick={() => void submitCode()}
-            className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-surface hover:bg-navy-strong disabled:opacity-60"
+            className="min-h-[44px] rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90 disabled:opacity-60"
           >
             {busy ? t.submitting : t.verifyCode}
           </button>
@@ -323,7 +323,7 @@ export function PortalLogin({
         type="button"
         disabled={busy}
         onClick={() => void requestCode()}
-        className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-surface hover:bg-navy-strong disabled:opacity-60"
+        className="min-h-[44px] rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90 disabled:opacity-60"
       >
         {busy ? t.submitting : t.requestCode}
       </button>

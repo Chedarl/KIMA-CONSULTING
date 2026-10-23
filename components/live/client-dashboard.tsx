@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { updateById } from "@/lib/db-write";
+import { demoIds, supabase } from "@/lib/supabase";
+import { submitRequestFile } from "@/lib/submit-request";
+import { todayInDouala } from "@/lib/dates";
 import { Card, CardHeader } from "@/components/ui";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
@@ -17,7 +18,7 @@ import {
   type ClientStatus,
   type ComplianceCase,
 } from "@/lib/cases";
-import { buildEvent, describe, timeline, type CaseEvent } from "@/lib/events";
+import { describe, timeline, type CaseEvent } from "@/lib/events";
 
 /**
  * The client's side of the same records.
@@ -49,10 +50,7 @@ const STEPS: ClientStatus[] = [
   "complete",
 ];
 
-const todayISO = () => {
-  const d = new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-};
+const todayISO = () => todayInDouala();
 
 function Tile({
   label,
@@ -127,10 +125,14 @@ export function ClientDashboard({
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const pending = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const db = supabase();
+      setIds(await demoIds());
       const [cs, rq, ev, tp] = await Promise.all([
         db
           .from("compliance_cases")
@@ -234,52 +236,35 @@ export function ClientDashboard({
   const stepLabels = [t.stepDocuments, t.stepProgress, t.stepReview, t.stepFiling, t.stepDone];
 
   /**
-   * Send a document.
-   *
-   * Writes the request to `submitted` and records the event that says so. The
-   * status is what the firm queries; the event is what both timelines render.
-   * The actor is the CLIENT, stated explicitly, because an event with the wrong
-   * name against it is worse than no event.
+   * Upload a document. The file is stored and the request moves to
+   * `submitted`, never to `accepted`. A click with no file changes nothing.
    */
-  async function send(r: CaseRequest) {
+  async function send(r: CaseRequest, file: File) {
+    if (!ids) {
+      setFailed(r.id);
+      return;
+    }
     setBusy(r.id);
     setFailed(null);
-    try {
-      // A zero-row update is how a refusal arrives under the capability
-      // policies, and it carries no error. Checked, or the client would be
-      // shown their document as sent while nothing moved.
-      const written = await updateById("document_requests", r.id, { status: "submitted" });
-      if (!written.ok) {
-        setFailed(r.id);
-        return;
-      }
-      const db = supabase();
-
-      if (r.case_id) {
-        const event = buildEvent(
-          r.case_id,
-          { role: "client", label: clientName },
-          {
-            kind: "request_submitted",
-            from: r.status,
-            to: "submitted",
-            subject: locale === "fr" ? r.label_fr : r.label_en,
-          },
-        );
-        await db.from("case_events").insert(event);
-      }
-
-      // Optimistic, then the realtime echo confirms it. On a slow connection a
-      // client should see their own action immediately.
+    const result = await submitRequestFile({
+      requestId: r.id,
+      file,
+      taxpayerId: ids.taxpayerId,
+      organizationId: ids.organizationId,
+      caseId: r.case_id,
+      label: locale === "fr" ? r.label_fr : r.label_en,
+      actorLabel: clientName,
+      previousStatus: r.status,
+    });
+    if (!result.ok) {
+      setFailed(r.id);
+    } else {
       setRequests((prev) =>
         prev.map((x) => (x.id === r.id ? { ...x, status: "submitted" as const } : x)),
       );
       void load();
-    } catch {
-      setFailed(r.id);
-    } finally {
-      setBusy(null);
     }
+    setBusy(null);
   }
 
   const label = (r: CaseRequest) => (locale === "fr" ? r.label_fr : r.label_en);
@@ -308,13 +293,13 @@ export function ClientDashboard({
       )}
 
       {cases === null ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="order-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-24 animate-pulse rounded-card bg-surface-sunken" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="order-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Tile label={t.activeServices} value={cases.length} tone="neutral" />
           <Tile
             label={t.actionRequired}
@@ -326,7 +311,7 @@ export function ClientDashboard({
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="order-1 grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-5">
           <Card>
             <CardHeader title={t.actionTitle} />
@@ -365,12 +350,23 @@ export function ClientDashboard({
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => void send(r)}
+                            onClick={() => {
+                              pending.current = r.id;
+                              fileRef.current?.click();
+                            }}
                             disabled={busy === r.id}
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-teal px-4 text-sm font-semibold text-surface transition-opacity hover:opacity-90 disabled:opacity-60"
+                            className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface transition-opacity hover:opacity-90 disabled:opacity-60"
                           >
                             {busy === r.id ? t.sending : t.send}
                           </button>
+                          {r.case_id && (
+                            <Link
+                              href={`/${locale}/app/declarations/${r.case_id}`}
+                              className="inline-flex min-h-[44px] items-center text-sm font-semibold text-navy"
+                            >
+                              {t.openService}
+                            </Link>
+                          )}
                           <Link
                             href={documentsHref}
                             className="inline-flex min-h-[44px] items-center text-sm font-medium text-fg-muted underline-offset-2 hover:underline"
@@ -412,9 +408,12 @@ export function ClientDashboard({
                         className="rounded-card border border-border bg-surface p-3 sm:p-4"
                       >
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <p className="font-medium text-fg">
+                          <Link
+                            href={`/${locale}/app/declarations/${c.id}`}
+                            className="font-medium text-fg underline-offset-2 hover:underline"
+                          >
                             {obligationLabel(c.obligation_code, locale)}
-                          </p>
+                          </Link>
                           <span className="tnum font-mono text-xs text-fg-subtle">
                             {c.period_token}
                           </span>
@@ -489,6 +488,20 @@ export function ClientDashboard({
           </Card>
         </div>
       </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        className="sr-only"
+        accept=".pdf,.jpg,.jpeg,.png,.webp,.csv,.xls,.xlsx,.txt"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          const id = pending.current;
+          const req = requests.find((r) => r.id === id);
+          if (file && req) void send(req, file);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }

@@ -48,6 +48,7 @@ export function Shell({
   soonLabel,
   menuLabel,
   tone = "light",
+  hideMobileMenu = false,
   children,
 }: {
   nav: NavItem[];
@@ -57,6 +58,8 @@ export function Shell({
   menuLabel: string;
   /** Firm workspace uses the brand navy rail. Client stays on the light rail. */
   tone?: "light" | "navy";
+  /** Client phones use a bottom bar instead of opening this rail. */
+  hideMobileMenu?: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname() || "";
@@ -71,6 +74,7 @@ export function Shell({
     <div className="flex flex-col gap-5 lg:flex-row lg:gap-7">
       {/* On a phone the rail collapses behind a disclosure rather than
           shrinking a desktop layout, so the work itself stays the priority. */}
+      {!hideMobileMenu && (
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -88,6 +92,7 @@ export function Shell({
           <path d="M4 6l4 4 4-4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
+      )}
 
       <nav
         aria-label={menuLabel}
@@ -163,7 +168,7 @@ export function Shell({
         </ul>
       </nav>
 
-      <div className="min-w-0 flex-1">
+      <div className={`min-w-0 flex-1 ${hideMobileMenu ? "pb-24 lg:pb-0" : ""}`}>
         {tone === "light" && (
           <header className="mb-5">
             <h1 className="font-display text-2xl font-bold tracking-tight text-fg">{title}</h1>
