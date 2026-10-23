@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Poppins, IBM_Plex_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import "../globals.css";
-import { Chrome } from "@/components/chrome";
 import { Footer } from "@/components/footer";
+import { SiteFrame } from "@/components/site-frame";
 import { ToastProvider } from "@/components/toast";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 
@@ -96,22 +96,21 @@ export default function LocaleLayout({
           {t.nav.skip}
         </a>
         <ToastProvider>
-        <Chrome
-          locale={locale}
-          labels={{
-            overview: t.nav.overview,
-            taxpayer: t.nav.taxpayer,
-            workspace: t.nav.workspace,
-            design: t.nav.design,
-            language: t.nav.language,
-            mainNav: t.nav.mainNav,
-            theme: t.nav.theme,
-          }}
-        />
-        <main id="main" className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
-          {children}
-        </main>
-        <Footer locale={locale} />
+          <SiteFrame
+            locale={locale}
+            labels={{
+              overview: t.nav.overview,
+              taxpayer: t.nav.taxpayer,
+              workspace: t.nav.workspace,
+              design: t.nav.design,
+              language: t.nav.language,
+              mainNav: t.nav.mainNav,
+              theme: t.nav.theme,
+            }}
+            footer={<Footer locale={locale} />}
+          >
+            {children}
+          </SiteFrame>
         </ToastProvider>
       </body>
     </html>

@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
-import { getDictionary, isLocale } from "@/lib/i18n";
+import { isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
-import { DemoBanner } from "@/components/ui";
 import { ClientService } from "@/components/live/client-service";
 
 /**
@@ -17,19 +16,15 @@ export default function ClientServicePage({
 }) {
   if (!isLocale(params.locale)) notFound();
   const locale = params.locale;
-  const t = getDictionary(locale);
   const w = getWorkspaceDictionary(locale);
 
   return (
-    <div className="flex flex-col gap-5">
-      <DemoBanner>{t.home.demoNotice}</DemoBanner>
-      <ClientService
-        caseId={params.caseId}
-        locale={locale}
-        t={w.clientService}
-        dash={w.clientDash}
-        backHref={`/${locale}/app/declarations`}
-      />
-    </div>
+    <ClientService
+      caseId={params.caseId}
+      locale={locale}
+      t={w.clientService}
+      dash={w.clientDash}
+      backHref={`/${locale}/app/services`}
+    />
   );
 }
