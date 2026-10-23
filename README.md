@@ -1,4 +1,4 @@
-# KIMA Compliance OS
+# KIMA OS
 
 Tax compliance management, accounting workflow automation and digital taxpayer
 services. Initial market Cameroon, expansion CEMAC. French and English, XAF.

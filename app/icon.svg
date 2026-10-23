@@ -1,9 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- App icon / favicon: the mark reversed out of a navy tile. -->
-  <rect width="64" height="64" rx="14" fill="#163B66" />
-  <g transform="translate(32 32) scale(0.74) translate(-32 -32)">
-    <rect x="10" y="8" width="10" height="48" rx="3" fill="#FFFFFF" />
-    <path d="M24 30 L42 8 L54 8 L36 30 Z" fill="#FFFFFF" />
-    <path d="M24 34 L36 34 L54 56 L42 56 Z" fill="#1E9E74" />
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="KIMA OS">
+<title>KIMA OS</title>
+<rect width="64" height="64" rx="14" fill="#1A3E68"/>
+<g transform="translate(9,11) scale(0.205)"><path fill="#FFFFFF" d="M16 24 H70 L86 46 V88 H16 Z"/>
+<path fill="#FFFFFF" d="M74 16 H110 L88 46 Z"/>
+<path fill="#FFFFFF" d="M85.9 108.1 L35.9 58.1 L16.1 77.9 L66.1 127.9 Z"/>
+<path fill="#FFFFFF" d="M74.0 125.7 L214.0 23.7 L194.0 -3.7 L54.0 98.3 Z"/>
+<path fill="#FFFFFF" d="M48 124 L78 112 L186 176 L150 200 Z"/>
+<path fill="#FFFFFF" d="M16 108 H50 L44 190 H16 Z"/></g>
 </svg>
