@@ -22,6 +22,7 @@ import {
   nextStages,
   obligationLabel,
   paymentLabel,
+  requestIsOutstanding,
   requestStatusLabel,
   stageLabel,
   waitsOn,
@@ -130,7 +131,15 @@ function Dimension({ label, value, tone }: { label: string; value: string; tone:
  * exists FOR. The client's five states live on their own portal, and the one
  * place the two meet is the "client sees" field below.
  */
-function StageRail({ current, locale }: { current: CaseStage; locale: "fr" | "en" }) {
+function StageRail({
+  current,
+  locale,
+  stepWord,
+}: {
+  current: CaseStage;
+  locale: "fr" | "en";
+  stepWord: string;
+}) {
   if (current === "abandoned") {
     return (
       <p className="rounded-lg border border-border-strong bg-surface-sunken px-3 py-2 text-sm font-medium text-fg-muted">
@@ -139,28 +148,37 @@ function StageRail({ current, locale }: { current: CaseStage; locale: "fr" | "en
     );
   }
   const at = STAGE_RAIL.indexOf(current);
+  const total = STAGE_RAIL.length;
   return (
-    <ol className="flex flex-wrap gap-1.5">
-      {STAGE_RAIL.map((s, i) => {
-        const here = i === at;
-        const done = i < at;
-        return (
-          <li
-            key={s}
-            aria-current={here ? "step" : undefined}
-            className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-              here
-                ? "border-navy bg-navy text-surface"
-                : done
-                  ? "border-teal/40 bg-teal-soft text-teal-text"
-                  : "border-border bg-surface-sunken text-fg-subtle"
-            }`}
-          >
-            {locale === "fr" ? STAGE_LABELS[s].fr : STAGE_LABELS[s].en}
-          </li>
-        );
-      })}
-    </ol>
+    <div>
+      <p role="status" className="text-xs font-semibold text-fg-subtle">
+        {stepWord} {at + 1} / {total}
+      </p>
+      <ol className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        {STAGE_RAIL.map((s, i) => {
+          const here = i === at;
+          const done = i < at;
+          return (
+            <li
+              key={s}
+              aria-current={here ? "step" : undefined}
+              className={`flex min-h-[44px] items-center gap-2 rounded-lg border px-2 ${
+                here
+                  ? "border-navy bg-navy text-surface"
+                  : done
+                    ? "border-teal/40 bg-teal-soft text-teal-text"
+                    : "border-border bg-surface text-fg-subtle"
+              }`}
+            >
+              <span className="font-mono text-xs">{i + 1}</span>
+              <span className="text-xs font-semibold leading-tight">
+                {locale === "fr" ? STAGE_LABELS[s].fr : STAGE_LABELS[s].en}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -694,7 +712,25 @@ export function CaseDetail({
           <Card>
             <CardHeader title={t.stageTitle} />
             <div className="flex flex-col gap-4 p-4 sm:p-5">
-              <StageRail current={row.stage} locale={locale} />
+              <StageRail current={row.stage} locale={locale} stepWord={t.step} />
+              {requests.length > 0 ? (
+                <p className="text-sm text-fg-muted">
+                  {t.receivedCount}{" "}
+                  <span className="tnum font-semibold text-fg">
+                    {requests.filter((r) => r.status === "submitted").length}
+                  </span>
+                  {" · "}
+                  {t.acceptedCount}{" "}
+                  <span className="tnum font-semibold text-teal-text">
+                    {requests.filter((r) => r.status === "accepted").length}
+                  </span>
+                  {" · "}
+                  {t.owedCount}{" "}
+                  <span className="tnum font-semibold text-amber-text">
+                    {requests.filter((r) => requestIsOutstanding(r.status)).length}
+                  </span>
+                </p>
+              ) : null}
 
               <dl className="grid gap-3 sm:grid-cols-3">
                 <Field label={t.due}>
