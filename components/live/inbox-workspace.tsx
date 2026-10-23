@@ -58,6 +58,7 @@ export type InboxLabels = {
   live: string;
   verdictsRecorded: string;
   verdictsRequired: string;
+  needFile: string;
   awaitingVerdicts: string;
   signInRequired: string;
 };
@@ -230,6 +231,10 @@ export function InboxWorkspace({
     }
     if (decision === "accepted" && ids.some((id) => !docs?.find((d) => d.id === id)?.acceptance)) {
       toast(labels.verdictsRequired, "error");
+      return;
+    }
+    if (decision === "accepted" && ids.some((id) => !docs?.find((d) => d.id === id)?.storage_path)) {
+      toast(labels.needFile, "error");
       return;
     }
     setBusy(true);
