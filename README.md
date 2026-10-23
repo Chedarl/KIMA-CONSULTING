@@ -373,7 +373,7 @@ Still open, and it is the honest limit of this increment:
   the demo taxpayer. That is what keeps the current interface working. It is
   one line, written on its own line, and **must be deleted before real taxpayer
   data exists** (R-32).
-- **R-36 close-out (apply migration `20261022213000_…`).** Portal and firm OTP
+- **R-36 close-out (applied as `20261023010535` through `20261023010729`).** Portal and firm OTP
   flows are wired in the app (`/login`, `/firm-login`). The server issues an
   8-digit code via `portal_issue_code` / `firm_issue_code` (service role only),
   delivers it through Resend (or `KIMA_DEMO_OTP_REVEAL=1` for synthetic demos),
@@ -490,7 +490,7 @@ and archive.
 
 ### The auth close-out changed what works without signing in
 
-The fix-forward branch (`20261022213000` and the two corrections after it) is
+The fix-forward branch (`20261023010535` through `20261023011145`) is
 applied. **Seeing is no longer mutating**: every write names the capability it
 needs, from the same matrix `lib/permissions.ts` holds. Measured through the
 publishable key: an anonymous caller reads the 4 demo cases and 5 requests,
@@ -506,10 +506,10 @@ Three things that cost real time, recorded so nobody pays twice:
    show a document as sent while the database ignored it.
 2. **The OTP hash was readable by anon** after a column revoke that was a
    no-op under a table-wide grant. An 8-digit code behind `sha256(code || id)`
-   is recoverable offline in seconds. Fixed in `20261022214500`.
+   is recoverable offline in seconds. Fixed in `20261023010824`.
 3. **The demo switch had no handle.** The gate was a GUC to be set with
    `alter database … set`, which managed Supabase roles may not do. Moved into
-   `app_flags` (`20261022215000`), default off. It is currently **true** on the
+   `app_flags` (`20261023011145`), default off. It is currently **true** on the
    synthetic project so the demo can be read; **it must be false before any
    real taxpayer data exists (R-32).**
 

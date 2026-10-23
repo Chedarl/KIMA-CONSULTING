@@ -3,44 +3,56 @@
 How a commit reaches production. Two independent pipelines, deliberately not
 coupled: Vercel deploys code, GitHub Actions applies database migrations.
 
-**Status of this document:** the pipeline described here is configured but has
-never applied a migration. Treat its behaviour as intended, not observed, until
-the first migration goes through it.
+**Status of the migration pipeline:** it has run, and it has not yet changed
+the database. GitHub Actions run
+[39904684722](https://github.com/Chedarl/KIMA-CONSULTING/actions/runs/39904684722)
+on `main` linked the Paris project, then `supabase db push` exited before
+applying anything:
 
-**The database and the repository have diverged, and the gap is widening.** The
-Paris project holds schema that `supabase/migrations/` does not: 6 migrations
-on 2026-10-21, 13 by 2026-10-22, against 0 `.sql` files in the repository
-throughout.
-
-This document deliberately does not list them. At the rate they are being added
-the list would be wrong within a day, and there is an authoritative source:
-
-```bash
-supabase migration list --linked     # applied remotely vs. present locally
+```text
+Remote migration versions not found in local migrations directory.
 ```
 
-Every one of them was applied directly through the Supabase management tools,
-so all of it bypassed both workflows below. Nothing replayed any of it on a
-clean database, and no pull request has ever shown the access policies it
-created. `supabase/README.md` records the same gap and asks for the export;
-the two documents agree.
+Secrets and `supabase link` succeeded. The remote history contained versions
+with no `.sql` file in the repository, and several files that were here used
+timestamps the server had never recorded. The CLI stops in that state so it
+does not apply a local history that has diverged from production.
 
-The practical cost compounds: each migration applied this way is one more that
-has to be reconstructed later, and the longer it runs the more the eventual
-export is archaeology rather than a dump.
+Those applied statements are now in `supabase/migrations/` under the version
+numbers stored in `supabase_migrations.schema_migrations`. `db push` skips a
+version it already finds there, so pushing these files does not re-run the SQL
+that created the live schema. History was not rewritten with
+`supabase migration repair --status reverted`. That command deletes rows from
+the remote history table; the next push would then try to create objects that
+already exist.
 
-**When that SQL is exported, keep these exact version numbers as the filenames.**
-`supabase db push` decides what to apply by comparing local filenames against
-the versions already recorded remotely. Re-exported under fresh timestamps, the
-same statements would be treated as new work and replayed against a database
-that already has those objects, and the push would fail on the first
-`create table`. Exported under the versions above, every one is already
-recorded remotely and `db push` correctly skips them — the repository becomes
-the source of truth without touching the database.
+**Filename versions are the identity.** `db push` compares the timestamp prefix
+of each local file with the versions already recorded remotely. The same SQL
+under a fresh timestamp is new work. On a database that already has the
+objects, that push fails on the first `create table` — or, worse, succeeds at
+something destructive. Keep the recorded version. Read it back from
+`supabase_migrations.schema_migrations` before naming a file that has already
+been applied.
 
-Until the export happens, the honest position is that the schema is live and
-unreviewed, and that `supabase/README.md` carries a security review listing
-seven gaps that all block real taxpayer data.
+One file is newer than every version on the server:
+`20261023052142_document_acceptance_snapshot.sql`. It adds the nullable
+`documents.acceptance` column the inbox already writes, and states that a
+failed verdict does not remove the row. The column is not on the Paris project.
+The same statement used to live at `20261023031000`, which is before the latest
+applied version (`20261023044730`). `db push` refuses a local file inserted
+before the last remote version unless `--include-all` is passed, and this
+workflow does not pass it. The statement moved forward so the workflow can
+apply it in order. It is `add column if not exists` plus a comment.
+
+Confirm before relying on the workflow:
+
+```bash
+supabase migration list --linked   # every remote version present locally
+supabase db push --dry-run         # should name only 20261023052142
+```
+
+The authoritative list is that command, not a table copied into this document.
+`supabase/migrations/README.md` records how the filenames were reconciled.
 
 ## Infrastructure
 
@@ -101,9 +113,10 @@ and checks that the committed migrations fully describe the schema they produce.
 `supabase/**`. Links the production project and runs `supabase db push`.
 Concurrency is set so a migration is never cancelled mid-flight.
 
-Both skip cleanly while `supabase/migrations/` holds no `.sql` files, so neither
-goes red on doc-only pushes. Confirmed on PR #1: the verify job ran and passed
-with no migrations present.
+Both skip cleanly while `supabase/migrations/` holds no `.sql` files, so a
+doc-only push does not go red for lack of SQL. PR #1 confirmed that skip. SQL
+is present now, so the verify job replays the full history on a pull request
+and `db push` runs on `main`.
 
 ### The Supabase GitHub App is also connected
 
@@ -127,9 +140,11 @@ the repository under Project Settings → Integrations. Not both.
 Worth confirming the App's current scope in the dashboard — the evidence here is
 one skipped check run, not a read of the integration settings.
 
-### Three manual steps before the migration workflow can run
+### Repository secrets the workflow reads
 
-It will fail with an explicit error until these are done.
+Run 39904684722 passed the secret check and `supabase link`. Both values are
+set on the repository. The job then failed on migration history, which is the
+gap closed above. To rotate either secret, repeat these steps:
 
 **1. Get a database password.** The project was created with a generated
 password that was never displayed, so there is nothing to copy. Reset it:

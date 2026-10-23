@@ -16,9 +16,10 @@
 | 20261021034146 | `onboarding_and_diagnostics` | `organizer_answers`, `validation_findings`, contact columns; **widened policies so onboarding can create taxpayers** |
 | 20261021034903 | `harden_definer_function` | `search_path = ''`, execute revoked from anon |
 
-The SQL currently lives in Supabase, not in this repo. **Export it to
-`supabase/migrations/` before anyone else needs to review the policies** — a
-policy that is not in version control cannot be reviewed in a pull request.
+The applied SQL is in `supabase/migrations/`, one file per version recorded on
+the project. Review the policies there. A file whose timestamp is not in
+`supabase_migrations.schema_migrations` is still pending; `db push` applies
+only those.
 
 ## The one structural guarantee
 
@@ -38,9 +39,12 @@ Scenario F holds against a direct SQL write, not merely against the interface.
 
 An ECC security review of this backend (2026-10-21) returned: *acceptable for a
 synthetic-data demo, blocking before any real taxpayer data.* The findings are
-accurate and are reproduced here so nobody has to rediscover them.
+the review of the schema as it stood that day. Later files in
+`supabase/migrations/` replaced several of the policies it describes. The live
+posture is those files. The list below is kept so the original gaps are not
+forgotten, not as a description of every policy that is in force now.
 
-**What someone holding the publishable key can currently do:** read every row
+**What the review found the publishable key could do on 2026-10-21:** read every row
 in the working tables, update any taxpayer, move any request to accepted or
 returned, insert a declaration marked `filed` with fabricated evidence values,
 forge `audit_events` rows, list and download every object in the storage
