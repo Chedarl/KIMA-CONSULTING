@@ -6,8 +6,12 @@ import { Chrome, type ChromeLabels } from "@/components/chrome";
 import type { Locale } from "@/lib/i18n";
 
 /**
- * Marketing chrome wraps every public route. The client portal brings its own
- * shell, so those routes render full-bleed. Firm workspace keeps the site header.
+ * Three shells, three boundaries.
+ *
+ * The client portal brings its own shell. The firm workspace and the design
+ * page keep the existing site header — those screens are not part of the
+ * public redesign. Marketing, sign-in and onboarding are full-bleed and bring
+ * their own header.
  */
 export function SiteFrame({
   locale,
@@ -23,6 +27,19 @@ export function SiteFrame({
   const path = usePathname() || "";
   const portal = path === `/${locale}/app` || path.startsWith(`/${locale}/app/`);
   if (portal) return <>{children}</>;
+
+  const firmChrome =
+    path === `/${locale}/workspace` ||
+    path.startsWith(`/${locale}/workspace/`) ||
+    path === `/${locale}/design` ||
+    path.startsWith(`/${locale}/design/`) ||
+    path === `/${locale}/firm-login` ||
+    path.startsWith(`/${locale}/firm-login/`);
+
+  if (!firmChrome) {
+    return <div className="public-site">{children}</div>;
+  }
+
   return (
     <>
       <Chrome locale={locale} labels={labels} />
