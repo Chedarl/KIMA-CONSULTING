@@ -1,22 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { audit, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { updateById } from "@/lib/db-write";
-import { hasBlocking, runDiagnostics, type Finding } from "@/lib/diagnostics";
-import { requestIsOutstanding, type RequestStatus } from "@/lib/cases";
+import { caseFindings } from "@/lib/case-diagnostics";
+import {
+  filingLabel,
+  nextFilingStatus,
+  obligationLabel,
+  stageLabel,
+  type CaseRequest,
+  type ComplianceCase,
+  type FilingStatus,
+} from "@/lib/cases";
+import { commandAdvanceCase, commandRecordFiling } from "@/lib/commands";
+import type { NewCaseEvent } from "@/lib/events";
+import { readFirmSession, type FirmSession } from "@/lib/firm-auth";
+import {
+  approvalLabel,
+  can,
+  canApproveReview,
+  denialLabel,
+  requiresSecondReview,
+  type Actor,
+  type FirmMember,
+} from "@/lib/permissions";
+import { hasBlocking as findingsBlock } from "@/lib/diagnostics";
 
 /**
- * Reviews and approvals, gated by diagnostics.
+ * Review queue for compliance cases.
  *
- * Approve is disabled while any blocking finding is open — the same shape as
- * ProConnect refusing an e-file on an EF Critical diagnostic, applied to the
- * gate Kima actually owns.
- *
- * Recording filing evidence is a separate, deliberate act. The database
- * refuses a `filed` row without a reference, a capture date and a source, so
- * this component cannot fake a filing even if it were wrong.
+ * Approval is `commandAdvanceCase` to `filing`, which runs `canApproveReview`.
+ * Filing evidence is `commandRecordFiling` for the single next legal status.
+ * A case is never marked verified because somebody clicked Approve.
+ * Without a firm session the write is refused — this screen does not impersonate.
  */
 export type ReviewLabels = {
   blocking: string;
@@ -33,73 +51,96 @@ export type ReviewLabels = {
   reviewer: string;
   none: string;
   failed: string;
+  signInRequired: string;
+  recordAttempt: string;
+  markAwaiting: string;
+  notPermitted: string;
+  discloseSelf: string;
+  stepRecorded: string;
+  selfApproved: string;
   empty: string;
   offline: string;
 };
 
-type DeclRow = {
-  id: string;
-  taxpayer_id: string;
-  organization_id: string;
-  label_fr: string;
-  label_en: string;
-  period: string;
-  due_on: string;
-  state: string;
-  prepared_by: string | null;
-  reviewer: string | null;
-  returned_count: number;
-  evidence_reference: string | null;
-};
-
-type TpRow = {
+type Taxpayer = {
   id: string;
   legal_name: string;
-  profile_verified: boolean;
+  profile_verified: boolean | null;
   tax_centre: string | null;
   accounting_framework: string | null;
   tax_regime: string | null;
 };
 
+const CASE_COLUMNS =
+  "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
+
+const REQUEST_COLUMNS =
+  "id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count";
+
+const btn =
+  "inline-flex min-h-[44px] items-center rounded-lg px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-fg-subtle";
+
+function samePerson(a: string | null, b: string | null): boolean {
+  return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function filingButton(to: FilingStatus, labels: ReviewLabels): string {
+  if (to === "attempted") return labels.recordAttempt;
+  if (to === "awaiting_verification") return labels.markAwaiting;
+  return labels.recordEvidence;
+}
+
 export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: ReviewLabels }) {
   const toast = useToast();
-  const [decls, setDecls] = useState<DeclRow[] | null>(null);
-  const [taxpayers, setTaxpayers] = useState<Record<string, TpRow>>({});
-  const [counts, setCounts] = useState<Record<string, { open: number; returned: number }>>({});
+  const [cases, setCases] = useState<ComplianceCase[] | null>(null);
+  const [taxpayers, setTaxpayers] = useState<Record<string, Taxpayer>>({});
+  const [requests, setRequests] = useState<Record<string, CaseRequest[]>>({});
+  const [members, setMembers] = useState<FirmMember[]>([]);
+  const [assignments, setAssignments] = useState<
+    { taxpayer_id: string; assigned_to: string | null }[]
+  >([]);
+  const [session, setSession] = useState<FirmSession | null>(null);
+  const [disclose, setDisclose] = useState<Record<string, boolean>>({});
+  const [evidence, setEvidence] = useState<Record<string, string>>({});
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [evidence, setEvidence] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      const [{ data: d }, { data: tp }, { data: reqs }] = await Promise.all([
-        db.from("declarations").select("*").order("due_on"),
-        db
-          .from("taxpayers")
-          .select("id, legal_name, profile_verified, tax_centre, accounting_framework, tax_regime"),
-        db.from("document_requests").select("taxpayer_id, status, returned_count"),
-      ]);
+      const [{ data: rows, error: caseError }, { data: tp }, { data: reqs }, { data: mem }, { data: eng }] =
+        await Promise.all([
+          db.from("compliance_cases").select(CASE_COLUMNS).is("closed_at", null).order("due_on"),
+          db
+            .from("taxpayers")
+            .select("id, legal_name, profile_verified, tax_centre, accounting_framework, tax_regime"),
+          db.from("document_requests").select(REQUEST_COLUMNS),
+          db.from("firm_members").select("id, person_label, role, active, deactivated_at"),
+          db.from("engagements").select("taxpayer_id, assigned_to"),
+        ]);
+      if (caseError) throw caseError;
 
-      const byId: Record<string, TpRow> = {};
-      for (const row of (tp ?? []) as TpRow[]) byId[row.id] = row;
+      const byTaxpayer: Record<string, Taxpayer> = {};
+      for (const row of (tp ?? []) as Taxpayer[]) byTaxpayer[row.id] = row;
 
-      const tally: Record<string, { open: number; returned: number }> = {};
-      for (const r of (reqs ?? []) as {
-        taxpayer_id: string;
-        status: string;
-        returned_count: number;
-      }[]) {
-        const slot = (tally[r.taxpayer_id] ??= { open: 0, returned: 0 });
-        if (requestIsOutstanding(r.status as RequestStatus)) {
-          slot.open += 1;
-        }
-        if (r.returned_count > 0) slot.returned += 1;
+      const byCase: Record<string, CaseRequest[]> = {};
+      for (const row of (reqs ?? []) as CaseRequest[]) {
+        if (!row.case_id) continue;
+        const list = byCase[row.case_id] ?? [];
+        byCase[row.case_id] = [...list, row];
       }
 
-      setTaxpayers(byId);
-      setCounts(tally);
-      setDecls((d ?? []) as DeclRow[]);
+      const roster = ((mem ?? []) as Omit<FirmMember, "email">[]).map((m) => ({
+        ...m,
+        email: null,
+      }));
+
+      setTaxpayers(byTaxpayer);
+      setRequests(byCase);
+      setMembers(roster);
+      setAssignments((eng ?? []) as { taxpayer_id: string; assigned_to: string | null }[]);
+      setCases((rows ?? []) as unknown as ComplianceCase[]);
+      setError(false);
     } catch {
       setError(true);
     }
@@ -109,49 +150,109 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
     void load();
   }, [load]);
 
-  async function approve(decl: DeclRow, findings: Finding[]) {
-    setBusy(decl.id);
+  useEffect(() => {
+    setSession(readFirmSession());
+  }, []);
+
+  useEffect(() => {
+    let channel: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
     try {
       const db = supabase();
-      await db.from("validation_findings").insert(
-        findings.map((f) => ({
-          declaration_id: decl.id,
-          taxpayer_id: decl.taxpayer_id,
-          check_code: f.code,
-          severity: f.severity,
-          message_fr: f.fr,
-          message_en: f.en,
-          status: "open",
-        })),
-      );
+      channel = db
+        .channel("reviews-queue")
+        .on("postgres_changes", { event: "*", schema: "public", table: "compliance_cases" }, () =>
+          void load(),
+        )
+        .on("postgres_changes", { event: "*", schema: "public", table: "document_requests" }, () =>
+          void load(),
+        )
+        .subscribe();
+    } catch {
+      channel = null;
+    }
+    return () => {
+      if (channel) void channel.unsubscribe();
+    };
+  }, [load]);
 
-      // Approved and submitted, but NOT filed: filing waits on evidence.
-      const written = await updateById("declarations", decl.id, {
-        state: "awaiting_evidence",
-        updated_at: new Date().toISOString(),
-      });
-      if (!written.ok) throw new Error(written.reason);
+  const member = useMemo(() => {
+    if (!session) return null;
+    return members.find((m) => m.id === session.memberId && m.active) ?? null;
+  }, [session, members]);
 
-      const { recordCaseEvent } = await import("@/lib/record-event");
-      await recordCaseEvent({
-        taxpayerId: decl.taxpayer_id,
-        organizationId: decl.organization_id,
-        actor: { role: "firm_reviewer", label: "Firm" },
-        kind: "note_added",
-        subject: decl.period,
-        reason: `Déclaration approuvée / Declaration approved for ${decl.period}`,
-      });
+  const actor = useMemo<Actor | null>(() => {
+    if (!member) return null;
+    return {
+      kind: "firm",
+      member,
+      assignedTaxpayerIds: assignments
+        .filter((e) => e.assigned_to && e.assigned_to === member.person_label)
+        .map((e) => e.taxpayer_id),
+    };
+  }, [member, assignments]);
+
+  const secondReview = useMemo(() => requiresSecondReview(members), [members]);
+
+  async function persist(
+    id: string,
+    patch: Record<string, unknown>,
+    events: NewCaseEvent[],
+  ): Promise<"ok" | "denied" | "failed"> {
+    const written = await updateById("compliance_cases", id, patch);
+    if (!written.ok) return written.reason === "not_permitted" ? "denied" : "failed";
+    if (events.length > 0) {
+      const { error: logError } = await supabase().from("case_events").insert(events);
+      if (logError) return "failed";
+    }
+    return "ok";
+  }
+
+  async function approve(row: ComplianceCase, caseRequests: CaseRequest[]) {
+    if (!member || !actor) {
+      toast(labels.signInRequired, "error");
+      return;
+    }
+    const tp = taxpayers[row.taxpayer_id];
+    if (!tp) return;
+    const findings = caseFindings({
+      c: row,
+      taxpayer: { ...tp, profile_verified: Boolean(tp.profile_verified) },
+      requests: caseRequests,
+    });
+    const result = commandAdvanceCase({
+      current: row,
+      advance: {
+        to: "filing",
+        by: member.person_label,
+        findings,
+        requests: caseRequests,
+      },
+      eventActor: { role: member.role, label: member.person_label },
+      authActor: actor,
+      requireSecondReview: secondReview,
+      discloseSelfApproval: disclose[row.id] === true,
+    });
+    if (!result.ok) {
+      toast(locale === "fr" ? result.reasonFr : result.reasonEn, "error");
+      return;
+    }
+    setBusy(row.id);
+    try {
+      const outcome = await persist(row.id, result.patch as Record<string, unknown>, result.events);
+      if (outcome !== "ok") {
+        toast(outcome === "denied" ? labels.notPermitted : labels.failed, "error");
+        await load();
+        return;
+      }
       await audit({
-        taxpayerId: decl.taxpayer_id,
-        organizationId: decl.organization_id,
+        taxpayerId: row.taxpayer_id,
         actor: "firm",
-        action: "declaration.approved",
-        resourceType: "declaration",
-        resourceId: decl.id,
-        before: { state: decl.state },
-        after: { state: "awaiting_evidence" },
+        action: "case.review_approved",
+        resourceType: "compliance_case",
+        resourceId: row.id,
+        before: { stage: row.stage },
+        after: { stage: "filing" },
       });
-
       toast(labels.approved);
       await load();
     } catch {
@@ -161,49 +262,49 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
     }
   }
 
-  async function recordEvidence(decl: DeclRow) {
-    const ref = (evidence[decl.id] ?? "").trim();
-    if (!ref) {
+  async function recordStep(row: ComplianceCase, to: FilingStatus) {
+    if (!member || !actor) {
+      toast(labels.signInRequired, "error");
+      return;
+    }
+    const ref = (evidence[row.id] ?? "").trim();
+    if (to === "verified" && !ref) {
       toast(labels.evidenceRequired, "error");
       return;
     }
-    setBusy(decl.id);
+    const result = commandRecordFiling({
+      current: row,
+      filing: {
+        to,
+        evidenceRef: to === "verified" ? ref : null,
+        reference: to === "verified" ? ref : null,
+      },
+      eventActor: { role: member.role, label: member.person_label },
+      authActor: actor,
+    });
+    if (!result.ok) {
+      toast(locale === "fr" ? result.reasonFr : result.reasonEn, "error");
+      return;
+    }
+    setBusy(row.id);
     try {
-      const db = supabase();
-      const written = await updateById("declarations", decl.id, {
-        state: "filed",
-        evidence_reference: ref,
-        evidence_captured_on: new Date().toISOString().slice(0, 10),
-        evidence_source: "official_receipt",
-        updated_at: new Date().toISOString(),
-      });
-      // The database CHECK refuses a filed row without all three evidence
-      // fields, so a failure here is the guarantee working, not a glitch.
-      // updateById also treats a zero-row PATCH as a refusal.
-      if (!written.ok) throw new Error(written.reason);
-
-      const { recordCaseEvent } = await import("@/lib/record-event");
-      await recordCaseEvent({
-        taxpayerId: decl.taxpayer_id,
-        organizationId: decl.organization_id,
-        actor: { role: "firm_reviewer", label: "Firm" },
-        kind: "filing_verified",
-        to: "verified",
-        subject: ref,
-        reason: `Dépôt confirmé pour ${decl.period}`,
-      });
+      const outcome = await persist(row.id, result.patch as Record<string, unknown>, result.events);
+      if (outcome !== "ok") {
+        toast(outcome === "denied" ? labels.notPermitted : labels.failed, "error");
+        await load();
+        return;
+      }
       await audit({
-        taxpayerId: decl.taxpayer_id,
-        organizationId: decl.organization_id,
+        taxpayerId: row.taxpayer_id,
         actor: "firm",
-        action: "declaration.filed",
-        resourceType: "declaration",
-        resourceId: decl.id,
-        after: { evidence_reference: ref },
+        action: "case.filing_recorded",
+        resourceType: "compliance_case",
+        resourceId: row.id,
+        before: { filing_status: row.filing_status },
+        after: { filing_status: to, filing_evidence_ref: to === "verified" ? ref : null },
       });
-
-      toast(labels.filed);
-      setEvidence((p) => ({ ...p, [decl.id]: "" }));
+      toast(to === "verified" ? labels.filed : labels.stepRecorded);
+      setEvidence((prev) => ({ ...prev, [row.id]: "" }));
       await load();
     } catch {
       toast(labels.failed, "error");
@@ -219,7 +320,7 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
       </p>
     );
   }
-  if (decls === null) {
+  if (cases === null) {
     return (
       <div className="flex flex-col gap-2" aria-busy="true">
         {[0, 1].map((i) => (
@@ -229,7 +330,14 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
     );
   }
 
-  const pending = decls.filter((d) => d.state !== "filed");
+  const pending = cases
+    .filter(
+      (c) =>
+        c.stage === "review" || (c.stage === "filing" && c.filing_status !== "verified"),
+    )
+    .slice()
+    .sort((a, b) => (a.due_on ?? "9999").localeCompare(b.due_on ?? "9999"));
+
   if (pending.length === 0) {
     return (
       <p className="rounded-card border border-teal-text/30 bg-teal-soft px-4 py-3 text-sm text-teal-text">
@@ -240,24 +348,50 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
 
   return (
     <div className="flex flex-col gap-4">
-      {pending.map((d, i) => {
-        const tp = taxpayers[d.taxpayer_id];
+      {!session ? (
+        <p className="rounded-card border border-amber-text/40 bg-amber-soft px-4 py-3 text-sm text-amber-text">
+          {labels.signInRequired}
+        </p>
+      ) : null}
+      {pending.map((row, i) => {
+        const tp = taxpayers[row.taxpayer_id];
         if (!tp) return null;
-        const c = counts[d.taxpayer_id] ?? { open: 0, returned: 0 };
-        const findings = runDiagnostics({
-          declaration: d,
-          taxpayer: tp,
-          openRequests: c.open,
-          returnedRequests: c.returned,
+        const caseRequests = requests[row.id] ?? [];
+        const findings = caseFindings({
+          c: row,
+          taxpayer: { ...tp, profile_verified: Boolean(tp.profile_verified) },
+          requests: caseRequests,
         });
-        const blocked = hasBlocking(findings);
+        const blocked = findingsBlock(findings);
         const blockingList = findings.filter((f) => f.severity === "blocking");
         const advisoryList = findings.filter((f) => f.severity === "advisory");
-        const awaitingEvidence = d.state === "awaiting_evidence";
+        const approval =
+          actor && row.stage === "review"
+            ? canApproveReview(row, actor, {
+                requireSecondReview: secondReview,
+                discloseSelfApproval: disclose[row.id] === true,
+              })
+            : null;
+        const next = row.stage === "filing" ? nextFilingStatus(row.filing_status) : null;
+        const filingCap = next === "verified" ? "filing.verify" : "filing.record";
+        const filingAllowed = actor && next ? can(actor, filingCap, row.taxpayer_id) : null;
+        const gate =
+          !actor
+            ? labels.signInRequired
+            : approval && !approval.ok
+              ? approvalLabel(approval.reason, locale)
+              : filingAllowed && !filingAllowed.ok
+                ? denialLabel(filingAllowed.reason, locale)
+                : null;
+        const showDisclose =
+          row.stage === "review" &&
+          !!member &&
+          samePerson(row.prepared_by, member.person_label) &&
+          !secondReview;
 
         return (
           <section
-            key={d.id}
+            key={row.id}
             className="rise-in rounded-card border border-border bg-surface"
             style={{ animationDelay: `${Math.min(i, 6) * 50}ms` }}
           >
@@ -265,20 +399,31 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
               <div>
                 <h3 className="font-display text-base font-semibold text-fg">{tp.legal_name}</h3>
                 <p className="text-sm text-fg-muted">
-                  {locale === "fr" ? d.label_fr : d.label_en} ·{" "}
-                  <span className="tnum font-mono">{d.period}</span>
+                  {obligationLabel(row.obligation_code, locale)} ·{" "}
+                  <span className="tnum font-mono">{row.period_token}</span>
                 </p>
                 <p className="mt-1 text-xs text-fg-subtle">
-                  {labels.preparedBy} {d.prepared_by ?? labels.none} · {labels.reviewer}{" "}
-                  {d.reviewer ?? labels.none}
+                  {labels.preparedBy} {row.prepared_by ?? labels.none} · {labels.reviewer}{" "}
+                  {row.approved_by ?? labels.none}
+                  {" · "}
+                  {stageLabel(row.stage, locale)} · {filingLabel(row.filing_status, locale)}
                 </p>
+                {row.self_approved ? (
+                  <p className="mt-1 text-xs font-semibold text-amber-text">{labels.selfApproved}</p>
+                ) : null}
               </div>
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                   blocked ? "bg-danger-soft text-danger-text" : "bg-teal-soft text-teal-text"
                 }`}
               >
-                {blocked ? `${blockingList.length} ${labels.blocking.toLowerCase()}` : labels.clean}
+                {blocked
+                  ? `${blockingList.length} ${labels.blocking.toLowerCase()}`
+                  : row.stage === "review" && approval && !approval.ok
+                    ? labels.approveBlocked
+                    : row.stage === "review"
+                      ? labels.clean
+                      : filingLabel(row.filing_status, locale)}
               </span>
             </header>
 
@@ -315,37 +460,62 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
               ))}
 
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                {!awaitingEvidence ? (
+                {row.stage === "review" ? (
                   <button
                     type="button"
-                    disabled={blocked || busy === d.id}
-                    onClick={() => void approve(d, findings)}
-                    className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-fg-subtle"
+                    disabled={blocked || !actor || (approval !== null && !approval.ok) || busy === row.id}
+                    onClick={() => void approve(row, caseRequests)}
+                    className={`${btn} bg-teal-text text-surface`}
                   >
                     {blocked ? labels.approveBlocked : labels.approve}
                   </button>
-                ) : (
+                ) : null}
+                {next ? (
                   <>
-                    <label htmlFor={`ev-${d.id}`} className="sr-only">
-                      {labels.evidencePlaceholder}
-                    </label>
-                    <input
-                      id={`ev-${d.id}`}
-                      value={evidence[d.id] ?? ""}
-                      onChange={(e) => setEvidence((p) => ({ ...p, [d.id]: e.target.value }))}
-                      placeholder={labels.evidencePlaceholder}
-                      className="min-h-[44px] flex-1 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-fg"
-                    />
+                    {next === "verified" ? (
+                      <>
+                        <label htmlFor={`ev-${row.id}`} className="sr-only">
+                          {labels.evidencePlaceholder}
+                        </label>
+                        <input
+                          id={`ev-${row.id}`}
+                          value={evidence[row.id] ?? ""}
+                          onChange={(e) =>
+                            setEvidence((prev) => ({ ...prev, [row.id]: e.target.value }))
+                          }
+                          placeholder={labels.evidencePlaceholder}
+                          className="min-h-[44px] min-w-[12rem] flex-1 rounded-lg border border-border bg-surface px-3 font-mono text-sm text-fg"
+                        />
+                      </>
+                    ) : null}
                     <button
                       type="button"
-                      disabled={busy === d.id}
-                      onClick={() => void recordEvidence(d)}
-                      className="inline-flex min-h-[44px] items-center rounded-lg bg-navy px-4 text-sm font-semibold text-surface disabled:opacity-60"
+                      disabled={!actor || (filingAllowed !== null && !filingAllowed.ok) || busy === row.id}
+                      onClick={() => void recordStep(row, next)}
+                      className={`${btn} bg-navy text-surface`}
                     >
-                      {labels.recordEvidence}
+                      {filingButton(next, labels)}
                     </button>
                   </>
-                )}
+                ) : null}
+                {showDisclose ? (
+                  <label className="flex min-h-[44px] items-center gap-2 text-sm text-fg">
+                    <input
+                      type="checkbox"
+                      checked={disclose[row.id] === true}
+                      onChange={(e) =>
+                        setDisclose((prev) => ({ ...prev, [row.id]: e.target.checked }))
+                      }
+                      className="size-4"
+                    />
+                    {labels.discloseSelf}
+                  </label>
+                ) : null}
+                {gate ? (
+                  <p className="w-full text-sm text-amber-text" role="status">
+                    {gate}
+                  </p>
+                ) : null}
               </div>
             </div>
           </section>

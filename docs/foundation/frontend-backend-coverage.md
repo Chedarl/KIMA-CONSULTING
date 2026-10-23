@@ -49,7 +49,7 @@ RPC: `portal_sign_in` (DEPRECATED). API: `POST /api/inquiry` (Resend).
 | Document review: 3 verdicts | `InboxWorkspace` + `DocumentVerdicts` `/workspace/inbox` | `DocumentsPanel` (send only) | REFLECTED, except upload carries no file (Storage not wired) |
 | Document naming: buckets, references | `FilingFramework` `/workspace/filing` | — | PARTIAL — grammar not applied to document centre / archive |
 | Rules: obligations, deadlines, prorogations | queue dates carry `due_needs_confirmation` | `ClientCompliance/Declarations/Archive` (live, ex-`demo-data`) | REFLECTED on client portal as of this change; firm deadlines calendar missing |
-| Diagnostics (pre-approval gate) | `ReviewsPanel` `/workspace/reviews` | — | PARTIAL — review & filing not one screen (board 9) |
+| Diagnostics (pre-approval gate) | `ReviewsPanel` `/workspace/reviews` | — | REFLECTED — queue is `compliance_cases`; approve calls `commandAdvanceCase` (SoD); filing evidence is one `commandRecordFiling` step |
 | Permissions: capabilities, SoD, denial reasons | — (no sign-in yet) | portal demo login | MISSING — shells must render `capabilitiesOf(actor)`; blocked by auth (R-36 delivery) |
 | Payments / billing dimension | nav `ready:false` | `PaymentsPanel` `/app/payments` | PARTIAL — firm billing missing |
 | Messages | `MessagesWorkspace` | `MessageThread` | REFLECTED (realtime) |

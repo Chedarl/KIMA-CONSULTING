@@ -153,6 +153,23 @@ try {
     assert.equal(result.reason, "forbidden");
   });
 
+  check("nextFilingStatus is one legal forward step", () => {
+    assert.equal(cases.nextFilingStatus("not_submitted"), "attempted");
+    assert.equal(cases.nextFilingStatus("attempted"), "awaiting_verification");
+    assert.equal(cases.nextFilingStatus("awaiting_verification"), "verified");
+    assert.equal(cases.nextFilingStatus("correction_required"), "attempted");
+    assert.equal(cases.nextFilingStatus("verified"), null);
+    for (const from of ["not_submitted", "attempted", "awaiting_verification", "correction_required"]) {
+      const to = cases.nextFilingStatus(from);
+      const result = cases.recordFiling(
+        { filing_status: from },
+        { to, evidenceRef: to === "verified" ? "ACK-1" : null },
+      );
+      assert.equal(result.ok, true);
+      assert.equal(result.patch.filing_status, to);
+    }
+  });
+
   check("three verdicts always recorded", () => {
     const facts = {
       doc_type: "receipt",

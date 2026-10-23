@@ -591,6 +591,26 @@ const FILING_FLOW: Record<FilingStatus, FilingStatus[]> = {
   correction_required: ["attempted"],
 };
 
+/**
+ * The one forward filing step.
+ *
+ * Rollbacks stay on the case screen. A queue that offered every legal edge
+ * would let one click skip the attempt and the wait, which is how a filing
+ * becomes "verified" without a real submission.
+ */
+const FORWARD_FILING: Partial<Record<FilingStatus, FilingStatus>> = {
+  not_submitted: "attempted",
+  attempted: "awaiting_verification",
+  awaiting_verification: "verified",
+  correction_required: "attempted",
+};
+
+export function nextFilingStatus(current: FilingStatus): FilingStatus | null {
+  const to = FORWARD_FILING[current];
+  if (!to || !FILING_FLOW[current]?.includes(to)) return null;
+  return to;
+}
+
 export type RecordFilingInput = {
   to: FilingStatus;
   reference?: string | null;

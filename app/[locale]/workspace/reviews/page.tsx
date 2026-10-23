@@ -38,6 +38,13 @@ export default function ReviewsPage({ params }: { params: { locale: string } }) 
           reviewer: k.reviewer,
           none: k.none,
           failed: k.failed,
+          signInRequired: k.signInRequired,
+          recordAttempt: k.recordAttempt,
+          markAwaiting: k.markAwaiting,
+          notPermitted: k.notPermitted,
+          discloseSelf: k.discloseSelf,
+          stepRecorded: k.stepRecorded,
+          selfApproved: k.selfApproved,
           empty: w.client.actionsEmpty,
           offline: t.work.offline,
         }}
