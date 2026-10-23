@@ -46,7 +46,7 @@ RPC: `portal_sign_in` (DEPRECATED). API: `POST /api/inquiry` (Resend).
 | Cases: stages, 4 dimensions, blocker, risk | `FirmDashboard`, `WorkQueue` | `ClientDashboard` (5 client states) | PARTIAL — no single-case screen (`/workspace/declarations/[id]`) |
 | Events: timeline, visibility, `drift()` | dashboard feed | dashboard feed (client-visible only) | PARTIAL — no audit/drift surface |
 | `activity_events` (legacy, 8 writers) | — | — | FAULT — fold into `case_events` (needs `taxpayer_id`, nullable `case_id`), then drop |
-| Document review: 3 verdicts | `InboxWorkspace` + `DocumentVerdicts` `/workspace/inbox` | `DocumentsPanel` (send only) | REFLECTED, except upload carries no file (Storage not wired) |
+| Document review: 3 verdicts | `InboxWorkspace` `/workspace/inbox` records `documents.acceptance` before accept | `DocumentsPanel` (send only) | REFLECTED on the firm inbox; upload still carries no file |
 | Document naming: buckets, references | `FilingFramework` `/workspace/filing` | — | PARTIAL — grammar not applied to document centre / archive |
 | Rules: obligations, deadlines, prorogations | queue dates carry `due_needs_confirmation` | `ClientCompliance/Declarations/Archive` (live, ex-`demo-data`) | REFLECTED on client portal as of this change; firm deadlines calendar missing |
 | Diagnostics (pre-approval gate) | `ReviewsPanel` `/workspace/reviews` | — | REFLECTED — queue is `compliance_cases`; approve calls `commandAdvanceCase` (SoD); filing evidence is one `commandRecordFiling` step |

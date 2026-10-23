@@ -9,6 +9,7 @@ import {
   reviewDocument,
   valueLabel,
   verdictLabel,
+  type AcceptanceRecord,
   type DocumentFacts,
   type DocumentType,
   type PaymentMethod,
@@ -39,17 +40,33 @@ const toneFor = (v: VerdictValue) => {
   return "border-border bg-surface-sunken text-fg-muted";
 };
 
-export function DocumentVerdicts({ locale, t }: { locale: "fr" | "en"; t: Dict["verdicts"] }) {
-  const [docType, setDocType] = useState<DocumentType>("purchase_invoice");
-  const [clientRegime, setClientRegime] = useState<Regime>("reel");
-  const [supplierRegime, setSupplierRegime] = useState<Regime | "unknown">("reel");
-  const [framework, setFramework] = useState<"normal" | "smt" | null>("normal");
-  const [payment, setPayment] = useState<PaymentMethod>("bank");
-  const [amount, setAmount] = useState(1_013_625);
-  const [supplierNiu, setSupplierNiu] = useState(true);
-  const [customerNiu, setCustomerNiu] = useState(true);
-  const [itemised, setItemised] = useState(true);
-  const [purpose, setPurpose] = useState(true);
+export function DocumentVerdicts({
+  locale,
+  t,
+  initial,
+  onRecord,
+  recording = false,
+}: {
+  locale: "fr" | "en";
+  t: Dict["verdicts"];
+  /** A review already stored on this document. The form opens on those facts. */
+  initial?: AcceptanceRecord | null;
+  /** Persist the three verdicts onto the document. Absent on the unbound lab. */
+  onRecord?: (record: AcceptanceRecord) => void;
+  recording?: boolean;
+}) {
+  const seed = initial?.facts;
+  const ctx = initial?.context;
+  const [docType, setDocType] = useState<DocumentType>(seed?.doc_type ?? "purchase_invoice");
+  const [clientRegime, setClientRegime] = useState<Regime>(ctx?.client_regime === "igs" ? "igs" : "reel");
+  const [supplierRegime, setSupplierRegime] = useState<Regime | "unknown">(seed?.supplier_regime ?? "unknown");
+  const [framework, setFramework] = useState<"normal" | "smt" | null>(ctx?.accounting_framework ?? null);
+  const [payment, setPayment] = useState<PaymentMethod>(seed?.payment_method ?? "unknown");
+  const [amount, setAmount] = useState(seed?.amount_ttc ?? 0);
+  const [supplierNiu, setSupplierNiu] = useState(Boolean(seed?.supplier_niu));
+  const [customerNiu, setCustomerNiu] = useState(Boolean(seed?.customer_niu));
+  const [itemised, setItemised] = useState(Boolean(seed?.itemised));
+  const [purpose, setPurpose] = useState(Boolean(seed?.business_purpose_stated));
 
   const facts: DocumentFacts = useMemo(
     () => ({
@@ -328,6 +345,28 @@ export function DocumentVerdicts({ locale, t }: { locale: "fr" | "en"; t: Dict["
                 </ul>
               )}
             </div>
+
+            {onRecord ? (
+              <button
+                type="button"
+                disabled={recording}
+                onClick={() =>
+                  onRecord({
+                    facts,
+                    context: {
+                      client_regime: clientRegime,
+                      accounting_framework: framework,
+                      period_date: ctx?.period_date ?? new Date().toISOString().slice(0, 10),
+                    },
+                    verdicts: review.verdicts,
+                    recorded_at: new Date().toISOString(),
+                  })
+                }
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-navy px-4 text-sm font-semibold text-surface disabled:opacity-60"
+              >
+                {t.recordOnFile}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

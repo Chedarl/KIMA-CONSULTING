@@ -3,7 +3,6 @@ import { getDictionary, isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import { DemoBanner } from "@/components/ui";
 import { InboxWorkspace } from "@/components/live/inbox-workspace";
-import { DocumentVerdicts } from "@/components/live/document-verdicts";
 
 /** Every document that arrived, across every client, with bulk review and file operations. */
 export default function InboxPage({ params }: { params: { locale: string } }) {
@@ -22,12 +21,9 @@ export default function InboxPage({ params }: { params: { locale: string } }) {
         <p className="text-sm text-fg-muted">{i.subtitle}</p>
       </div>
 
-      {/* Three verdicts first — the live acceptance model. Binary bulk actions
-          below remain for triage speed and must not be mistaken for the full review. */}
-      <DocumentVerdicts locale={locale} t={w.verdicts} />
-
       <InboxWorkspace
         locale={locale}
+        verdicts={w.verdicts}
         labels={{
           allClients: i.allClients,
           allStatuses: i.allStatuses,
@@ -59,6 +55,10 @@ export default function InboxPage({ params }: { params: { locale: string } }) {
           connecting: t.work.connecting,
           offline: t.work.offline,
           live: t.work.live,
+          verdictsRecorded: i.verdictsRecorded,
+          verdictsRequired: i.verdictsRequired,
+          awaitingVerdicts: i.awaitingVerdicts,
+          signInRequired: i.signInRequired,
         }}
       />
     </div>

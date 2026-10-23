@@ -247,10 +247,15 @@ const fr = {
       filingWait: "Une seule étape à la fois. Vérifié exige la référence de l'accusé.",
     },
     inbox: {
-      subtitle: "Toutes les pièces reçues, tous clients confondus.",
+      subtitle:
+        "Une pièce reçue n'est pas une pièce acceptée. Les trois avis sont enregistrés avant l'acceptation.",
       allClients: "Tous les clients",
       allStatuses: "Tous les statuts",
-      statusPending: "À examiner",
+      statusPending: "Reçue",
+      verdictsRecorded: "Avis enregistrés — la pièce reste au dossier",
+      verdictsRequired: "Enregistrez les trois avis avant d'accepter la pièce.",
+      awaitingVerdicts: "Trois avis non enregistrés",
+      signInRequired: "Connectez-vous en tant que membre du cabinet. Sans session, cette action est refusée.",
       statusAccepted: "Acceptée",
       statusReturned: "Retournée",
       selected: "sélectionnée(s)",
@@ -465,6 +470,7 @@ const fr = {
     sourceVerified: "Règle vérifiée",
     sourceInferred: "À valider",
     sourceUnverified: "Non tracée",
+    recordOnFile: "Enregistrer les trois avis sur la pièce",
   },
 
   /**
@@ -936,10 +942,15 @@ const en: WorkspaceDictionary = {
       filingWait: "One step at a time. Verified requires the acknowledgment reference.",
     },
     inbox: {
-      subtitle: "Every document received, across all clients.",
+      subtitle:
+        "A document received is not a document accepted. The three verdicts are recorded before acceptance.",
       allClients: "All clients",
       allStatuses: "All statuses",
-      statusPending: "To review",
+      statusPending: "Received",
+      verdictsRecorded: "Verdicts recorded — the document stays on file",
+      verdictsRequired: "Record the three verdicts before accepting the document.",
+      awaitingVerdicts: "Three verdicts not recorded",
+      signInRequired: "Sign in as a firm member. Without a session this action is refused.",
       statusAccepted: "Accepted",
       statusReturned: "Returned",
       selected: "selected",
@@ -1140,6 +1151,7 @@ const en: WorkspaceDictionary = {
     sourceVerified: "Verified rule",
     sourceInferred: "To be validated",
     sourceUnverified: "Not traced",
+    recordOnFile: "Record the three verdicts on the document",
   },
 
   register: {

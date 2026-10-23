@@ -151,6 +151,14 @@ export type Verdict = {
   requiresHumanDecision: boolean;
 };
 
+/** What was read on one document, and the three verdicts that followed. */
+export type AcceptanceRecord = {
+  facts: DocumentFacts;
+  context: ReviewContext;
+  verdicts: Verdict[];
+  recorded_at: string;
+};
+
 export type DocumentReview = {
   verdicts: Verdict[];
   /**
@@ -625,9 +633,9 @@ export const verdictLabel: Record<VerdictKind, { fr: string; en: string }> = {
 };
 
 export const valueLabel: Record<VerdictValue, { fr: string; en: string }> = {
-  pass: { fr: "Recevable", en: "Accepted" },
-  partial: { fr: "Recevable avec réserve", en: "Accepted with reservation" },
-  fail: { fr: "Non recevable", en: "Not accepted" },
+  pass: { fr: "Recevable", en: "Passes" },
+  partial: { fr: "Recevable avec réserve", en: "Passes with a reservation" },
+  fail: { fr: "Non recevable", en: "Does not pass" },
   indeterminate: { fr: "À trancher", en: "Needs a decision" },
   not_applicable: { fr: "Sans objet", en: "Not applicable" },
 };

@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { audit, supabase, type DocumentRow } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { updateById, updateManyById } from "@/lib/db-write";
+import { readFirmSession, type FirmSession } from "@/lib/firm-auth";
+import { valueLabel, verdictLabel, type AcceptanceRecord } from "@/lib/document-review";
+import { DocumentVerdicts } from "@/components/live/document-verdicts";
+import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 
 /**
  * The firm's document inbox: everything that arrived, across every client.
@@ -47,12 +51,26 @@ export type InboxLabels = {
   connecting: string;
   offline: string;
   live: string;
+  verdictsRecorded: string;
+  verdictsRequired: string;
+  awaitingVerdicts: string;
+  signInRequired: string;
 };
+
+type VerdictCopy = ReturnType<typeof getWorkspaceDictionary>["verdicts"];
 
 type Client = { id: string; legal_name: string };
 type Req = { id: string; taxpayer_id: string; label_fr: string; label_en: string };
 
-export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels: InboxLabels }) {
+export function InboxWorkspace({
+  locale,
+  labels,
+  verdicts,
+}: {
+  locale: "fr" | "en";
+  labels: InboxLabels;
+  verdicts: VerdictCopy;
+}) {
   const toast = useToast();
   const [docs, setDocs] = useState<DocumentRow[] | null>(null);
   const [clients, setClients] = useState<Record<string, Client>>({});
@@ -65,6 +83,8 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
   const [busy, setBusy] = useState(false);
   const [live, setLive] = useState(false);
   const [error, setError] = useState(false);
+  const [session, setSession] = useState<FirmSession | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -85,24 +105,34 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
   }, []);
 
   useEffect(() => {
+    setSession(readFirmSession());
+  }, []);
+
+  useEffect(() => {
     void load();
-    const db = supabase();
-    const ch = db
-      .channel(`inbox-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "documents" }, (p) => {
-        const row = p.new as DocumentRow;
-        if (!row?.id) return;
-        setDocs((prev) =>
-          prev
-            ? prev.some((x) => x.id === row.id)
-              ? prev.map((x) => (x.id === row.id ? row : x))
-              : [row, ...prev]
-            : prev,
-        );
-      })
-      .subscribe((s) => setLive(s === "SUBSCRIBED"));
+    let db: ReturnType<typeof supabase> | null = null;
+    let ch: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
+    try {
+      db = supabase();
+      ch = db
+        .channel(`inbox-${Math.random().toString(36).slice(2)}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "documents" }, (p) => {
+          const row = p.new as DocumentRow;
+          if (!row?.id) return;
+          setDocs((prev) =>
+            prev
+              ? prev.some((x) => x.id === row.id)
+                ? prev.map((x) => (x.id === row.id ? row : x))
+                : [row, ...prev]
+              : prev,
+          );
+        })
+        .subscribe((s) => setLive(s === "SUBSCRIBED"));
+    } catch {
+      setError(true);
+    }
     return () => {
-      db.removeChannel(ch);
+      if (db && ch) db.removeChannel(ch);
     };
   }, [load]);
 
@@ -115,9 +145,47 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
     );
   }, [docs, clientFilter, statusFilter]);
 
+  async function recordAcceptance(doc: DocumentRow, record: AcceptanceRecord) {
+    if (!session) {
+      toast(labels.signInRequired, "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      const written = await updateById("documents", doc.id, { acceptance: record });
+      if (!written.ok) throw new Error(written.reason);
+      setDocs((prev) =>
+        prev ? prev.map((d) => (d.id === doc.id ? { ...d, acceptance: record } : d)) : prev,
+      );
+      await audit({
+        taxpayerId: doc.taxpayer_id,
+        actor: "firm",
+        action: "document.verdicts_recorded",
+        resourceType: "document",
+        resourceId: doc.id,
+        after: {
+          verdicts: record.verdicts.map((v) => ({ kind: v.kind, value: v.value })),
+        },
+      });
+      toast(labels.verdictsRecorded);
+    } catch {
+      toast(labels.failed, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function decide(decision: "accepted" | "returned", why?: string) {
     const ids = [...sel];
     if (ids.length === 0) return;
+    if (!session) {
+      toast(labels.signInRequired, "error");
+      return;
+    }
+    if (decision === "accepted" && ids.some((id) => !docs?.find((d) => d.id === id)?.acceptance)) {
+      toast(labels.verdictsRequired, "error");
+      return;
+    }
     setBusy(true);
     const snapshot = new Map(docs?.map((d) => [d.id, d.review_status]) ?? []);
     setDocs((prev) =>
@@ -330,6 +398,12 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
         <span className="ml-auto text-xs text-fg-subtle">{labels.latest}</span>
       </div>
 
+      {!session ? (
+        <p className="rounded-card border border-amber-text/40 bg-amber-soft px-4 py-3 text-sm text-amber-text">
+          {labels.signInRequired}
+        </p>
+      ) : null}
+
       {sel.size > 0 && (
         <div className="rise-in flex flex-wrap items-center gap-2 rounded-card border border-navy/30 bg-navy-soft px-4 py-3">
           <span className="text-sm font-semibold text-navy">
@@ -339,7 +413,7 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
             type="button"
             disabled={busy}
             onClick={() => void decide("accepted")}
-            className="min-h-[44px] rounded-lg bg-teal-text px-3 text-sm font-semibold text-surface disabled:opacity-60"
+            className="min-h-[44px] rounded-lg bg-navy px-3 text-sm font-semibold text-surface disabled:opacity-60"
           >
             {labels.acceptSelected}
           </button>
@@ -395,14 +469,17 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
           {labels.empty}
         </p>
       ) : (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
         <ul className="flex flex-col gap-2">
           {shown.map((d, i) => {
             const client = clients[d.taxpayer_id];
             const checked = sel.has(d.id);
+            const open = (selectedId ?? shown[0]?.id) === d.id;
+            const stored = d.acceptance?.verdicts ?? [];
             return (
               <li
                 key={d.id}
-                className="rise-in rounded-card border border-border bg-surface p-3"
+                className={`rise-in rounded-card border bg-surface p-3 ${open ? "border-navy" : "border-border"}`}
                 style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
               >
                 <div className="flex flex-wrap items-center gap-3">
@@ -420,31 +497,53 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
                     }
                     className="h-5 w-5 shrink-0"
                   />
-                  <span className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(d.id)}
+                    className="min-h-[44px] min-w-0 flex-1 text-left"
+                  >
                     <span className="block truncate font-mono text-sm text-fg">{d.file_name}</span>
                     <span className="block truncate text-xs text-fg-subtle">
                       {client?.legal_name ?? labels.unbound} ·{" "}
                       {d.byte_size ? `${Math.round(d.byte_size / 1024)} kB` : "—"}
                     </span>
-                  </span>
+                  </button>
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                       d.review_status === "accepted"
                         ? "bg-teal-soft text-teal-text"
                         : d.review_status === "returned"
                           ? "bg-danger-soft text-danger-text"
-                          : "bg-surface-sunken text-fg-muted"
+                          : "bg-amber-soft text-amber-text"
                     }`}
                   >
-                    {labels.status[d.review_status] ?? d.review_status}
+                    {d.review_status === "pending" && d.acceptance
+                      ? labels.verdictsRecorded
+                      : (labels.status[d.review_status] ?? d.review_status)}
                   </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {stored.length === 0 ? (
+                    <span className="text-xs text-fg-subtle">{labels.awaitingVerdicts}</span>
+                  ) : (
+                    stored.map((v) => (
+                      <span
+                        key={v.kind}
+                        className="rounded-full bg-surface-sunken px-2 py-1 text-xs font-medium text-fg"
+                      >
+                        {locale === "fr" ? verdictLabel[v.kind].fr : verdictLabel[v.kind].en}
+                        {": "}
+                        {locale === "fr" ? valueLabel[v.value].fr : valueLabel[v.value].en}
+                      </span>
+                    ))
+                  )}
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => void preview(d)}
-                    className="min-h-[36px] rounded-lg border border-border px-2.5 text-xs font-semibold text-fg-muted hover:bg-surface-sunken"
+                    className="min-h-[44px] rounded-lg border border-border px-2.5 text-xs font-semibold text-fg-muted hover:bg-surface-sunken"
                   >
                     {labels.preview}
                   </button>
@@ -452,7 +551,7 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
                     type="button"
                     disabled={busy}
                     onClick={() => void rename(d)}
-                    className="min-h-[36px] rounded-lg border border-border px-2.5 text-xs font-semibold text-fg-muted hover:bg-surface-sunken disabled:opacity-60"
+                    className="min-h-[44px] rounded-lg border border-border px-2.5 text-xs font-semibold text-fg-muted hover:bg-surface-sunken disabled:opacity-60"
                   >
                     {labels.rename}
                   </button>
@@ -465,7 +564,7 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
                         if (e.target.value) void copyTo(d, e.target.value);
                         e.target.value = "";
                       }}
-                      className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-xs text-fg"
+                      className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-xs text-fg"
                     >
                       <option value="">—</option>
                       {reqs
@@ -482,6 +581,21 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
             );
           })}
         </ul>
+        {(() => {
+          const current = shown.find((d) => d.id === (selectedId ?? shown[0]?.id));
+          if (!current) return null;
+          return (
+            <DocumentVerdicts
+              key={current.id}
+              locale={locale}
+              t={verdicts}
+              initial={current.acceptance ?? null}
+              recording={busy}
+              onRecord={(record) => void recordAcceptance(current, record)}
+            />
+          );
+        })()}
+        </div>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { AcceptanceRecord } from "./document-review";
 
 /**
  * Browser Supabase client.
@@ -68,6 +69,8 @@ export type DocumentRow = {
   uploaded_by: "taxpayer" | "firm";
   arrived_via: string;
   review_status: string;
+  /** Facts and the three verdicts. Absent until a practitioner records them. */
+  acceptance?: AcceptanceRecord | null;
   created_at: string;
 };
 
