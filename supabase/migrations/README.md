@@ -42,7 +42,8 @@ directory is closing.
 | 20261022181734 | `portal_one_time_code_replaces_niu_password` | ✅ |
 | 20261022192100 | `registration_kpis_runs_as_the_caller` | ✅ |
 | 20261022213000 | `auth_closeout_otp_and_capability_writes` | ✅ |
-| 20261023031000 | `document_acceptance_snapshot` | ✅ |
+| 20261023052631 | `document_acceptance_snapshot` | ✅ |
+| 20261023052633 | `firm_confirms_service_payments` | ✅ |
 
 ## Finishing the export
 

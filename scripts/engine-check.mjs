@@ -62,6 +62,9 @@ const out = compile([
   "lib/diagnostics.ts",
   "lib/commands.ts",
   "lib/document-review.ts",
+  "lib/billing.ts",
+  "lib/engagements.ts",
+  "lib/vault.ts",
 ]);
 
 const require = createRequire(import.meta.url);
@@ -70,6 +73,9 @@ const cases = require(join(out, "cases.js"));
 const permissions = require(join(out, "permissions.js"));
 const commands = require(join(out, "commands.js"));
 const review = require(join(out, "document-review.js"));
+const billing = require(join(out, "billing.js"));
+const engagements = require(join(out, "engagements.js"));
+const vault = require(join(out, "vault.js"));
 
 try {
   check("packCoverage CM has mostly inferred rules", () => {
@@ -199,6 +205,91 @@ try {
     });
     assert.equal(result.verdicts.length, 3);
     assert.equal(result.recorded, true);
+  });
+
+  check("fee ledger derives balances and confirms only with a reference", () => {
+    const payments = [
+      { invoice_id: "a", amount_minor: 5000, status: "confirmed", provider_reference: "MM1" },
+      { invoice_id: "a", amount_minor: 2000, status: "pending_confirmation", provider_reference: null },
+      { invoice_id: "a", amount_minor: 9000, status: "rejected", provider_reference: null },
+    ];
+    const bal = billing.ledgerBalance(payments, "a");
+    assert.equal(bal.confirmed, 5000);
+    assert.equal(bal.pending, 2000);
+    assert.equal(billing.outstandingMinor(10000, bal), 3000);
+    const pending = { status: "pending_confirmation", provider_reference: null };
+    assert.equal(billing.reviewServicePayment(pending, { to: "confirmed", by: "Irina" }).ok, false);
+    const confirmed = billing.reviewServicePayment(pending, {
+      to: "confirmed",
+      by: "Irina",
+      reference: "REC-9",
+      at: "2026-10-23T08:00:00.000Z",
+    });
+    assert.equal(confirmed.ok, true);
+    assert.equal(confirmed.patch.status, "confirmed");
+    assert.equal(confirmed.patch.provider_reference, "REC-9");
+    assert.equal(confirmed.patch.confirmed_by, "Irina");
+    const rejected = billing.reviewServicePayment(pending, { to: "rejected", by: "Irina" });
+    assert.equal(rejected.ok, true);
+    assert.equal(rejected.patch.status, "rejected");
+    assert.equal(
+      billing.reviewServicePayment(
+        { status: "confirmed", provider_reference: "REC-9" },
+        { to: "rejected", by: "Irina" },
+      ).reason,
+      "not_pending",
+    );
+    assert.equal(
+      billing.feeOverdue(
+        { id: "a", taxpayer_id: "t", number: "K-1", total_minor: 10000, status: "issued", due_on: "2026-10-01" },
+        "2026-10-23",
+        5000,
+      ),
+      true,
+    );
+  });
+
+  check("engagement writes the timestamps authorityCheck reads", () => {
+    const draft = engagements.draftEngagement({
+      taxpayerId: "tp",
+      serviceCode: "VAT",
+      feeXaf: 7500,
+      scopeNote: "TVA mensuelle",
+    });
+    assert.equal(draft.ok, true);
+    assert.equal(draft.row.status, "pending");
+    assert.equal(draft.row.authorized_at, null);
+    assert.equal(draft.row.fee_xaf, 7500);
+    assert.equal(engagements.draftEngagement({ taxpayerId: "tp", feeXaf: 1.5 }).reason, "fee_invalid");
+    assert.equal(engagements.engagementPosture(draft.row), "awaiting_authorisation");
+
+    const authorised = engagements.authorizeEngagement(draft.row, "2026-10-23T09:00:00.000Z");
+    assert.equal(authorised.ok, true);
+    assert.equal(authorised.patch.status, "authorized");
+    assert.equal(authorised.event.kind, "engagement_authorized");
+    assert.equal(authorised.event.to, "authorized");
+    const row = { ...draft.row, ...authorised.patch, scope_note: "TVA mensuelle", service_code: "VAT" };
+    assert.equal(engagements.engagementPosture(row), "authorised");
+    assert.equal(engagements.authorizeEngagement(row).reason, "already_authorised");
+
+    assert.equal(engagements.revokeEngagement(row, "  ").reason, "reason_required");
+    const revoked = engagements.revokeEngagement(row, "Le client retire le mandat", "2026-10-23T10:00:00.000Z");
+    assert.equal(revoked.ok, true);
+    assert.equal(revoked.patch.status, "revoked");
+    assert.equal(revoked.event.reason, "Le client retire le mandat");
+    assert.equal(revoked.event.to, "revoked");
+    assert.equal("authorized_at" in revoked.patch, false);
+    assert.equal(engagements.engagementPosture({ ...row, ...revoked.patch }), "revoked");
+    assert.equal(engagements.authorizeEngagement({ ...row, ...revoked.patch }).reason, "already_revoked");
+  });
+
+  check("vault keeps accepted evidence and verified filings apart from the inbox", () => {
+    assert.equal(vault.acceptedIntoVault({ review_status: "accepted" }), true);
+    assert.equal(vault.acceptedIntoVault({ review_status: "pending" }), false);
+    assert.equal(vault.acceptedIntoVault({ review_status: "returned" }), false);
+    assert.equal(vault.filingEvidence({ filing_status: "verified", filing_evidence_ref: "ACK-1" }), true);
+    assert.equal(vault.filingEvidence({ filing_status: "verified", filing_evidence_ref: "  " }), false);
+    assert.equal(vault.filingEvidence({ filing_status: "attempted", filing_evidence_ref: "ACK-1" }), false);
   });
 
   console.log(`\n${passed} assertions passed`);

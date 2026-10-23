@@ -9,9 +9,9 @@ import { FirmSessionBar } from "@/components/live/firm-session-bar";
 /**
  * Firm workspace chrome.
  *
- * Modules without an engine stay visible and disabled. Leads, engagements,
- * the vault and billing are named here so the map matches the product, and
- * they do not open until the screen behind them exists.
+ * Modules without an engine stay visible and disabled. Engagements, the
+ * vault and billing open onto the ledgers that already exist. Declarations,
+ * reports and settings stay closed until those engines do.
  */
 export default function FirmLayout({
   children,
@@ -29,7 +29,7 @@ export default function FirmLayout({
     { href: base, label: w.firm.nav.overview, icon: "grid", ready: true },
     { href: `${base}/leads`, label: w.firm.nav.leads, icon: "user", ready: true },
     { href: `${base}/clients`, label: w.firm.nav.clients, icon: "people", ready: true },
-    { href: `${base}/engagements`, label: w.firm.nav.engagements, icon: "folder", ready: false },
+    { href: `${base}/engagements`, label: w.firm.nav.engagements, icon: "folder", ready: true },
     { href: `${base}/queue`, label: w.firm.nav.queue, icon: "queue", ready: true },
     { href: `${base}/inbox`, label: w.firm.nav.inbox, icon: "inbox", ready: true },
     { href: `${base}/cases`, label: w.firm.nav.cases, icon: "file", ready: true },
@@ -38,8 +38,8 @@ export default function FirmLayout({
     { href: `${base}/filing`, label: w.firm.nav.filing, icon: "archive", ready: true },
     { href: `${base}/declarations`, label: w.firm.nav.declarations, icon: "file", ready: false },
     { href: `${base}/calendar`, label: w.firm.nav.calendar, icon: "calendar", ready: true },
-    { href: `${base}/vault`, label: w.firm.nav.vault, icon: "archive", ready: false },
-    { href: `${base}/billing`, label: w.firm.nav.billing, icon: "card", ready: false },
+    { href: `${base}/vault`, label: w.firm.nav.vault, icon: "archive", ready: true },
+    { href: `${base}/billing`, label: w.firm.nav.billing, icon: "card", ready: true },
     { href: `${base}/reports`, label: w.firm.nav.reports, icon: "chart", ready: false },
     { href: `${base}/admin`, label: w.firm.nav.admin, icon: "cog", ready: false },
   ];
