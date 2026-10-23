@@ -62,6 +62,7 @@ const out = compile([
   "lib/diagnostics.ts",
   "lib/commands.ts",
   "lib/document-review.ts",
+  "lib/public-onboarding.ts",
 ]);
 
 const require = createRequire(import.meta.url);
@@ -70,6 +71,7 @@ const cases = require(join(out, "cases.js"));
 const permissions = require(join(out, "permissions.js"));
 const commands = require(join(out, "commands.js"));
 const review = require(join(out, "document-review.js"));
+const onboarding = require(join(out, "public-onboarding.js"));
 
 try {
   check("packCoverage CM has mostly inferred rules", () => {
@@ -199,6 +201,34 @@ try {
     });
     assert.equal(result.verdicts.length, 3);
     assert.equal(result.recorded, true);
+  });
+
+  check("public onboarding stays a private application", () => {
+    const draft = {
+      ...onboarding.EMPTY_ONBOARDING,
+      kind: "business",
+      name: "Amina Ngo",
+      email: "amina@example.com",
+      legalName: "Mbango Trading SARL",
+      niu: "rc/yaoundé/b/1234",
+      services: ["tax", "dsf"],
+      language: "en",
+    };
+    assert.deepEqual(onboarding.issuesFor("verify", draft), []);
+    assert.equal(onboarding.taxpayerTypeFor("accounting_firm"), "business_moral");
+    assert.equal(onboarding.taxpayerTypeFor("individual"), "individual_pit");
+    const row = onboarding.registrationInsert(draft, "11111111-1111-1111-1111-111111111111");
+    assert.equal(row.base.taxpayer_type, "business_moral");
+    assert.equal(row.base.declared_niu, "RCYAOUNDB1234");
+    assert.equal(row.full.workspace_kind, "business");
+    assert.equal(row.full.onboarding.isolation, "private_application");
+    assert.equal(row.base.declared_regime, undefined);
+    assert.equal(row.base.declared_centre, undefined);
+    const thin = { ...draft, legalName: "A", services: [] };
+    assert.ok(onboarding.issuesFor("verify", thin).includes("legalName"));
+    assert.ok(onboarding.issuesFor("verify", thin).includes("services"));
+    assert.equal(onboarding.inviteEmailIssue("not-an-email"), "inviteEmail");
+    assert.equal(onboarding.inviteEmailIssue("a@b.co"), null);
   });
 
   console.log(`\n${passed} assertions passed`);

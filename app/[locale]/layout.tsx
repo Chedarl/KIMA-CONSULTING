@@ -6,6 +6,7 @@ import { Footer } from "@/components/footer";
 import { SiteFrame } from "@/components/site-frame";
 import { ToastProvider } from "@/components/toast";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
+import { getPublicCopy } from "@/lib/i18n-public";
 
 /**
  * This is the root layout. Every route lives under the [locale] segment so that
@@ -50,12 +51,13 @@ export function generateStaticParams() {
 export function generateMetadata({ params }: { params: { locale: string } }): Metadata {
   const locale: Locale = isLocale(params.locale) ? params.locale : "fr";
   const t = getDictionary(locale);
+  const pub = getPublicCopy(locale);
   return {
     title: {
       default: `${t.brand} — ${t.proposition}`,
       template: `%s · ${t.brand}`,
     },
-    description: t.home.heroBody,
+    description: pub.home.heroBody,
     alternates: {
       canonical: `/${locale}`,
       languages: { fr: "/fr", en: "/en" },
