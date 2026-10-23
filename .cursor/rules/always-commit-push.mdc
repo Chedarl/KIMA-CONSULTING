@@ -1,0 +1,14 @@
+---
+description: Always commit finished work and push to origin without waiting to be asked
+alwaysApply: true
+---
+
+# Always Commit and Push
+
+When a coherent unit of work is finished (feature slice, fix, docs update, or a planned phase like A/B/C):
+
+1. **Commit** it on the current branch using the repo's conventional style (imperative, why-focused, match recent `git log`).
+2. **Push** to `origin` with `-u` when the branch has no upstream yet; otherwise `git push`.
+3. Do **not** wait for a separate "please commit" or "please push" — this rule is the standing instruction.
+4. Still follow the Git Safety Protocol: no force-push to main/master, no `--no-verify`, no amend unless the amend rules are fully met, never commit secrets (`.env*`, credentials).
+5. Prefer one commit per finished unit; do not mix unrelated tooling dumps with product commits unless the user asked for that tooling in-repo.

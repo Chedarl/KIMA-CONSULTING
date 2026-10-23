@@ -459,6 +459,19 @@ It subscribes to `document_requests`, `case_events` and `compliance_cases`, so
 an accountant's decision reaches the client without either of them pressing
 anything.
 
+**Client record pages are now live too** (`components/live/client-records.tsx`,
+mounted at `/[locale]/app/{compliance,declarations,archive}`). They used to
+render `lib/demo-data` — an invented profile and invented obligations — while
+`lib/rules` and the case engine sat unused by them. They now read `taxpayers`,
+`compliance_cases`, `document_requests` and `case_events`: the four axes on
+separate rows with an unverified profile flagged on its face, progress in the
+five client states via `clientStatus()`, per-case history from client-visible
+`case_events`, and an archive that only lists a case when its filing is
+`verified` AND carries an evidence reference. Which backend process has which
+surface — and which have none yet — is tracked in
+`docs/foundation/frontend-backend-coverage.md`, updated in the same commit as
+every screen.
+
 **Remaining screens**: 01 registration · 02 business onboarding · 04 client 360
 · 05 document centre · 06 compliance case · 07 review and filing · 09 mobile
 portal · 10 delivery and archive.

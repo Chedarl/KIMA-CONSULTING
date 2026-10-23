@@ -475,6 +475,16 @@ const fr = {
     stepDone: "Terminé",
     offline: "Connexion indisponible — rien n'est affiché plutôt qu'une information périmée.",
   },
+  clientRecords: {
+    loading: "Chargement de vos dossiers…",
+    profileEmpty: "Votre profil fiscal n'est pas encore enregistré.",
+    noCases: "Aucun dossier en cours pour le moment.",
+    obligationsTitle: "Vos obligations",
+    evidence: "Preuve de dépôt",
+    noEvidenceYet: "Preuve en attente — le dépôt n'est pas encore confirmé.",
+    historyTitle: "Historique",
+    historyEmpty: "Aucun événement enregistré pour ce dossier.",
+  },
   dashboard: {
     greetingMorning: "Bonjour",
     greetingAfternoon: "Bon après-midi",
@@ -981,6 +991,16 @@ const en: WorkspaceDictionary = {
     stepFiling: "Filing",
     stepDone: "Complete",
     offline: "Cannot reach the data — showing nothing rather than something out of date.",
+  },
+  clientRecords: {
+    loading: "Loading your records…",
+    profileEmpty: "Your tax profile is not on record yet.",
+    noCases: "No case in progress right now.",
+    obligationsTitle: "Your obligations",
+    evidence: "Filing evidence",
+    noEvidenceYet: "Evidence pending — the filing is not confirmed yet.",
+    historyTitle: "History",
+    historyEmpty: "No event recorded for this case yet.",
   },
   dashboard: {
     greetingMorning: "Good morning",
