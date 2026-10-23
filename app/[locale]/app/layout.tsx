@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
-import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
-import { Shell, type NavItem } from "@/components/shell";
-import { ClientMobileNav } from "@/components/live/client-mobile-nav";
+import { getPortalDictionary } from "@/lib/i18n-portal";
+import { PortalCopyProvider } from "@/components/client-portal/copy";
+import { ClientPortalShell } from "@/components/client-portal/shell";
 
 /**
- * The client workspace shell. Modules that do not exist yet appear in the rail
- * as disabled items rather than links that 404 — see components/shell.tsx.
+ * Client portal chrome. Firm workspace keeps components/shell.tsx.
+ * Copy is passed in for one language so the client bundle does not ship both.
  */
 export default function ClientLayout({
   children,
@@ -17,40 +17,11 @@ export default function ClientLayout({
 }) {
   if (!isLocale(params.locale)) notFound();
   const locale = params.locale;
-  const w = getWorkspaceDictionary(locale);
-  const base = `/${locale}/app`;
-
-  const nav: NavItem[] = [
-    { href: base, label: w.client.nav.dashboard, icon: "grid", ready: true },
-    { href: `${base}/compliance`, label: w.client.nav.compliance, icon: "shield", ready: true },
-    { href: `${base}/documents`, label: w.client.nav.documents, icon: "folder", ready: true },
-    { href: `${base}/declarations`, label: w.client.nav.declarations, icon: "file", ready: true },
-    { href: `${base}/archive`, label: w.client.nav.archive, icon: "archive", ready: true },
-    { href: `${base}/messages`, label: w.client.nav.messages, icon: "chat", ready: true },
-    { href: `${base}/payments`, label: w.client.nav.payments, icon: "card", ready: true },
-    { href: `${base}/support`, label: w.client.nav.support, icon: "help", ready: false },
-    { href: `${base}/profile`, label: w.client.nav.profile, icon: "user", ready: false },
-  ];
+  const copy = getPortalDictionary(locale);
 
   return (
-    <Shell
-      nav={nav}
-      title={w.client.title}
-      subtitle={w.client.subtitle}
-      soonLabel={w.soon}
-      menuLabel={w.menu}
-      hideMobileMenu
-    >
-      {children}
-      <ClientMobileNav
-        locale={locale}
-        labels={{
-          home: w.client.nav.home,
-          documents: w.client.nav.documents,
-          messages: w.client.nav.messages,
-          more: w.client.nav.more,
-        }}
-      />
-    </Shell>
+    <PortalCopyProvider copy={copy}>
+      <ClientPortalShell locale={locale}>{children}</ClientPortalShell>
+    </PortalCopyProvider>
   );
 }

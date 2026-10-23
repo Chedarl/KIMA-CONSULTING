@@ -501,3 +501,34 @@ h1, h2, h3, .font-display {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
+
+/*
+ * Client portal only. Locks the light palette from the client mockups even
+ * when the marketing site is in dark mode. Firm workspace does not use this
+ * class, so its theme is unchanged.
+ */
+.client-portal {
+  --bg: 244 247 251; /* #F4F7FB */
+  --surface: 255 255 255;
+  --surface-sunken: 241 245 249;
+  --border: 226 232 240;
+  --border-strong: 203 213 225;
+  --fg: 20 34 53;
+  --fg-muted: 71 85 105;
+  --fg-subtle: 100 116 139;
+  --navy: 13 27 42;
+  --navy-strong: 13 27 42;
+  --navy-soft: 232 238 246;
+  --teal: 30 158 116;
+  --teal-text: 15 107 79;
+  --teal-soft: 230 244 238;
+  --amber: 217 149 40;
+  --amber-text: 146 64 14;
+  --amber-soft: 255 246 232;
+  --danger: 185 28 28;
+  --danger-text: 185 28 28;
+  --danger-soft: 254 232 232;
+  color-scheme: light;
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+}

@@ -59,10 +59,14 @@ export function ClientMessageThread({
   locale,
   senderName,
   labels,
+  appearance = "default",
+  heading,
 }: {
   locale: "fr" | "en";
   senderName: string;
   labels: MessageLabels;
+  appearance?: "default" | "portal";
+  heading?: string;
 }) {
   const [tid, setTid] = useState<string | null>(null);
 
@@ -94,6 +98,8 @@ export function ClientMessageThread({
       taxpayerId={tid}
       senderName={senderName}
       labels={labels}
+      appearance={appearance}
+      heading={heading}
     />
   );
 }
@@ -106,6 +112,8 @@ export function MessageThread({
   labels,
   firmActor = null,
   sendBlocked = null,
+  appearance = "default",
+  heading,
 }: {
   locale: "fr" | "en";
   side: "taxpayer" | "firm";
@@ -115,6 +123,9 @@ export function MessageThread({
   /** Set on the firm side from the OTP session. Absent means the send is refused. */
   firmActor?: { role: ActorRole; label: string } | null;
   sendBlocked?: string | null;
+  /** Client portal layout. Firm workspace keeps the default thread. */
+  appearance?: "default" | "portal";
+  heading?: string;
 }) {
   const toast = useToast();
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
@@ -125,6 +136,7 @@ export function MessageThread({
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [threadId, setThreadId] = useState("general");
   const bottom = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -257,6 +269,113 @@ export function MessageThread({
         {[0, 1, 2].map((i) => (
           <div key={i} className="skeleton h-14 rounded-card" />
         ))}
+      </div>
+    );
+  }
+
+  if (appearance === "portal") {
+    const groups = new Map<string, { id: string; title: string; preview: string; unread: boolean }>();
+    groups.set("general", { id: "general", title: labels.noRequest, preview: "", unread: false });
+    for (const r of requests) {
+      groups.set(r.id, {
+        id: r.id,
+        title: locale === "fr" ? r.label_fr : r.label_en,
+        preview: "",
+        unread: false,
+      });
+    }
+    for (const m of msgs) {
+      const id = m.request_id ?? "general";
+      const slot = groups.get(id) ?? { id, title: labels.firmName, preview: "", unread: false };
+      slot.preview = m.body;
+      if (m.sender === "firm" && !m.read_at) slot.unread = true;
+      groups.set(id, slot);
+    }
+    const list = [...groups.values()];
+    const activeId = groups.has(threadId) ? threadId : "general";
+    const shown = msgs.filter((m) => (m.request_id ?? "general") === activeId);
+    const activeTitle = groups.get(activeId)?.title ?? labels.firmName;
+
+    return (
+      <div className="flex flex-col gap-4">
+        {heading && <h1 className="font-display text-[1.65rem] font-semibold tracking-tight text-fg">{heading}</h1>}
+        <div className="grid min-h-[32rem] overflow-hidden rounded-card border border-border bg-white shadow-card lg:grid-cols-[240px_minmax(0,1fr)]">
+          <aside className="border-b border-border lg:border-b-0 lg:border-r">
+            <ul className="flex gap-2 overflow-x-auto p-2 lg:flex-col">
+              {list.map((g) => (
+                <li key={g.id} className="min-w-[12rem] lg:min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setThreadId(g.id);
+                      setAbout(g.id === "general" ? "" : g.id);
+                    }}
+                    aria-current={g.id === activeId ? "true" : undefined}
+                    className={`flex min-h-[56px] w-full items-start gap-2 rounded-lg px-3 py-2 text-left hover:bg-surface-sunken ${
+                      g.id === activeId ? "bg-surface-sunken" : ""
+                    }`}
+                  >
+                    <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${g.unread ? "bg-amber" : "bg-transparent"}`} />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-fg">{labels.firmName}</span>
+                      <span className="block truncate text-xs text-fg-muted">{g.title}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+          <div className="flex min-h-[24rem] flex-col">
+            <div className="border-b border-border px-4 py-3">
+              <p className="text-sm font-semibold text-fg">{labels.firmName}</p>
+              <p className="text-xs text-fg-muted">{activeTitle}</p>
+            </div>
+            <ol className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4" aria-live="polite">
+              {shown.length === 0 && (
+                <li className="text-sm text-fg-muted">
+                  {labels.empty}
+                </li>
+              )}
+              {shown.map((m) => {
+                const mine = m.sender === "taxpayer";
+                return (
+                  <li key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm text-white ${mine ? "bg-teal-text" : "bg-[#163B66]"}`}>
+                      <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                    </div>
+                  </li>
+                );
+              })}
+              <div ref={bottom} />
+            </ol>
+            <form
+              className="flex items-center gap-2 border-t border-border p-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (activeId !== "general") setAbout(activeId);
+                void send();
+              }}
+            >
+              <label htmlFor="portal-msg" className="sr-only">{labels.placeholder}</label>
+              <input
+                id="portal-msg"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={labels.placeholder}
+                disabled={Boolean(sendBlocked)}
+                className="min-h-[44px] flex-1 rounded-lg border border-border px-3 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={busy || Boolean(sendBlocked) || draft.trim().length === 0}
+                className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-white hover:bg-[#0c5a42] disabled:opacity-50"
+              >
+                {busy ? labels.sending : labels.send}
+              </button>
+            </form>
+          </div>
+        </div>
+        <p className="text-xs text-fg-subtle">{labels.demoIdentity}</p>
       </div>
     );
   }

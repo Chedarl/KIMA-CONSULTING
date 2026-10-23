@@ -5,7 +5,8 @@ import Link from "next/link";
 import { demoIds, supabase } from "@/lib/supabase";
 import { submitRequestFile } from "@/lib/submit-request";
 import { todayInDouala } from "@/lib/dates";
-import { Card, CardHeader } from "@/components/ui";
+import { usePortalCopy } from "@/components/client-portal/copy";
+import { Pill, PrimaryButton, StatusStepper } from "@/components/client-portal/ui";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
   awaitingClient,
@@ -18,7 +19,6 @@ import {
   type ClientStatus,
   type ComplianceCase,
 } from "@/lib/cases";
-import { describe, timeline, type CaseEvent } from "@/lib/events";
 
 /**
  * The client's side of the same records.
@@ -52,59 +52,6 @@ const STEPS: ClientStatus[] = [
 
 const todayISO = () => todayInDouala();
 
-function Tile({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "neutral" | "amber" | "danger" | "teal";
-}) {
-  const accent =
-    tone === "danger"
-      ? "text-danger-text"
-      : tone === "amber"
-        ? "text-amber-text"
-        : tone === "teal"
-          ? "text-teal-text"
-          : "text-fg";
-  return (
-    <div className="rounded-card border border-border bg-surface p-4">
-      <p className={`tnum font-display text-3xl font-semibold leading-none ${accent}`}>{value}</p>
-      <p className="mt-2 text-sm font-medium text-fg-muted">{label}</p>
-    </div>
-  );
-}
-
-/** The five client states as a rail. Current step filled, the rest outlined. */
-function ProgressRail({ current, labels }: { current: ClientStatus; labels: string[] }) {
-  const at = STEPS.indexOf(current);
-  return (
-    <ol className="mt-3 flex flex-wrap gap-x-1 gap-y-2" aria-label={labels[at]}>
-      {STEPS.map((s, i) => {
-        const done = i < at;
-        const here = i === at;
-        return (
-          <li key={s} className="flex min-w-0 flex-1 basis-16 flex-col gap-1">
-            <span
-              aria-hidden
-              className={`h-1.5 rounded-full ${done ? "bg-teal" : here ? "bg-navy" : "bg-border"}`}
-            />
-            <span
-              className={`truncate text-[11px] leading-tight ${
-                here ? "font-semibold text-fg" : "text-fg-subtle"
-              }`}
-            >
-              {labels[i]}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 export function ClientDashboard({
   locale,
   t,
@@ -120,11 +67,12 @@ export function ClientDashboard({
   const [clientName, setClientName] = useState(fallbackName);
   const [cases, setCases] = useState<ComplianceCase[] | null>(null);
   const [requests, setRequests] = useState<CaseRequest[]>([]);
-  const [events, setEvents] = useState<CaseEvent[]>([]);
   const [offline, setOffline] = useState(false);
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [justSent, setJustSent] = useState<string | null>(null);
+  const copy = usePortalCopy();
   const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<string | null>(null);
@@ -133,7 +81,7 @@ export function ClientDashboard({
     try {
       const db = supabase();
       setIds(await demoIds());
-      const [cs, rq, ev, tp] = await Promise.all([
+      const [cs, rq, tp] = await Promise.all([
         db
           .from("compliance_cases")
           .select(
@@ -145,13 +93,6 @@ export function ClientDashboard({
           .select(
             "id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count",
           ),
-        db
-          .from("case_events")
-          .select(
-            "id, case_id, occurred_at, dimension, kind, actor_role, actor_label, from_value, to_value, subject_ref, reason, visibility",
-          )
-          .order("occurred_at", { ascending: false })
-          .limit(6),
         db.from("taxpayers").select("legal_name").limit(1),
       ]);
       if (cs.error) throw cs.error;
@@ -159,7 +100,6 @@ export function ClientDashboard({
       if (who?.legal_name) setClientName(who.legal_name);
       setCases((cs.data ?? []) as ComplianceCase[]);
       setRequests((rq.data ?? []) as CaseRequest[]);
-      setEvents((ev.data ?? []) as CaseEvent[]);
     } catch {
       setOffline(true);
       setCases([]);
@@ -223,17 +163,20 @@ export function ClientDashboard({
     [cases, today],
   );
 
-  const nextDeadline = useMemo(
-    () =>
-      [...(cases ?? [])]
-        .filter((c) => c.due_on)
-        .sort((a, b) => (a.due_on ?? "").localeCompare(b.due_on ?? ""))[0] ?? null,
-    [cases],
-  );
+  const stepLabels = [
+    copy.steps.documents,
+    copy.steps.preparation,
+    copy.steps.review,
+    copy.steps.filing,
+    copy.steps.completed,
+  ];
 
-  const visible = useMemo(() => timeline(events, "client"), [events]);
-
-  const stepLabels = [t.stepDocuments, t.stepProgress, t.stepReview, t.stepFiling, t.stepDone];
+  const featured = useMemo(() => {
+    const open = (cases ?? []).filter((c) => !c.closed_at);
+    return (
+      [...open].sort((a, b) => (a.due_on ?? "9999").localeCompare(b.due_on ?? "9999"))[0] ?? null
+    );
+  }, [cases]);
 
   /**
    * Upload a document. The file is stored and the request moves to
@@ -259,6 +202,7 @@ export function ClientDashboard({
     if (!result.ok) {
       setFailed(r.id);
     } else {
+      setJustSent(locale === "fr" ? r.label_fr : r.label_en);
       setRequests((prev) =>
         prev.map((x) => (x.id === r.id ? { ...x, status: "submitted" as const } : x)),
       );
@@ -269,225 +213,184 @@ export function ClientDashboard({
 
   const label = (r: CaseRequest) => (locale === "fr" ? r.label_fr : r.label_en);
 
+  const primary = owed[0] ?? null;
+  const featuredStatus = featured
+    ? clientStatus(featured, awaitingClient(byCase[featured.id] ?? []))
+    : null;
+
+  const tiles = [
+    {
+      href: `/${locale}/app/services`,
+      value: cases?.length ?? 0,
+      label: (cases?.length ?? 0) === 1 ? copy.activeOne : copy.activeMany,
+      valueClass: "text-fg",
+    },
+    {
+      href: `/${locale}/app/requests`,
+      value: owed.length,
+      label: copy.pending,
+      valueClass: "text-teal-text",
+    },
+    {
+      href: documentsHref,
+      value: sentCount,
+      label: copy.shared,
+      valueClass: "text-teal",
+    },
+    {
+      href: `/${locale}/app/calendar`,
+      value: overdueCount,
+      label: copy.overdue,
+      valueClass: "text-danger-text",
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-fg sm:text-3xl">
-            {t.welcome}, {clientName}
+          <h1 className="font-display text-[1.65rem] font-semibold tracking-tight text-fg">
+            {copy.welcome}, {clientName}
           </h1>
-          <p className="mt-1 text-sm text-fg-muted">{t.subtitle}</p>
+          <p className="mt-1 text-sm text-fg-muted">{copy.overview}</p>
         </div>
         {live && (
           <p className="inline-flex items-center gap-1.5 text-xs text-teal-text">
             <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-teal" />
-            {t.live}
+            {copy.live}
           </p>
         )}
       </div>
 
       {offline && (
-        <p className="rounded-card border border-amber/50 bg-amber-soft px-4 py-3 text-sm text-amber-text">
-          {t.offline}
+        <p className="rounded-card border border-amber/50 bg-amber-soft px-4 py-3 text-sm text-amber-text" role="status">
+          {copy.offline}
+        </p>
+      )}
+
+      {justSent && (
+        <p className="rounded-card border border-teal/40 bg-teal-soft px-4 py-3 text-sm text-teal-text" role="status">
+          {justSent} — {t.sent}
         </p>
       )}
 
       {cases === null ? (
-        <div className="order-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-card bg-surface-sunken" />
+            <div key={i} className="h-24 animate-pulse rounded-card bg-white" />
           ))}
         </div>
       ) : (
-        <div className="order-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Tile label={t.activeServices} value={cases.length} tone="neutral" />
-          <Tile
-            label={t.actionRequired}
-            value={owed.length}
-            tone={owed.length > 0 ? "amber" : "teal"}
-          />
-          <Tile label={t.documentsShared} value={sentCount} tone="neutral" />
-          <Tile label={t.overdue} value={overdueCount} tone={overdueCount > 0 ? "danger" : "teal"} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {tiles.map((tile) => (
+            <Link
+              key={tile.label}
+              href={tile.href}
+              className="rounded-card border border-border bg-white p-5 shadow-card transition-shadow hover:shadow-raised focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-navy"
+            >
+              <p className={`tnum font-display text-3xl font-semibold leading-none ${tile.valueClass}`}>{tile.value}</p>
+              <p className="mt-2 text-sm text-fg-muted">{tile.label}</p>
+            </Link>
+          ))}
         </div>
       )}
 
-      <div className="order-1 grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-5">
-          <Card>
-            <CardHeader title={t.actionTitle} />
-            <div className="p-4 sm:p-5">
-              {owed.length === 0 ? (
-                <div className="rounded-card border border-dashed border-border bg-surface-sunken p-5 text-center">
-                  <p className="text-sm font-medium text-fg">{t.actionEmpty}</p>
-                  <p className="mt-1 text-xs text-fg-subtle">{t.actionEmptyHint}</p>
-                </div>
-              ) : (
-                <ul className="flex flex-col gap-3">
-                  {owed.map((r) => {
-                    const late = r.due_on < today;
-                    return (
-                      <li
-                        key={r.id}
-                        className={`rounded-card border p-3 sm:p-4 ${
-                          late
-                            ? "border-danger-text/40 bg-danger-soft"
-                            : "border-amber/50 bg-amber-soft"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="font-medium text-fg">{label(r)}</p>
-                          <span
-                            className={`tnum shrink-0 font-mono text-xs font-semibold ${
-                              late ? "text-danger-text" : "text-amber-text"
-                            }`}
-                          >
-                            {t.dueOn} {r.due_on}
-                          </span>
-                        </div>
-                        {r.status === "returned" && (
-                          <p className="mt-1 text-xs font-medium text-danger-text">{t.againHint}</p>
-                        )}
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              pending.current = r.id;
-                              fileRef.current?.click();
-                            }}
-                            disabled={busy === r.id}
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface transition-opacity hover:opacity-90 disabled:opacity-60"
-                          >
-                            {busy === r.id ? t.sending : t.send}
-                          </button>
-                          {r.case_id && (
-                            <Link
-                              href={`/${locale}/app/declarations/${r.case_id}`}
-                              className="inline-flex min-h-[44px] items-center text-sm font-semibold text-navy"
-                            >
-                              {t.openService}
-                            </Link>
-                          )}
-                          <Link
-                            href={documentsHref}
-                            className="inline-flex min-h-[44px] items-center text-sm font-medium text-fg-muted underline-offset-2 hover:underline"
-                          >
-                            {t.openDocuments}
-                          </Link>
-                        </div>
-                        {failed === r.id && (
-                          <p className="mt-2 text-xs font-medium text-danger-text">
-                            {t.sendFailed}
-                          </p>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-
-              {/* The sentence that stops a green tick from meaning approval. */}
-              <p className="mt-4 border-t border-border pt-3 text-xs leading-snug text-fg-subtle">
-                {t.receivedNotAccepted}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section
+          className={`rounded-card border p-5 shadow-card ${
+            primary ? "border-amber/40 bg-[#FFF8EC]" : "border-border bg-white"
+          }`}
+        >
+          {primary ? (
+            <>
+              <p className="flex items-center gap-2 text-sm font-semibold text-amber-text">
+                <WarningIcon />
+                {copy.actionNeeded}
               </p>
-            </div>
-          </Card>
+              <h2 className="mt-2 font-display text-lg font-semibold text-fg">{label(primary)}</h2>
+              <p className="mt-1 text-sm text-fg-muted">
+                {t.dueOn} {primary.due_on}
+                {primary.status === "returned" ? ` — ${t.againHint}` : ""}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <PrimaryButton
+                  disabled={busy === primary.id}
+                  onClick={() => {
+                    pending.current = primary.id;
+                    fileRef.current?.click();
+                  }}
+                >
+                  {busy === primary.id ? copy.uploading : copy.upload}
+                </PrimaryButton>
+                {owed.length > 1 && (
+                  <Link href={`/${locale}/app/requests`} className="text-sm font-semibold text-navy hover:underline">
+                    {owed.length - 1} {copy.moreActions}
+                  </Link>
+                )}
+              </div>
+              {failed === primary.id && <p className="mt-2 text-xs font-medium text-danger-text">{t.sendFailed}</p>}
+              <p className="mt-4 text-xs text-fg-subtle">{t.receivedNotAccepted}</p>
+            </>
+          ) : (
+            <>
+              <h2 className="font-display text-base font-semibold text-fg">{copy.noAction}</h2>
+              <p className="mt-1 text-sm text-fg-muted">{copy.noActionHint}</p>
+              <Link href={documentsHref} className="mt-3 inline-flex min-h-[44px] items-center text-sm font-semibold text-teal-text hover:underline">
+                {t.openDocuments}
+              </Link>
+            </>
+          )}
+        </section>
 
-          <Card>
-            <CardHeader title={t.servicesTitle} />
-            <div className="p-4 sm:p-5">
-              {(cases ?? []).length === 0 ? (
-                <p className="text-sm text-fg-subtle">{t.servicesEmpty}</p>
-              ) : (
-                <ul className="flex flex-col gap-4">
-                  {(cases ?? []).map((c) => {
-                    const reqs = byCase[c.id] ?? [];
-                    const state = clientStatus(c, awaitingClient(reqs));
-                    return (
-                      <li
-                        key={c.id}
-                        className="rounded-card border border-border bg-surface p-3 sm:p-4"
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <Link
-                            href={`/${locale}/app/declarations/${c.id}`}
-                            className="font-medium text-fg underline-offset-2 hover:underline"
-                          >
-                            {obligationLabel(c.obligation_code, locale)}
-                          </Link>
-                          <span className="tnum font-mono text-xs text-fg-subtle">
-                            {c.period_token}
-                          </span>
-                        </div>
-                        <ProgressRail current={state} labels={stepLabels} />
-                        {c.due_on && (
-                          <p className="tnum mt-2 font-mono text-xs text-fg-subtle">
-                            {t.dueOn} {c.due_on}
-                            {c.due_needs_confirmation && (
-                              <span className="ml-2 font-sans text-amber-text">{t.provisional}</span>
-                            )}
-                          </p>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </Card>
-        </div>
-
-        <div className="flex flex-col gap-5">
-          <Card>
-            <CardHeader title={t.nextDeadline} />
-            <div className="p-4 sm:p-5">
-              {!nextDeadline ? (
-                <p className="text-sm text-fg-subtle">{t.noDeadline}</p>
-              ) : (
-                <>
-                  <p className="font-display text-lg font-semibold text-fg">
-                    {obligationLabel(nextDeadline.obligation_code, locale)}
-                  </p>
-                  <p className="tnum mt-1 font-mono text-sm text-fg-muted">{nextDeadline.due_on}</p>
-                  {nextDeadline.due_needs_confirmation && (
-                    <p className="mt-2 text-xs text-amber-text">{t.provisional}</p>
-                  )}
-                </>
-              )}
-            </div>
-          </Card>
-
-          <Card>
-            <CardHeader title={t.updatesTitle} />
-            <div className="p-4 sm:p-5">
-              {visible.length === 0 ? (
-                <p className="text-sm text-fg-subtle">{t.updatesEmpty}</p>
-              ) : (
-                <>
-                  <ul className="flex flex-col gap-3">
-                    {visible.map((e) => (
-                      <li
-                        key={e.id}
-                        className="border-b border-border/60 pb-3 last:border-0 last:pb-0"
-                      >
-                        <p className="text-sm leading-snug text-fg">{describe(e, locale)}</p>
-                        <p className="tnum mt-1 font-mono text-xs text-fg-subtle">
-                          {e.occurred_at.slice(0, 10)}
-                          {e.actor_role !== "client" && e.actor_label && (
-                            <span className="font-sans"> · {e.actor_label}</span>
-                          )}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-3 border-t border-border pt-3 text-xs leading-snug text-fg-subtle">
-                    {t.updatesHint}
-                  </p>
-                </>
-              )}
-            </div>
-          </Card>
-        </div>
+        <section className="rounded-card border border-border bg-white p-5 shadow-card">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-base font-semibold text-fg">{copy.currentServices}</h2>
+            <Link href={`/${locale}/app/services`} className="text-sm font-semibold text-[#1B4E89] hover:underline">
+              {copy.viewAll} →
+            </Link>
+          </div>
+          {(cases ?? []).length === 0 ? (
+            <p className="mt-4 text-sm text-fg-muted">{copy.servicesEmpty}</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-border">
+              {(cases ?? []).slice(0, 4).map((c) => {
+                const state = clientStatus(c, awaitingClient(byCase[c.id] ?? []));
+                return (
+                  <li key={c.id}>
+                    <Link
+                      href={`/${locale}/app/declarations/${c.id}`}
+                      className="flex min-h-[44px] items-center justify-between gap-3 py-2 hover:text-teal-text"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-fg">{obligationLabel(c.obligation_code, locale)}</span>
+                        <span className="tnum block font-mono text-xs text-fg-subtle">{c.period_token}</span>
+                      </span>
+                      <Pill tone={state === "waiting_on_you" ? "amber" : state === "complete" ? "green" : "muted"}>
+                        {state === "waiting_on_you" ? copy.badgeAction : state === "complete" ? copy.badgeDone : copy.badgeActive}
+                      </Pill>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       </div>
+
+      {featured && featuredStatus ? (
+        <div>
+          <StatusStepper
+            title={`${obligationLabel(featured.obligation_code, locale)} (${featured.period_token})`}
+            labels={stepLabels}
+            current={STEPS.indexOf(featuredStatus)}
+          />
+          {featured.due_needs_confirmation && (
+            <p className="mt-2 text-xs text-amber-text">{copy.provisional}</p>
+          )}
+        </div>
+      ) : (
+        cases !== null && <p className="text-sm text-fg-muted">{copy.noDeclaration}</p>
+      )}
 
       <input
         ref={fileRef}
@@ -503,5 +406,14 @@ export function ClientDashboard({
         }}
       />
     </div>
+  );
+}
+
+function WarningIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M12 4 3 19h18z" />
+      <path d="M12 10v4M12 17h.01" />
+    </svg>
   );
 }
