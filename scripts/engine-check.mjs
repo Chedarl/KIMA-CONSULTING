@@ -18,8 +18,9 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("..", import.meta.url));
 
 function compile(files) {
   const out = mkdtempSync(join(tmpdir(), "kima-engine-"));
@@ -37,9 +38,10 @@ function compile(files) {
     "--moduleResolution",
     "node",
   ];
-  const r = spawnSync(join(root, "node_modules/.bin/tsc"), args, { encoding: "utf8" });
+  const tsc = join(root, "node_modules", "typescript", "bin", "tsc");
+  const r = spawnSync(process.execPath, [tsc, ...args], { encoding: "utf8" });
   if (r.status !== 0) {
-    console.error(r.stdout || r.stderr);
+    console.error(r.stdout || r.stderr || r.error);
     throw new Error("tsc failed");
   }
   return out;
