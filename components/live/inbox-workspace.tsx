@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { audit, supabase, type DocumentRow } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
+import { updateById, updateManyById } from "@/lib/db-write";
 
 /**
  * The firm's document inbox: everything that arrived, across every client.
@@ -125,9 +126,8 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
 
     const failed: string[] = [];
     try {
-      const db = supabase();
-      const { error: e } = await db.from("documents").update({ review_status: decision }).in("id", ids);
-      if (e) throw e;
+      const written = await updateManyById("documents", ids, { review_status: decision });
+      if (!written.ok) throw new Error(written.reason);
 
       for (const id of ids) {
         const doc = docs?.find((d) => d.id === id);
@@ -140,8 +140,8 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
           patch.reason_fr = why ?? null;
           patch.reason_en = why ?? null;
         }
-        const { error: re } = await db.from("document_requests").update(patch).eq("id", doc.request_id);
-        if (re) failed.push(id);
+        const reqWritten = await updateById("document_requests", doc.request_id, patch);
+        if (!reqWritten.ok) failed.push(id);
 
         await audit({
           taxpayerId: doc.taxpayer_id,
@@ -240,14 +240,10 @@ export function InboxWorkspace({ locale, labels }: { locale: "fr" | "en"; labels
     if (!next || next.trim() === doc.file_name) return;
     setBusy(true);
     try {
-      const db = supabase();
       // The display name changes; the stored object keeps its path, so no
       // evidence link is broken by a rename.
-      const { error: e } = await db
-        .from("documents")
-        .update({ file_name: next.trim() })
-        .eq("id", doc.id);
-      if (e) throw e;
+      const written = await updateById("documents", doc.id, { file_name: next.trim() });
+      if (!written.ok) throw new Error(written.reason);
       await audit({
         taxpayerId: doc.taxpayer_id,
         actor: "firm",

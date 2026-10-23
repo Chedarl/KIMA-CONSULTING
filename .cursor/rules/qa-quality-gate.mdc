@@ -23,4 +23,8 @@ code generation, compilation, or visual appearance.
 Do not claim release readiness when P0 or P1 defects
 remain unresolved.
 
-Do not implement suggested fixes without authorization.
+Standing authorization (2026-10-22): implement audit remediations, commit,
+and push to GitHub without asking each time. Deploy to Vercel on product
+pushes to main. Apply Supabase migrations when a change includes schema.
+Still never commit secrets, force-push, or claim release readiness while
+P0 or P1 defects remain open.

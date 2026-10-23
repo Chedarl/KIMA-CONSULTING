@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { updateById } from "@/lib/db-write";
 import { audit, demoIds, supabase, type DocumentRow } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 
@@ -113,22 +114,15 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
     );
 
     try {
-      const db = supabase();
-      const { error: docErr } = await db
-        .from("documents")
-        .update({ review_status: decision })
-        .eq("id", doc.id);
-      if (docErr) throw docErr;
+      const written = await updateById("documents", doc.id, { review_status: decision });
+      if (!written.ok) throw new Error(written.reason);
 
       if (doc.request_id) {
-        const { error: reqErr } = await db
-          .from("document_requests")
-          .update({
-            status: decision === "accepted" ? "accepted" : "returned",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", doc.request_id);
-        if (reqErr) throw reqErr;
+        const reqWritten = await updateById("document_requests", doc.request_id, {
+          status: decision === "accepted" ? "accepted" : "returned",
+          updated_at: new Date().toISOString(),
+        });
+        if (!reqWritten.ok) throw new Error(reqWritten.reason);
       }
 
       const { recordCaseEvent } = await import("@/lib/record-event");

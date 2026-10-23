@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { audit, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
+import { updateById } from "@/lib/db-write";
 import { hasBlocking, runDiagnostics, type Finding } from "@/lib/diagnostics";
 import { requestIsOutstanding, type RequestStatus } from "@/lib/cases";
 
@@ -125,11 +126,11 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
       );
 
       // Approved and submitted, but NOT filed: filing waits on evidence.
-      const { error: e } = await db
-        .from("declarations")
-        .update({ state: "awaiting_evidence", updated_at: new Date().toISOString() })
-        .eq("id", decl.id);
-      if (e) throw e;
+      const written = await updateById("declarations", decl.id, {
+        state: "awaiting_evidence",
+        updated_at: new Date().toISOString(),
+      });
+      if (!written.ok) throw new Error(written.reason);
 
       const { recordCaseEvent } = await import("@/lib/record-event");
       await recordCaseEvent({
@@ -169,19 +170,17 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
     setBusy(decl.id);
     try {
       const db = supabase();
-      const { error: e } = await db
-        .from("declarations")
-        .update({
-          state: "filed",
-          evidence_reference: ref,
-          evidence_captured_on: new Date().toISOString().slice(0, 10),
-          evidence_source: "official_receipt",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", decl.id);
+      const written = await updateById("declarations", decl.id, {
+        state: "filed",
+        evidence_reference: ref,
+        evidence_captured_on: new Date().toISOString().slice(0, 10),
+        evidence_source: "official_receipt",
+        updated_at: new Date().toISOString(),
+      });
       // The database CHECK refuses a filed row without all three evidence
       // fields, so a failure here is the guarantee working, not a glitch.
-      if (e) throw e;
+      // updateById also treats a zero-row PATCH as a refusal.
+      if (!written.ok) throw new Error(written.reason);
 
       const { recordCaseEvent } = await import("@/lib/record-event");
       await recordCaseEvent({

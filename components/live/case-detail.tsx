@@ -33,6 +33,7 @@ import {
   type Engagement,
 } from "@/lib/cases";
 import { caseFindings, type CaseTaxpayer } from "@/lib/case-diagnostics";
+import { commandAdvanceCase } from "@/lib/commands";
 import { updateById } from "@/lib/db-write";
 import { readFirmSession, type FirmSession } from "@/lib/firm-auth";
 import type { Finding } from "@/lib/diagnostics";
@@ -40,7 +41,6 @@ import {
   describe,
   drift,
   eventFromRequest,
-  eventsFromAdvance,
   noteEvent,
   timeline,
   type CaseEvent,
@@ -60,9 +60,9 @@ import {
  * One compliance case, from the firm's side — screen 06.
  *
  * This is where the engines stop being libraries and become a workflow. Every
- * button asks the same function the harnesses ask: a stage move is `advance()`,
- * the review gate is `canApproveReview()`, the checks are `caseFindings()`, the
- * history is `eventsFromAdvance()`. NOTHING ON THIS PAGE DECIDES ANYTHING
+ * button asks the same function the harnesses ask: a stage move is
+ * `commandAdvanceCase()` (capability + `advance()` + events), the review gate
+ * is `canApproveReview()`, the checks are `caseFindings()`. NOTHING ON THIS PAGE DECIDES ANYTHING
  * ITSELF. A surface that re-derived a rule would be a second opinion, and the
  * second opinion is always the one that goes stale.
  *
@@ -400,10 +400,20 @@ export function CaseDetail({
   );
 
   async function move(to: CaseStage) {
-    if (!row || !member) return;
-    const input = moveInput(to);
-    const result = advance(row, input);
-    if (!result.ok) return;
+    if (!row || !member || !actor) return;
+    const result = commandAdvanceCase({
+      current: row,
+      advance: moveInput(to),
+      eventActor: { role: member.role, label: member.person_label },
+      authActor: actor,
+      requireSecondReview: requiresSecondReview(members),
+      discloseSelfApproval: disclose,
+    });
+    if (!result.ok) {
+      setFailed(to);
+      setRefusedBy(locale === "fr" ? result.reasonFr : result.reasonEn);
+      return;
+    }
     setBusy(to);
     setFailed(null);
     setRefusedBy(null);
@@ -415,14 +425,8 @@ export function CaseDetail({
         return;
       }
       const db = supabase();
-      // Written from the same input the gate judged, by the function that
-      // re-runs that gate: the log cannot record a move the engine refused.
-      const log = eventsFromAdvance(row, input, {
-        role: member.role,
-        label: member.person_label,
-      });
-      if (log.length > 0) {
-        const { error: logError } = await db.from("case_events").insert(log);
+      if (result.events.length > 0) {
+        const { error: logError } = await db.from("case_events").insert(result.events);
         if (logError) throw logError;
       }
       await load();

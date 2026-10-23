@@ -21,11 +21,10 @@ export default function ClientLayout({
 
   const nav: NavItem[] = [
     { href: base, label: w.client.nav.dashboard, icon: "grid", ready: true },
-    // Still backed by lib/demo-data — visible but disabled until live-wired.
-    { href: `${base}/compliance`, label: w.client.nav.compliance, icon: "shield", ready: false },
+    { href: `${base}/compliance`, label: w.client.nav.compliance, icon: "shield", ready: true },
     { href: `${base}/documents`, label: w.client.nav.documents, icon: "folder", ready: true },
-    { href: `${base}/declarations`, label: w.client.nav.declarations, icon: "file", ready: false },
-    { href: `${base}/archive`, label: w.client.nav.archive, icon: "archive", ready: false },
+    { href: `${base}/declarations`, label: w.client.nav.declarations, icon: "file", ready: true },
+    { href: `${base}/archive`, label: w.client.nav.archive, icon: "archive", ready: true },
     { href: `${base}/messages`, label: w.client.nav.messages, icon: "chat", ready: true },
     { href: `${base}/payments`, label: w.client.nav.payments, icon: "card", ready: true },
     { href: `${base}/support`, label: w.client.nav.support, icon: "help", ready: false },

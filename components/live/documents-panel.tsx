@@ -9,6 +9,7 @@ import {
   type DocumentRow,
 } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
+import { updateById } from "@/lib/db-write";
 
 /**
  * The document centre, live.
@@ -153,11 +154,11 @@ export function DocumentsPanel({
         });
         if (docErr) throw docErr;
 
-        const { error: reqErr } = await db
-          .from("document_requests")
-          .update({ status: "submitted", updated_at: new Date().toISOString() })
-          .eq("id", requestId);
-        if (reqErr) throw reqErr;
+        const reqWritten = await updateById("document_requests", requestId, {
+          status: "submitted",
+          updated_at: new Date().toISOString(),
+        });
+        if (!reqWritten.ok) throw new Error(reqWritten.reason);
 
         const { recordCaseEvent } = await import("@/lib/record-event");
         await recordCaseEvent({

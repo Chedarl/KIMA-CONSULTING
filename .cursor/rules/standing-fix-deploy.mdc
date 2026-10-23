@@ -1,0 +1,23 @@
+---
+description: Standing authorization to fix, commit, and deploy without asking each time
+alwaysApply: true
+---
+
+# Standing fix, commit, and deploy
+
+Granted 2026-10-22 by the product owner. Applies until revoked in chat.
+
+When an audit finding or agreed product defect has a clear fix:
+
+1. Implement it. Do not ask permission again for each defect.
+2. Commit on the current branch (conventional, why-focused).
+3. Push to GitHub `origin`.
+4. If the change is product code on `main` and the Vercel project is linked, deploy production (`vercel deploy --prod` or the Git integration).
+5. If the change includes SQL the remote project does not have yet, apply it to the Supabase project `kima-consulting` (`vhrnrbnjhmxrygvyfirf`). Do not replay migrations that are already applied. Do not write real taxpayer data.
+
+Still required:
+
+- No secrets in git. No force-push to main. No `--no-verify`.
+- Do not claim release readiness while P0 or P1 remain.
+- Do not turn off `allow_demo_anon` until OTP sign-in is proven; that flag is the synthetic demo, not a silent production switch.
+- Hard constraints in `CLAUDE.md` still win (no invented tax rules, no DGI claims).

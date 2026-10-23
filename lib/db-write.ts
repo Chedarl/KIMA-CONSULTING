@@ -48,3 +48,29 @@ export async function updateById(
     return { ok: false, reason: "error", detail: e instanceof Error ? e.message : "unknown" };
   }
 }
+
+/**
+ * Update several rows by id and prove every one changed.
+ *
+ * A short result means at least one row was invisible to this actor. Callers
+ * must treat that as a refusal, not as a partial success.
+ */
+export async function updateManyById(
+  table: string,
+  ids: string[],
+  patch: Record<string, unknown>,
+): Promise<WriteOutcome> {
+  if (ids.length === 0) return { ok: true };
+  try {
+    const { data, error } = await supabase()
+      .from(table)
+      .update(patch)
+      .in("id", ids)
+      .select("id");
+    if (error) return { ok: false, reason: "error", detail: error.message };
+    if (!data || data.length !== ids.length) return { ok: false, reason: "not_permitted" };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: "error", detail: e instanceof Error ? e.message : "unknown" };
+  }
+}
