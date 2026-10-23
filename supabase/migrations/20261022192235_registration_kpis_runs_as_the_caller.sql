@@ -8,9 +8,6 @@
 -- security_invoker makes it run as the caller, so the base table's policy
 -- applies. The KPI dashboard is a firm surface, so firm-only is the behaviour
 -- it should have had from the start.
---
--- Verified: as anon, `registrations` returns [] and the view now returns
--- total 0 rather than total 1.
 alter view registration_kpis set (security_invoker = on);
 
 comment on view registration_kpis is

@@ -1,18 +1,17 @@
 -- The demo-anon gate needed a handle somebody can actually reach.
 --
--- 20261022213000 gated it behind `current_setting('app.allow_demo_anon')`, to
--- be turned on with `alter database … set`. On a managed Supabase project
+-- The previous part gated it behind `current_setting('app.allow_demo_anon')`,
+-- to be turned on with `alter database … set`. On a managed Supabase project
 -- neither the API role nor the dashboard SQL role may set a database or role
--- parameter: `alter database postgres set` is refused outright, and
--- `alter role anon set` fails silently. A switch nobody can move is not a
--- switch. It left the gate permanently off with no supported way to run the
--- synthetic demo, which invites the next person to "fix" it by deleting the
--- gate -- and that gate is what stands between a future real taxpayer and the
--- open internet.
+-- parameter -- both `alter database postgres set` and `alter role anon set`
+-- are refused. A switch nobody can move is not a switch: it left the gate
+-- permanently off with no supported way to run the synthetic demo, and
+-- invited the next person to "fix" it by deleting the gate.
 --
--- So the flag becomes a row: default off, readable only through a
+-- So the flag becomes a row. Default off, readable only through a
 -- security-definer function, and turning it on is a deliberate, auditable
--- write that is still there to be found tomorrow.
+-- write that shows up in the table rather than in a session variable nobody
+-- can inspect afterwards.
 
 create table if not exists app_flags (
   key text primary key,

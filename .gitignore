@@ -31,6 +31,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Supabase CLI local cache (not schema)
+supabase/.temp/
+
 # client fixtures — real taxpayer data must never be committed (risk R-32)
 /fixtures/real/
 
