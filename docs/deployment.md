@@ -217,9 +217,40 @@ Then check it:
   `app_flags.demo_otp_reveal` on, never for a real address;
 - the function's logs show no `bind …` errors.
 
-Roll back by redeploying the downloaded v3. Secrets it reads (set in Supabase, never in
-the repo): `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (injected by Supabase),
-`RESEND_API_KEY`, `KIMA_MAIL_FROM`.
+Secrets it reads (set in Supabase, never in the repo): `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY` (injected by Supabase), `RESEND_API_KEY`, `KIMA_MAIL_FROM`.
+
+**Rollback.** No verbatim copy of v3 exists: not in the repository, not in any local
+checkout, and no file was kept from the download. The nearest text is in git history:
+`supabase/functions/auth-codes/index.ts` at `63582e2` / `2254cc9` (#13) is v3 plus the
+binding check and the error-text change, and `5a188c1` (#15) differs from it only in the
+header comment. Rolling back to v3 itself is **not advised**: v3 answered ok after a
+refused identity binding. The rollback target is the file at `5a188c1`, the same as the
+live v5. Before the next deploy, run step 1 and keep the download under
+`docs/deployment-artifacts/auth-codes/v<N>/` (or attach it to the PR) so that a real
+copy of the version being replaced exists.
+
+### auth-codes version history (read-only check, 27 Oct 2026, Agent A)
+
+What the platform shows (`list_edge_functions`, `get_edge_function`, function logs):
+
+| Version | When (UTC) | From where | Evidence |
+|---|---|---|---|
+| 1 | 23 Oct, 04:05 (function created 04:05:37) | By hand, no repository | Function logs: deployment `…_1` booted 04:06–04:08, curl requests |
+| 2 | 23 Oct, by 04:12 | By hand, no repository | Function logs: deployment `…_2` booted 04:12, requests from `node` |
+| 3 | Between 23 Oct 04:13 and 27 Oct 18:30 | By hand, no repository | Fetched read-only on 27 Oct (#13 header). No request served by v3 appears in the retained logs (23–27 Oct) |
+| 4 | **Could not determine.** Between the v3 fetch (27 Oct, before 18:30, the time of commit `63582e2`) and 19:24:19 | **Could not determine.** Not from CI: no workflow deploys Edge Functions (`.github/workflows/` has none). So by hand (CLI, dashboard or MCP) | No v4 request in the function logs; the platform keeps no per-version deploy record that the read-only tools expose |
+| 5 | 27 Oct, 19:24:19 (`updated_at`) | This file, with the owner's go | Booted 19:24:34; served the post-deploy check (one 200, one 400). Source equals `index.ts` at `5a188c1` (below) |
+
+The most likely reading, unproven: v4 and v5 were both deploys in the same session on
+27 Oct (a first deploy attempt, then a redeploy). The person who ran the 27 Oct deploy
+can confirm. Until then, v4 stays "unexplained, superseded".
+
+**v5 equals the repository.** The live source (`get_edge_function`, one file
+`index.ts`) was saved and compared with `supabase/functions/auth-codes/index.ts` at
+`main` (`8bb83cb`, same blob as `5a188c1`) after normalising line endings: `diff` finds
+no difference, and both have sha256 `58e82a01…a716613` with LF endings. The repository
+blob is stored with LF; the Windows checkout shows CRLF only because of `core.autocrlf`.
 
 ## Risks
 

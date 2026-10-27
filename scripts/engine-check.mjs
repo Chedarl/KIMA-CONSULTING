@@ -410,6 +410,49 @@ try {
     }
   });
 
+  // D6 + D2 review of #6. The SQL negative tests (supabase/tests/fee_payments_test.sql)
+  // prove the behaviour; this keeps the interface rule and the database rule
+  // from drifting apart without anyone noticing.
+  check("T-21 a client report is only ever pending, and a fee review is final in the database too", () => {
+    const dir = join(root, "supabase", "migrations");
+    const sql = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => readFileSync(join(dir, f), "utf8").replace(/\r\n/g, "\n"))
+      .join("\n");
+    const policy = sql.match(
+      /create policy "client reports fee payments"[\s\S]*?with check \(([\s\S]*?)\n  \);/i,
+    );
+    assert.ok(policy, "client insert policy on service_payments not found");
+    for (const clause of [
+      "status = 'pending_confirmation'",
+      "reported_by = 'taxpayer'",
+      "confirmed_at is null",
+      "confirmed_by is null",
+      "client_taxpayer_ids()",
+      "i.taxpayer_id = service_payments.taxpayer_id",
+    ]) {
+      assert.ok(policy[1].includes(clause), `client insert policy must require ${clause}`);
+    }
+    assert.ok(/create policy "client reads own payments"[\s\S]*?client_taxpayer_ids\(\)/i.test(sql));
+    assert.ok(/create trigger service_payment_review_guard\s+before update on public\.service_payments/i.test(sql));
+    assert.ok(/old\.status <> 'pending_confirmation'/.test(sql), "the guard must refuse moving a final payment");
+
+    // The interface says the same: only a pending payment moves.
+    for (const status of ["confirmed", "rejected"]) {
+      assert.equal(
+        billing.reviewServicePayment({ status, provider_reference: "R" }, { to: "rejected", by: "P" }).reason,
+        "not_pending",
+      );
+    }
+    // A client report, however large, never makes the fee Paid.
+    const reportedOnly = billing.ledgerBalance(
+      [{ invoice_id: "i", amount_minor: 15000, status: "pending_confirmation", provider_reference: "MP" }],
+      "i",
+    );
+    assert.equal(billing.feePaymentState(15000, reportedOnly), "reported");
+  });
+
   // deliverOneTimeCode with a stubbed fetch: a send failure to a real address
   // is a failure, never a reveal, even with the flag on outside production.
   {
