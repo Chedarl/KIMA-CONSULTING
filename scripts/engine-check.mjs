@@ -328,6 +328,12 @@ try {
     }
     assert.ok(sqlKinds && sqlKinds.length > 0, "client_may_record() not found in migrations");
     assert.deepEqual([...sqlKinds].sort(), [...events.CLIENT_EVENT_KINDS].sort());
+    // Not derived from visibility: client-WRITABLE is a strict subset of
+    // client-VISIBLE. payment_verified is visible to the client and must never
+    // be writable by one, so the two lists cannot be equal.
+    const visible = new Set(events.clientVisibleKinds());
+    assert.ok(events.CLIENT_EVENT_KINDS.length < visible.size, "writable list must be narrower than visible list");
+    assert.ok(visible.has("payment_verified") && visible.has("filing_verified"));
     for (const k of events.CLIENT_EVENT_KINDS) {
       assert.ok(events.EVENT_KINDS[k], `${k} is not a known event kind`);
       assert.equal(events.EVENT_KINDS[k].clientVisible, true, `${k} must be client-visible`);

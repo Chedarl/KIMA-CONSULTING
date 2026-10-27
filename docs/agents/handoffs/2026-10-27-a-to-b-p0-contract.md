@@ -142,6 +142,46 @@ its own hash, path rules and three verdicts), `kind`, `captured_at`.
 - "Next action" is derived on screen, not stored.
 - An exported case file is marked "not an official document".
 
+#### Reconciliation with Agent B's requests (`2026-10-27-b-to-a-incident-schema.md`)
+
+**This section is the single source for the incident contract** (B's point 6). Where it
+and the tables above disagree, this section wins. It is still a **proposal**. Nothing
+here is built in this PR, and the migration waits for the owner's approval of P1-2.
+
+| B's point | Agent A's answer |
+|---|---|
+| 1. `CLIENT_EVENT_KINDS` missing; must not derive from visibility | **Done in this PR.** `CLIENT_EVENT_KINDS` (`lib/events.ts`) is its own list. T-16 compares it with the SQL `client_may_record()` list parsed from the migration, and asserts it is strictly narrower than `clientVisibleKinds()`, which includes `payment_verified` and `filing_verified`. |
+| 2. Enum mismatch (`requested`, `received`) | **Agree: new type plus a one-time mapping**, not `ALTER TYPE … ADD VALUE`. New type `tax_payment_state` with the seven values. The mapping is `requested → unknown`, `received → reference_recorded`; the others are kept. **Counter-proposal on the name:** keep the column name `payment_evidence_status` and change its type, instead of adding `payment_state`. `canDeliver()`, PR #6 screens and the event log already read that name. Rename your camelCase mirror to `paymentEvidenceStatus`. Add `payment_verified_by`, `payment_verified_at` and `payment_verified_evidence_id` (→ `incident_evidence.id`), with the CHECK and trigger exactly as you wrote them (`verified` only from `official_receipt` or `administration_response` evidence, and no `debit_observed → verified` edge). |
+| 3. Three incident types | **Agree.** `payment_step_error`, `debit_not_recognised`, `certificate_blocked`. `portal_unavailable` and `other` come later by migration. |
+| 4. Payment lives on the case | **Agree.** The incident reads it and never stores its own copy. |
+| 5. Credential before verification (P1-8) | **Agree, and it is an owner decision.** I propose the payment `verified` CHECK and the incident `resolved` trigger land in the same migration as the credential record, so no plain `firm_reviewer` can verify. If the owner wants the payment states sooner, `verified` stays refused for everyone until P1-8 lands. |
+| 6. One contract file | **This section.** |
+
+Accepted additions to the tables above:
+- **`incidents`:** add `attempted_step`, `reported_error` (declared, never verified), `resolution_outcome`, `resolution_reason`, `resolved_by` and `resolved_at`. `amount_minor` is `bigint`, integer XAF, declared and nullable. `masked_reference` is displayed as `•••• 1234`. The server hashes the full reference and never stores it. `portal` is a `HARMONY_PORTALS` key or null. The CHECK is: `resolved`/`closed_unresolved` ⇒ `resolution_reason` and `resolved_by` not null. The trigger is: `resolved` needs cited official evidence, and for `debit_not_recognised` the case's payment state must be `verified`.
+- **`incident_evidence` and `incident_contacts`** each carry `taxpayer_id`, so RLS reads one column through `can_see_taxpayer()`. It must match the incident's taxpayer (composite FK).
+- **`incident_evidence.kind`:** `debit_sms | wallet_screenshot | bank_statement | portal_screenshot | official_receipt | administration_response | other`. It also gets `added_by_role`.
+- **`incident_contacts`:** `channel` is `phone | in_person | email | online_form | other`. Add `counterparty` and `unresolved`. `ticket_ref` is stored masked plus sha256, like the transaction reference.
+- **Append-only:** both child tables are append-only by grant (UPDATE, DELETE and TRUNCATE revoked), as `case_events` is.
+
+Client updates on `incidents` (this replaces "update while open" above):
+- A client may insert only with `status = 'open'` and their own `taxpayer_id`.
+- A client may edit the declared fields only while the incident is `open`.
+- A client may move the status only `open → escalated → awaiting_administration`, and reopen `closed_unresolved → open`.
+- A client may never set `resolved` or `closed_unresolved`, and never a `resolution_*` or `payment_verified_*` column.
+- A trigger enforces all of this, as `client_request_update_guard` does for requests.
+
+Event kinds, final proposal for the `incident` dimension:
+- **Client-writable:** `incident_reported`, `incident_evidence_added`, `support_contact_logged`, `payment_attempted`, `payment_debit_observed`, `payment_reference_recorded`, `incident_escalated`, `incident_awaiting_administration`, `incident_reopened`. All are client-visible, and none of them verifies anything. They join `CLIENT_EVENT_KINDS` and `client_may_record()` in the same migration, and T-16 keeps the two equal.
+- **Firm-only:** `payment_verified` (exists), `payment_disputed`, `payment_not_applicable`, `incident_resolved`, `incident_closed_unresolved`.
+
+Tests that come with the migration:
+- SQL negative tests for B's A-3 (a client cannot verify a payment) and A-4 (a client cannot set a payment state outside the three declared ones).
+- A test that the contact log is append-only.
+- T-16 extended to the new kinds.
+
+`npm run test:journey` now runs in CI (`.github/workflows/ci.yml`, this PR).
+
 ## Why
 
 `docs/audits/2026-10-27-taxdome-parity/security-and-integrity-review.md` findings #2,
