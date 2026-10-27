@@ -1,0 +1,25 @@
+---
+description: Two-agent contract (owner, 27 Oct 2026) — Cursor is Agent B; never touch the database, auth or deploy; read AGENTS.md first
+alwaysApply: true
+---
+
+# Two-agent boundaries
+
+Cursor works on this repository as **Agent B** (taxpayer journey and incident recovery),
+defined in `.claude/agents/kima-agent-b-journey.md` (the agents normally run in Claude Code). Agent A (Claude Code) owns security
+and the database. The full contract is `AGENTS.md`: read it before any change.
+
+Always, for every Cursor task in this repo:
+
+1. **Do not edit** `supabase/**`, `app/api/**`, `lib/auth-*.ts`, `lib/portal-auth.ts`,
+   `lib/firm-auth.ts`, `lib/supabase*.ts`, `lib/permissions.ts`, `lib/db-write.ts`,
+   `scripts/engine-check.mjs` or `.github/workflows/**`. Write a handoff in
+   `docs/agents/handoffs/` for Agent A instead.
+2. **Do not apply SQL** to any Supabase project, **do not deploy**, and **do not merge
+   into `main`**. Each of these needs an owner approval naming that change.
+3. Check the **current gate** in `AGENTS.md`. Before gate 4, produce plans and documents
+   only.
+4. Before reporting work as done, run `kima-qa-auditor`.
+
+This rule overrides `standing-fix-deploy.mdc`, which is suspended. `always-commit-push.mdc`
+still applies to your own branch: commit and push, open a PR, do not merge.
