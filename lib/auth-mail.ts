@@ -54,7 +54,7 @@ export async function deliverOneTimeCode(input: {
   audience: "portal" | "firm";
 }): Promise<DeliverCodeResult> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.KIMA_MAIL_FROM ?? "Kima Consulting <onboarding@resend.dev>";
+  const from = process.env.KIMA_MAIL_FROM ?? "KIMA CONSULTING <onboarding@resend.dev>";
   const reveal = mayRevealCode({
     revealFlag: process.env.KIMA_DEMO_OTP_REVEAL,
     vercelEnv: process.env.VERCEL_ENV,
@@ -70,11 +70,11 @@ export async function deliverOneTimeCode(input: {
   const subject =
     input.audience === "firm"
       ? fr
-        ? "Kima — votre code d'accès cabinet"
-        : "Kima — your firm access code"
+        ? "KIMA OS — votre code d'accès cabinet"
+        : "KIMA OS — your firm access code"
       : fr
-        ? "Kima — votre code d'accès"
-        : "Kima — your access code";
+        ? "KIMA OS — votre code d'accès"
+        : "KIMA OS — your access code";
 
   const text = [
     fr ? "Bonjour," : "Hello,",
@@ -87,7 +87,7 @@ export async function deliverOneTimeCode(input: {
       ? "Il expire dans dix minutes et ne peut être utilisé qu'une fois."
       : "It expires in ten minutes and can be used only once.",
     "",
-    "— Kima Consulting",
+    "— KIMA CONSULTING",
     "",
     fr
       ? "Message de démonstration. Aucune intégration DGI n'est établie."

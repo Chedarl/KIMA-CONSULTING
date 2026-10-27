@@ -262,6 +262,11 @@ favicon; `public/logo.svg` keeps the colour mark at the old path. Light chrome
 switches between the colour and white marks with `.brand-mark-light` /
 `.brand-mark-dark` in `app/globals.css`. The old intelligent-K files
 (`logo-horizontal`, `logo-dark`, `logo-mono`) are gone; do not reintroduce them.
+The mails use the same names: subjects start "KIMA OS —", the signature is
+"— KIMA CONSULTING", and the default sender (when `KIMA_MAIL_FROM` is unset) is
+`KIMA CONSULTING <onboarding@resend.dev>`. `lib/auth-mail.ts`, `app/api/inquiry/route.ts`
+and the `auth-codes` Edge Function carry identical strings, so a sign-in code reads the
+same whichever path sent it.
 
 Note the split between a brand colour and its text colour: teal is about 3:1 on
 white, so `--teal` is a fill and `--teal-text` is the type colour. Never use a
