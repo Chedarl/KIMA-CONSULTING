@@ -5,6 +5,7 @@ import { insertRegistration } from "@/lib/insert-registration";
 import type { getPublicCopy } from "@/lib/i18n-public";
 import {
   contactLeadIssues,
+  OPEN_WORKSPACE_KINDS,
   type OnboardingDraft,
   type OnboardingIssue,
   type WorkspaceKind,
@@ -12,7 +13,7 @@ import {
 
 type Copy = ReturnType<typeof getPublicCopy>;
 
-const KINDS: WorkspaceKind[] = ["individual", "business", "accounting_firm"];
+const KINDS: readonly WorkspaceKind[] = OPEN_WORKSPACE_KINDS;
 
 export function ContactForm({ locale, copy }: { locale: "fr" | "en"; copy: Copy }) {
   const t = copy.home;

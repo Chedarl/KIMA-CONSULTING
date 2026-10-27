@@ -76,6 +76,8 @@ From the owner's taxpayer-first brief; analysis in
 | R-42 | A KIMA case file is presented by a taxpayer as if it were an ACF | M | **H** | No seal, QR or "conforme"; fixed "not an ACF" line in both locales; link to the DGI service (carries the 22 Oct "Dossier fiscal" decision) | Founder | Open |
 | R-43 | Escalation guidance paraphrases unverified commentary and is wrong | M | **H** | Guidance strings may cite only `verified` sources; otherwise a fixed "not yet confirmed" fallback | Tax reviewer | Open |
 | R-44 | Incident evidence captures DGI credentials or one-time codes | M | **H** | KIMA never asks for DGI credentials; capture warning; code-shaped strings rejected in free text | Eng lead | Open |
+| R-45 | A plain-language bulletin misstates the official text it summarises | M | **H** | Expert-comptable approves every bulletin; machine drafts never shown; each bulletin links the original and names the reviewer; bulletins inform, never create obligations | Reviewer (expert-comptable) | Open |
+| R-46 | An official text changes or is withdrawn and the bulletin or rule built on it goes stale | M | **H** | Source register keeps URL, fetch date and `sha256`; a changed hash withdraws dependent bulletins and flags dependent rules for re-verification | Eng lead | Open |
 
 ## Phase gates
 

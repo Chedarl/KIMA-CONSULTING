@@ -3,6 +3,7 @@ import { ContactForm } from "@/components/marketing/contact-form";
 import { MarketingHeader } from "@/components/marketing/header";
 import { ServiceIcon, type ServiceIconName } from "@/components/marketing/icons";
 import { getPublicCopy, type PublicLocale } from "@/lib/i18n-public";
+import { OPEN_WORKSPACE_KINDS } from "@/lib/public-onboarding";
 
 const SERVICE_ICONS: ServiceIconName[] = ["tax", "dsf", "accounting", "calendar", "expert"];
 
@@ -96,9 +97,9 @@ export function HomePage({ locale }: { locale: PublicLocale }) {
           <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
             <h2 className="font-display text-3xl font-bold text-fg">{t.pricingTitle}</h2>
             <p className="mt-2 max-w-2xl text-sm text-fg-muted">{t.pricingIntro}</p>
-            <ul className="mt-8 grid gap-4 lg:grid-cols-3">
-              {t.pricing.map((plan, i) => {
-                const kind = i === 0 ? "individual" : i === 1 ? "business" : "accounting_firm";
+            <ul className="mt-8 grid gap-4 md:grid-cols-2">
+              {OPEN_WORKSPACE_KINDS.map((kind, i) => {
+                const plan = t.pricing[i];
                 return (
                   <li key={plan.title} className="flex flex-col rounded-card border border-border bg-white p-6 shadow-card">
                     <h3 className="font-display text-xl font-semibold text-fg">{plan.title}</h3>
