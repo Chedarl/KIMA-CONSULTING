@@ -45,7 +45,7 @@ standard is "less painful, more accurate", not more screens.
 | P2-2 | Variant 1 (portal error before deadline) as incident type with deadline-risk warning | ADAPT | P1-2, a verified IGS deadline |
 | P2-3 | Link `filing_evidence_ref` to `documents.id`; compute `sha256` on upload | ADAPT | P0-1 |
 | P2-4 | Assisted / WhatsApp / paper intake of incident evidence (`arrived_via`, captured-by provenance) | ADAPT | P1-2 |
-| P2-5 | Organisation scoping in `member_has()` — **blocking before a second firm**. Until it lands the firm sign-up option stays hidden (`OPEN_WORKSPACE_KINDS`, done 27 Oct) | ADAPT | — |
+| P2-5 | Organisation scoping in `member_has()` — **BLOCKING: must merge before any second firm is onboarded** (owner decision D7, 27 Oct; risk R-47). Not built now. Today `member_has(cap)` asks only "does the caller's role hold this capability?", never "in which organisation?", so a partner of firm X would pass every firm policy on firm Y's rows: `can_see_taxpayer()` (`member_has('case.view')`), invoices and `service_payments` read, insert and confirm (`billing.view`, `payment.record`, `billing.manage`), `taxpayers` update, `case_tasks`, `validation_findings`. The fix is a per-organisation check (`member_has(cap, org)` or `can_see_taxpayer()` resolving the taxpayer's organisation), every policy rewritten to pass the row's `organization_id`, and SQL negative tests with two firms. Until it lands the firm sign-up option stays hidden (`OPEN_WORKSPACE_KINDS`, done 27 Oct) and no second `organizations` row may hold members. Owner: Agent A | ADAPT | — (blocks multi-firm work) |
 | P2-6 | Quarter-keyed periods so quarter-specific prorogations match | ADAPT | — |
 
 ## P3 — validation and reach

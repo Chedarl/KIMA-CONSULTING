@@ -78,6 +78,7 @@ From the owner's taxpayer-first brief; analysis in
 | R-44 | Incident evidence captures DGI credentials or one-time codes | M | **H** | KIMA never asks for DGI credentials; capture warning; code-shaped strings rejected in free text | Eng lead | Open |
 | R-45 | A plain-language bulletin misstates the official text it summarises | M | **H** | Expert-comptable approves every bulletin; machine drafts never shown; each bulletin links the original and names the reviewer; bulletins inform, never create obligations | Reviewer (expert-comptable) | Open |
 | R-46 | An official text changes or is withdrawn and the bulletin or rule built on it goes stale | M | **H** | Source register keeps URL, fetch date and `sha256`; a changed hash withdraws dependent bulletins and flags dependent rules for re-verification | Eng lead | Open |
+| R-47 | A second accounting firm is onboarded before permissions are organisation-scoped, and its members read or confirm the first firm's taxpayers, invoices and fee payments | M | **H** | **[NEW] 2026-10-27, owner decision D7.** `member_has()` checks the role's capability, not the organisation, so every firm policy is tenant-wide across firms. Mitigation: firm sign-up stays hidden (`OPEN_WORKSPACE_KINDS`); backlog P2-5 (organisation scoping, with two-firm SQL negative tests) is a **blocking** Agent A item that must merge before any second firm holds members | Agent A + Founder | **Blocking a second firm** |
 
 ## Phase gates
 
