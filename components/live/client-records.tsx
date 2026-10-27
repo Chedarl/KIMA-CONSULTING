@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Card, CardHeader, Timeline } from "@/components/ui";
+import { usePortalCopy } from "@/components/client-portal/copy";
+import { EmptyState, PageHeading, Pill } from "@/components/client-portal/ui";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
   awaitingClient,
@@ -202,7 +204,7 @@ function Shell({
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h2 className="font-display text-lg font-semibold text-fg">{title}</h2>
+        <h1 className="font-display text-[1.65rem] font-semibold tracking-tight text-fg">{title}</h1>
         <p className="text-sm text-fg-muted">{subtitle}</p>
       </div>
       {offline && (
@@ -407,7 +409,10 @@ export function ClientArchive({
   dash: DashDict;
   r: RecordsDict;
 }) {
+  const copy = usePortalCopy();
   const { records, offline } = useClientRecords();
+  const [year, setYear] = useState("all");
+  const [kind, setKind] = useState("all");
 
   const filed = useMemo(
     () =>
@@ -417,36 +422,96 @@ export function ClientArchive({
     [records],
   );
   const years = useMemo(
-    () => [...new Set(filed.map((cs) => cs.period_token.slice(0, 4)))].sort().reverse(),
+    () => [...new Set(filed.map((cs) => cs.period_token.slice(0, 4)).filter((y) => /^\d{4}$/.test(y)))].sort().reverse(),
     [filed],
   );
+  const types = useMemo(
+    () => [...new Set(filed.map((cs) => obligationLabel(cs.obligation_code, locale)))].sort(),
+    [filed, locale],
+  );
+  const shown = filed.filter((cs) => {
+    if (year !== "all" && !cs.period_token.startsWith(year)) return false;
+    if (kind !== "all" && obligationLabel(cs.obligation_code, locale) !== kind) return false;
+    return true;
+  });
 
   return (
-    <Shell title={c.archiveTitle} subtitle={c.archiveSubtitle} records={records} offline={offline} dash={dash} r={r}>
-      {years.length === 0 ? (
-        <Card className="px-5 py-8">
-          <p className="text-sm text-fg-muted">{c.archiveEmpty}</p>
-        </Card>
-      ) : (
-        years.map((year) => (
-          <Card key={year}>
-            <CardHeader title={year} />
-            <ul className="divide-y divide-border">
-              {filed
-                .filter((cs) => cs.period_token.startsWith(year))
-                .map((cs) => (
-                  <li key={cs.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-fg">{obligationLabel(cs.obligation_code, locale)}</p>
-                      <p className="tnum font-mono text-xs text-fg-subtle">{cs.period_token}</p>
-                    </div>
-                    <EvidenceLine c={cs} r={r} />
-                  </li>
-                ))}
-            </ul>
-          </Card>
-        ))
+    <div className="flex flex-col gap-5">
+      <PageHeading
+        title={copy.recordsTitle}
+        subtitle={
+          <span>
+            <span className="block font-medium text-fg">{copy.vault}</span>
+            <span>{copy.acceptedOnly}</span>
+          </span>
+        }
+      />
+      {offline && (
+        <p className="rounded-card border border-amber/50 bg-amber-soft px-4 py-3 text-sm text-amber-text">{dash.offline}</p>
       )}
-    </Shell>
+      {records === null ? (
+        <div className="flex flex-col gap-3" aria-busy="true">
+          <span className="sr-only">{r.loading}</span>
+          <div className="h-28 animate-pulse rounded-card bg-white" />
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <label className="text-sm text-fg-muted">
+              <span className="sr-only">{copy.year}</span>
+              <select value={year} onChange={(e) => setYear(e.target.value)} className="min-h-[44px] rounded-lg border border-border bg-white px-3 text-sm text-fg">
+                <option value="all">{copy.allYears}</option>
+                {years.map((y) => (
+                  <option key={y} value={y}>{copy.year} {y}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm text-fg-muted">
+              <span className="sr-only">{copy.allTypes}</span>
+              <select value={kind} onChange={(e) => setKind(e.target.value)} className="min-h-[44px] rounded-lg border border-border bg-white px-3 text-sm text-fg">
+                <option value="all">{copy.allTypes}</option>
+                {types.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {shown.length === 0 ? (
+            <EmptyState title={filed.length === 0 ? copy.noRecords : copy.recordsNoMatch} hint={filed.length === 0 ? copy.noRecordsHint : copy.recordsNoMatchHint} />
+          ) : (
+            <div className="overflow-x-auto rounded-card border border-border bg-white shadow-card">
+              <table className="w-full min-w-[680px] text-left text-sm">
+                <thead className="text-fg-muted">
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3 font-medium">{copy.colType}</th>
+                    <th className="px-4 py-3 font-medium">{copy.colPeriod}</th>
+                    <th className="px-4 py-3 font-medium">{copy.colStatus}</th>
+                    <th className="px-4 py-3 font-medium">{copy.colDate}</th>
+                    <th className="px-4 py-3 font-medium">{copy.colAction}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((cs) => (
+                    <tr key={cs.id} className="border-b border-border last:border-0 hover:bg-surface-sunken">
+                      <td className="px-4 py-3 font-medium text-fg">{obligationLabel(cs.obligation_code, locale)}</td>
+                      <td className="tnum px-4 py-3 text-fg-muted">{cs.period_token}</td>
+                      <td className="px-4 py-3">
+                        <Pill tone="green">{copy.delivered}</Pill>
+                      </td>
+                      <td className="tnum px-4 py-3 text-fg-muted">{(cs.filing_verified_at ?? "").slice(0, 10) || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm text-fg-muted" title={copy.noFile}>
+                          <code className="tnum font-mono text-xs">{cs.filing_evidence_ref}</code>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

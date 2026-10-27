@@ -65,6 +65,7 @@ const out = compile([
   "lib/billing.ts",
   "lib/engagements.ts",
   "lib/vault.ts",
+  "lib/public-onboarding.ts",
 ]);
 
 const require = createRequire(import.meta.url);
@@ -76,6 +77,7 @@ const review = require(join(out, "document-review.js"));
 const billing = require(join(out, "billing.js"));
 const engagements = require(join(out, "engagements.js"));
 const vault = require(join(out, "vault.js"));
+const onboarding = require(join(out, "public-onboarding.js"));
 
 try {
   check("packCoverage CM has mostly inferred rules", () => {
@@ -290,6 +292,41 @@ try {
     assert.equal(vault.filingEvidence({ filing_status: "verified", filing_evidence_ref: "ACK-1" }), true);
     assert.equal(vault.filingEvidence({ filing_status: "verified", filing_evidence_ref: "  " }), false);
     assert.equal(vault.filingEvidence({ filing_status: "attempted", filing_evidence_ref: "ACK-1" }), false);
+  });
+
+  check("public onboarding stays a private application", () => {
+    const draft = {
+      ...onboarding.EMPTY_ONBOARDING,
+      kind: "business",
+      name: "Amina Ngo",
+      email: "amina@example.com",
+      legalName: "Mbango Trading SARL",
+      niu: "rc/yaoundé/b/1234",
+      services: ["tax", "dsf"],
+      language: "en",
+    };
+    assert.deepEqual(onboarding.issuesFor("verify", draft), []);
+    assert.equal(onboarding.taxpayerTypeFor("accounting_firm"), "business_moral");
+    assert.equal(onboarding.taxpayerTypeFor("individual"), "individual_pit");
+    const row = onboarding.registrationInsert(draft, "11111111-1111-1111-1111-111111111111");
+    assert.equal(row.base.taxpayer_type, "business_moral");
+    assert.equal(row.base.declared_niu, "RCYAOUNDB1234");
+    assert.equal(row.full.workspace_kind, "business");
+    assert.equal(row.full.onboarding.isolation, "private_application");
+    assert.equal(row.base.declared_regime, undefined);
+    assert.equal(row.base.declared_centre, undefined);
+    const thin = { ...draft, legalName: "A", services: [] };
+    assert.ok(onboarding.issuesFor("verify", thin).includes("legalName"));
+    assert.ok(onboarding.issuesFor("verify", thin).includes("services"));
+    assert.equal(onboarding.inviteEmailIssue("not-an-email"), "inviteEmail");
+    assert.equal(onboarding.inviteEmailIssue("a@b.co"), null);
+  });
+
+  check("accounting-firm workspaces are not offered until organisation scoping", () => {
+    assert.deepEqual([...onboarding.OPEN_WORKSPACE_KINDS], ["individual", "business"]);
+    assert.equal(onboarding.isOpenWorkspaceKind("accounting_firm"), false);
+    assert.equal(onboarding.isOpenWorkspaceKind("business"), true);
+    assert.equal(onboarding.isWorkspaceKind("accounting_firm"), true);
   });
 
   console.log(`\n${passed} assertions passed`);

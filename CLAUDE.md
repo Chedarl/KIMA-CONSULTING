@@ -44,6 +44,12 @@ Phase 1 deliverables live in `docs/foundation/`:
 - `harmony2-dgi-platform-research.md` — the DGI's Harmony 2 platform: the portal map, what
   it streamlines, and the line between retrieving a document and claiming an integration
 
+`docs/strategy/2026-10-27-taxpayer-first/` answers the owner's 27 Oct taxpayer-first
+brief (gap matrix, journeys, backlog, sources, test protocol). It is a **proposal**: do
+not build its items until the owner approves it. The owner kept the blueprint — a
+taxpayer may start alone and *declare* what happened; only a reviewer moves filing,
+tax payment or certificate to `verified`.
+
 Still outstanding from blueprint §20: A (software PRD), B (backlog with acceptance
 tests), D (journey diagrams), G (component UI/UX specification), H (technical
 architecture and API plan), J (phased implementation plan).

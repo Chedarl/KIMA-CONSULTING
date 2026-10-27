@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { Inter, Poppins, IBM_Plex_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import "../globals.css";
-import { Chrome } from "@/components/chrome";
 import { Footer } from "@/components/footer";
+import { SiteFrame } from "@/components/site-frame";
 import { ToastProvider } from "@/components/toast";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
+import { getPublicCopy } from "@/lib/i18n-public";
 
 /**
  * This is the root layout. Every route lives under the [locale] segment so that
@@ -50,12 +51,13 @@ export function generateStaticParams() {
 export function generateMetadata({ params }: { params: { locale: string } }): Metadata {
   const locale: Locale = isLocale(params.locale) ? params.locale : "fr";
   const t = getDictionary(locale);
+  const pub = getPublicCopy(locale);
   return {
     title: {
       default: `${t.brand} — ${t.proposition}`,
       template: `%s · ${t.brand}`,
     },
-    description: t.home.heroBody,
+    description: pub.home.heroBody,
     alternates: {
       canonical: `/${locale}`,
       languages: { fr: "/fr", en: "/en" },
@@ -96,22 +98,21 @@ export default function LocaleLayout({
           {t.nav.skip}
         </a>
         <ToastProvider>
-        <Chrome
-          locale={locale}
-          labels={{
-            overview: t.nav.overview,
-            taxpayer: t.nav.taxpayer,
-            workspace: t.nav.workspace,
-            design: t.nav.design,
-            language: t.nav.language,
-            mainNav: t.nav.mainNav,
-            theme: t.nav.theme,
-          }}
-        />
-        <main id="main" className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
-          {children}
-        </main>
-        <Footer locale={locale} />
+          <SiteFrame
+            locale={locale}
+            labels={{
+              overview: t.nav.overview,
+              taxpayer: t.nav.taxpayer,
+              workspace: t.nav.workspace,
+              design: t.nav.design,
+              language: t.nav.language,
+              mainNav: t.nav.mainNav,
+              theme: t.nav.theme,
+            }}
+            footer={<Footer locale={locale} />}
+          >
+            {children}
+          </SiteFrame>
         </ToastProvider>
       </body>
     </html>

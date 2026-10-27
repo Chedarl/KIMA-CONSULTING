@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
+import type { getPublicCopy } from "@/lib/i18n-public";
 import { regime as regimeDef, taxCentre as centreDef } from "@/lib/rules";
+import { KimaWordmark } from "@/components/marketing/wordmark";
 import {
   audienceMismatch,
   clearSession,
@@ -16,17 +19,24 @@ import {
 } from "@/lib/portal-auth";
 
 /**
- * Portal sign-in — name + taxpayer number identify; a one-time code authenticates.
+ * Client sign-in. The screen matches the navy / card mockup.
+ * The secret is a one-time code. There is no password field.
  */
 type Dict = ReturnType<typeof getWorkspaceDictionary>;
+type AuthCopy = ReturnType<typeof getPublicCopy>["auth"];
+
+const inputClass =
+  "mt-1.5 min-h-[48px] w-full rounded-lg border border-border bg-white px-3 text-sm text-fg";
 
 export function PortalLogin({
   locale,
   t,
+  auth,
   portalHref,
 }: {
   locale: "fr" | "en";
   t: Dict["login"];
+  auth: AuthCopy;
   portalHref: string;
 }) {
   const [audience, setAudience] = useState<PortalAudience>("individual");
@@ -60,7 +70,6 @@ export function PortalLogin({
       );
       return;
     }
-    // Uniform UX whether or not the account exists — never say "unknown NIU".
     if (!result.reference) {
       setError(t.codeSentBlind);
       return;
@@ -104,231 +113,222 @@ export function PortalLogin({
     setSession(null);
   }
 
-  if (session) {
-    const centre = session.taxCentre ? centreDef(session.taxCentre) : undefined;
-    const reg = session.taxRegime ? regimeDef(session.taxRegime) : undefined;
-    const rows: { label: string; value: string }[] = [
-      { label: t.detailName, value: session.displayName },
-      { label: t.detailNumber, value: formatTaxNumber(session.niu) || t.detailUnknown },
-      {
-        label: t.detailCentre,
-        value: centre ? (locale === "fr" ? centre.fr : centre.en) : t.detailUnknown,
-      },
-      {
-        label: t.detailRegime,
-        value: reg ? (locale === "fr" ? reg.fr : reg.en) : t.detailUnknown,
-      },
-    ];
-
-    return (
-      <div className="rise-in flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-raised sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-text">
-              {t.welcome}
-            </p>
-            <h2 className="mt-1 font-display text-xl font-semibold text-fg">
-              {session.displayName}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => void out()}
-            className="min-h-[44px] rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken"
-          >
-            {t.signOut}
-          </button>
-        </div>
-
-        {audienceMismatch(session) && (
-          <p className="rounded-lg border border-amber/50 bg-amber-soft px-3 py-2 text-sm text-amber-text">
-            {t.mismatch}
-          </p>
-        )}
-
-        <div className="rounded-card border border-border bg-surface-sunken p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-            {t.detailsTitle}
-          </p>
-          <p className="mt-1 text-xs text-fg-subtle">{t.detailsHint}</p>
-          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-            {rows.map((row) => (
-              <div key={row.label} className="rounded-lg bg-surface px-3 py-2">
-                <dt className="text-xs text-fg-subtle">{row.label}</dt>
-                <dd className="mt-0.5 break-words font-medium text-fg">{row.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-
-        <p className={`text-sm ${session.profileVerified ? "text-teal-text" : "text-amber-text"}`}>
-          {session.profileVerified ? t.verified : t.unverified}
-        </p>
-
-        <a
-          href={portalHref}
-          className="inline-flex min-h-[44px] w-fit items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90"
-        >
-          {t.continueToPortal}
-        </a>
-      </div>
-    );
-  }
-
-  const nameLabel = audience === "individual" ? t.nameIndividual : t.nameBusiness;
-  const nameHint = audience === "individual" ? t.nameHintIndividual : t.nameHintBusiness;
-  const numberLabel = audience === "individual" ? t.numberIndividual : t.numberBusiness;
-
-  if (reference) {
-    return (
-      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-raised sm:p-6">
-        <div>
-          <h2 className="font-display text-xl font-semibold text-fg">{t.codeTitle}</h2>
-          <p className="mt-1 text-sm text-fg-muted">
-            {masked ? t.codeIntro.replace("{destination}", masked) : t.codeIntroBlind}
-          </p>
-        </div>
-
-        {demoCode && (
-          <p className="rounded-lg border border-amber/50 bg-amber-soft px-3 py-2 font-mono text-sm text-amber-text">
-            {t.demoCodeLabel}: {demoCode}
-          </p>
-        )}
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="portal-code" className="text-sm font-medium text-fg">
-            {t.codeLabel}
-          </label>
-          <input
-            id="portal-code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !busy) void submitCode();
-            }}
-            className="min-h-[44px] rounded-lg border border-border bg-surface px-3 font-mono text-sm tracking-widest text-fg"
-          />
-        </div>
-
-        {error && (
-          <p role="alert" className="text-sm text-danger-text">
-            {error}
-          </p>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void submitCode()}
-            className="min-h-[44px] rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90 disabled:opacity-60"
-          >
-            {busy ? t.submitting : t.verifyCode}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setReference(null);
-              setCode("");
-              setDemoCode(null);
-              setError(null);
-            }}
-            className="min-h-[44px] rounded-lg border border-border px-4 text-sm font-semibold text-fg hover:bg-surface-sunken"
-          >
-            {t.back}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const nameLabel = audience === "individual" ? auth.name : auth.nameBusiness;
 
   return (
-    <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-raised sm:p-6">
-      <div>
-        <h2 className="font-display text-xl font-semibold text-fg">{t.title}</h2>
-        <p className="mt-1 text-sm text-fg-muted">{t.intro}</p>
-      </div>
+    <div className="grid min-h-screen lg:grid-cols-2">
+      <section className="flex items-center justify-center bg-[#0D1B2A] px-8 py-16 text-center text-white">
+        <div className="max-w-sm">
+          <KimaWordmark tone="light" size="lg" />
+          <p className="mt-8 text-base text-white/85">{auth.secure}</p>
+        </div>
+      </section>
 
-      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t.intro}>
-        {(["individual", "business"] as const).map((a) => {
-          const active = audience === a;
-          return (
-            <button
-              key={a}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => {
-                setAudience(a);
-                setError(null);
+      <main id="main" className="flex items-center justify-center bg-[#F4F6F8] px-4 py-12">
+        <div className="w-full max-w-md rounded-card border border-border bg-white px-6 py-8 shadow-raised sm:px-8">
+          <h1 className="text-center font-display text-2xl font-bold text-fg">{auth.welcome}</h1>
+
+          {session ? (
+            <SessionCard
+              locale={locale}
+              t={t}
+              session={session}
+              portalHref={portalHref}
+              onSignOut={() => void out()}
+            />
+          ) : reference ? (
+            <div className="mt-6 flex flex-col gap-4">
+              <p className="text-sm text-fg-muted">
+                {masked ? t.codeIntro.replace("{destination}", masked) : t.codeIntroBlind}
+              </p>
+              {demoCode && (
+                <p className="rounded-lg border border-amber/50 bg-amber-soft px-3 py-2 font-mono text-sm text-amber-text">
+                  {t.demoCodeLabel}: {demoCode}
+                </p>
+              )}
+              <label htmlFor="portal-code" className="text-sm font-medium text-fg">
+                {t.codeLabel}
+                <input
+                  id="portal-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !busy) void submitCode();
+                  }}
+                  className={`${inputClass} font-mono tracking-widest`}
+                />
+              </label>
+              {error && (
+                <p role="alert" className="text-sm text-danger-text">
+                  {error}
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void submitCode()}
+                className="public-cta min-h-[48px] rounded-lg text-sm font-semibold disabled:opacity-60"
+              >
+                {busy ? t.submitting : auth.signIn}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void requestCode()}
+                className="min-h-[44px] text-sm font-semibold text-teal-text hover:underline"
+              >
+                {auth.resend}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setReference(null);
+                  setCode("");
+                  setDemoCode(null);
+                  setError(null);
+                }}
+                className="min-h-[44px] text-sm font-medium text-fg-muted hover:text-fg"
+              >
+                {t.back}
+              </button>
+            </div>
+          ) : (
+            <form
+              className="mt-6 flex flex-col gap-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!busy) void requestCode();
               }}
-              className={`min-h-[44px] flex-1 rounded-lg border px-3 text-sm transition-colors sm:flex-none ${
-                active
-                  ? "border-navy bg-navy font-semibold text-surface"
-                  : "border-border text-fg-muted hover:bg-surface-sunken"
-              }`}
             >
-              {a === "individual" ? t.tabIndividual : t.tabBusiness}
-            </button>
-          );
-        })}
-      </div>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t.intro}>
+                {(["individual", "business"] as const).map((a) => {
+                  const active = audience === a;
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => {
+                        setAudience(a);
+                        setError(null);
+                      }}
+                      className={`min-h-[44px] rounded-lg border px-2 text-sm ${
+                        active
+                          ? "border-teal bg-teal-soft font-semibold text-fg"
+                          : "border-border text-fg-muted hover:bg-[#F4F7FB]"
+                      }`}
+                    >
+                      {a === "individual" ? auth.individual : auth.business}
+                    </button>
+                  );
+                })}
+              </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="portal-name" className="text-sm font-medium text-fg">
-          {nameLabel}
-        </label>
-        <p className="text-xs text-fg-subtle">{nameHint}</p>
-        <input
-          id="portal-name"
-          type="text"
-          autoComplete="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-fg"
-        />
-      </div>
+              <label htmlFor="portal-name" className="text-sm font-medium text-fg">
+                {nameLabel}
+                <input
+                  id="portal-name"
+                  type="text"
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="portal-number" className="text-sm font-medium text-fg">
-          {numberLabel}
-        </label>
-        <p className="text-xs text-fg-subtle">{t.numberHint}</p>
-        <input
-          id="portal-number"
-          type="text"
-          inputMode="text"
-          autoCapitalize="characters"
-          spellCheck={false}
-          value={number}
-          onChange={(e) => setNumber(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !busy) void requestCode();
-          }}
-          className="min-h-[44px] rounded-lg border border-border bg-surface px-3 font-mono text-sm tracking-wide text-fg"
-        />
-      </div>
+              <label htmlFor="portal-number" className="text-sm font-medium text-fg">
+                {nameLabel === auth.name ? t.numberIndividual : t.numberBusiness}
+                <input
+                  id="portal-number"
+                  type="text"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  value={number}
+                  onChange={(e) => setNumber(e.target.value)}
+                  className={`${inputClass} font-mono tracking-wide`}
+                />
+              </label>
+              <p className="text-xs text-fg-subtle">{t.numberHint}</p>
 
-      {error && (
-        <p role="alert" className="text-sm text-danger-text">
-          {error}
-        </p>
+              {error && (
+                <p role="alert" className="text-sm text-danger-text">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={busy}
+                className="public-cta min-h-[48px] rounded-lg text-sm font-semibold disabled:opacity-60"
+              >
+                {busy ? t.submitting : auth.sendCode}
+              </button>
+
+              <p className="text-center text-xs leading-relaxed text-fg-subtle">{auth.otpNote}</p>
+
+              <p className="text-center text-sm text-fg">
+                {auth.noAccount}{" "}
+                <Link href={`/${locale}/register`} className="font-semibold text-teal-text hover:underline">
+                  {auth.create}
+                </Link>
+              </p>
+            </form>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function SessionCard({
+  locale,
+  t,
+  session,
+  portalHref,
+  onSignOut,
+}: {
+  locale: "fr" | "en";
+  t: Dict["login"];
+  session: PortalSession;
+  portalHref: string;
+  onSignOut: () => void;
+}) {
+  const centre = session.taxCentre ? centreDef(session.taxCentre) : undefined;
+  const reg = session.taxRegime ? regimeDef(session.taxRegime) : undefined;
+  const rows = [
+    { label: t.detailName, value: session.displayName },
+    { label: t.detailNumber, value: formatTaxNumber(session.niu) || t.detailUnknown },
+    { label: t.detailCentre, value: centre ? (locale === "fr" ? centre.fr : centre.en) : t.detailUnknown },
+    { label: t.detailRegime, value: reg ? (locale === "fr" ? reg.fr : reg.en) : t.detailUnknown },
+  ];
+
+  return (
+    <div className="mt-6 flex flex-col gap-4 text-left">
+      <p className="text-sm text-fg-muted">{session.displayName}</p>
+      {audienceMismatch(session) && (
+        <p className="rounded-lg border border-amber/50 bg-amber-soft px-3 py-2 text-sm text-amber-text">{t.mismatch}</p>
       )}
-
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void requestCode()}
-        className="min-h-[44px] rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90 disabled:opacity-60"
-      >
-        {busy ? t.submitting : t.requestCode}
+      <dl className="grid gap-3 sm:grid-cols-2">
+        {rows.map((row) => (
+          <div key={row.label} className="rounded-lg bg-[#F4F7FB] px-3 py-2">
+            <dt className="text-xs text-fg-subtle">{row.label}</dt>
+            <dd className="mt-0.5 break-words text-sm font-medium text-fg">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className={`text-sm ${session.profileVerified ? "text-teal-text" : "text-amber-text"}`}>
+        {session.profileVerified ? t.verified : t.unverified}
+      </p>
+      <a href={portalHref} className="public-cta inline-flex min-h-[48px] items-center justify-center rounded-lg text-sm font-semibold">
+        {t.continueToPortal}
+      </a>
+      <button type="button" onClick={onSignOut} className="min-h-[44px] text-sm font-semibold text-fg-muted hover:text-fg">
+        {t.signOut}
       </button>
-
-      <p className="border-t border-border pt-3 text-xs text-fg-subtle">{t.demoNotice}</p>
     </div>
   );
 }

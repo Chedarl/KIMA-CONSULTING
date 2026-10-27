@@ -501,3 +501,92 @@ h1, h2, h3, .font-display {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
+
+/*
+ * Client portal only. Locks the light palette from the client mockups even
+ * when the marketing site is in dark mode. Firm workspace does not use this
+ * class, so its theme is unchanged.
+ */
+/*
+ * Public marketing, sign-in and onboarding. Locks the mockup palette so a
+ * dark theme chosen on the firm desk does not repaint these screens.
+ * Firm routes do not use this class.
+ *
+ * Teal is darkened just enough for white label text to clear 4.5:1.
+ */
+.public-site {
+  --bg: 255 255 255;
+  --surface: 255 255 255;
+  --surface-sunken: 244 247 251;
+  --border: 226 232 240;
+  --border-strong: 203 213 225;
+  --fg: 13 27 42;
+  --fg-muted: 71 85 105;
+  --fg-subtle: 100 116 139;
+  --navy: 13 27 42;
+  --navy-strong: 8 18 32;
+  --navy-soft: 232 238 246;
+  --teal: 15 122 102; /* #0F7A66 */
+  --teal-text: 12 90 74;
+  --teal-soft: 230 244 238;
+  --amber: 217 149 40;
+  --amber-text: 146 64 14;
+  --amber-soft: 255 246 232;
+  color-scheme: light;
+  background: #fff;
+  color: rgb(var(--fg));
+  min-height: 100vh;
+}
+
+.public-site :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px #0d1b2a;
+}
+
+.public-cta {
+  background: rgb(var(--teal));
+  color: #fff;
+}
+
+.public-cta:hover {
+  filter: brightness(1.08);
+}
+
+.hero-photo {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 28%, #000 100%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 28%, #000 100%);
+}
+
+@media (max-width: 1023px) {
+  .hero-photo {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 88%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 88%, transparent 100%);
+  }
+}
+
+.client-portal {
+  --bg: 244 247 251; /* #F4F7FB */
+  --surface: 255 255 255;
+  --surface-sunken: 241 245 249;
+  --border: 226 232 240;
+  --border-strong: 203 213 225;
+  --fg: 20 34 53;
+  --fg-muted: 71 85 105;
+  --fg-subtle: 100 116 139;
+  --navy: 13 27 42;
+  --navy-strong: 13 27 42;
+  --navy-soft: 232 238 246;
+  --teal: 30 158 116;
+  --teal-text: 15 107 79;
+  --teal-soft: 230 244 238;
+  --amber: 217 149 40;
+  --amber-text: 146 64 14;
+  --amber-soft: 255 246 232;
+  --danger: 185 28 28;
+  --danger-text: 185 28 28;
+  --danger-soft: 254 232 232;
+  color-scheme: light;
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+}

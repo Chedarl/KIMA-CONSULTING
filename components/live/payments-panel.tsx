@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ledgerBalance } from "@/lib/billing";
 import { audit, demoIds, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
+import { usePortalCopy } from "@/components/client-portal/copy";
+import { EmptyState, FilterBar, PageHeading, Pill, PrimaryButton, xaf } from "@/components/client-portal/ui";
+import { todayInDouala } from "@/lib/dates";
 
 /**
  * Kima's service fees — NOT tax paid to the DGI. The two must never read as
@@ -80,6 +83,8 @@ const fmt = (minor: number, locale: "fr" | "en") =>
 
 export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels: PaymentLabels }) {
   const toast = useToast();
+  const copy = usePortalCopy();
+  const [q, setQ] = useState("");
   const [invoices, setInvoices] = useState<Invoice[] | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
@@ -216,171 +221,158 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
     );
   }
 
+  const year = todayInDouala().slice(0, 4);
+  const outstandingTotal = invoices.reduce((sum, inv) => {
+    const b = balances[inv.id] ?? { confirmed: 0, pending: 0 };
+    return sum + Math.max(0, inv.total_minor - b.confirmed - b.pending);
+  }, 0);
+  const paidThisYear = payments
+    .filter((p) => p.status === "confirmed" && p.created_at.slice(0, 4) === year)
+    .reduce((sum, p) => sum + p.amount_minor, 0);
+  const next = [...invoices]
+    .filter((inv) => {
+      const b = balances[inv.id] ?? { confirmed: 0, pending: 0 };
+      return inv.due_on && inv.total_minor - b.confirmed - b.pending > 0;
+    })
+    .sort((a, b) => (a.due_on ?? "").localeCompare(b.due_on ?? ""))[0];
+  const shown = invoices.filter((inv) => {
+    const text = `${inv.number} ${inv.description_fr} ${inv.description_en}`.toLowerCase();
+    return !q.trim() || text.includes(q.trim().toLowerCase());
+  });
+
   return (
     <div className="flex flex-col gap-5">
-      <p className="rounded-card border border-border bg-surface-sunken px-4 py-2.5 text-xs text-fg-muted">
-        {labels.notAGateway}
-      </p>
+      <PageHeading title={copy.paymentsTitle} />
+      <div className="grid gap-3 md:grid-cols-3">
+        <article className="rounded-card border border-amber/30 bg-[#FFF8EC] p-5 shadow-card">
+          <p className="text-sm text-fg-muted">{copy.outstanding}</p>
+          <p className="tnum mt-2 font-display text-2xl font-semibold text-fg">{xaf(outstandingTotal, locale)}</p>
+        </article>
+        <article className="rounded-card border border-border bg-white p-5 shadow-card">
+          <p className="text-sm text-fg-muted">{copy.paidYear}</p>
+          <p className="tnum mt-2 font-display text-2xl font-semibold text-teal-text">{xaf(paidThisYear, locale)}</p>
+        </article>
+        <article className="rounded-card border border-border bg-white p-5 shadow-card">
+          <p className="text-sm text-fg-muted">{copy.nextDue}</p>
+          <p className="mt-2 font-display text-2xl font-semibold text-fg">
+            {next?.due_on
+              ? new Intl.DateTimeFormat(locale === "fr" ? "fr-CM" : "en-CM", {
+                  month: "short",
+                  day: "numeric",
+                  timeZone: "Africa/Douala",
+                }).format(new Date(`${next.due_on}T12:00:00Z`))
+              : copy.noneDue}
+          </p>
+        </article>
+      </div>
 
-      <section>
-        <h3 className="mb-3 font-display text-base font-semibold text-fg">{labels.invoices}</h3>
-        {invoices.length === 0 ? (
-          <p className="text-sm text-fg-muted">{labels.noInvoices}</p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {invoices.map((inv, i) => {
-              const b = balances[inv.id] ?? { confirmed: 0, pending: 0 };
-              const outstanding = inv.total_minor - b.confirmed - b.pending;
-              const settled = outstanding <= 0;
-              return (
-                <li
-                  key={inv.id}
-                  className="rise-in rounded-card border border-border bg-surface p-4"
-                  style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-mono text-sm font-semibold text-fg">{inv.number}</p>
-                      <p className="text-sm text-fg-muted">
-                        {locale === "fr" ? inv.description_fr : inv.description_en}
-                      </p>
-                      <p className="mt-1 text-xs text-fg-subtle">
-                        {labels.due} {inv.due_on}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="tnum font-mono text-lg font-semibold text-fg">
-                        {fmt(inv.total_minor, locale)}
-                        <span className="ml-1 text-xs text-fg-muted">{labels.xaf}</span>
-                      </p>
-                      <p
-                        className={`tnum font-mono text-xs ${
-                          settled ? "text-teal-text" : "text-amber-text"
-                        }`}
-                      >
-                        {settled
-                          ? labels.paid
-                          : `${labels.balance} ${fmt(outstanding, locale)} ${labels.xaf}`}
-                      </p>
+      <FilterBar label={copy.searchInvoices} value={q} onChange={setQ} placeholder={copy.searchInvoices} />
+
+      {shown.length === 0 ? (
+        <EmptyState title={invoices.length === 0 ? copy.noInvoices : copy.paymentsNoMatch} hint={invoices.length === 0 ? copy.noInvoicesHint : undefined} />
+      ) : (
+        <div className="overflow-x-auto rounded-card border border-border bg-white shadow-card">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="text-fg-muted">
+              <tr className="border-b border-border">
+                <th className="px-4 py-3 font-medium">{copy.colInvoice}</th>
+                <th className="px-4 py-3 font-medium">{copy.colDescription}</th>
+                <th className="px-4 py-3 font-medium">{copy.colDue}</th>
+                <th className="px-4 py-3 font-medium">{copy.colStatus}</th>
+                <th className="px-4 py-3 font-medium">{copy.colAction}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((inv) => {
+                const b = balances[inv.id] ?? { confirmed: 0, pending: 0 };
+                const outstanding = inv.total_minor - b.confirmed - b.pending;
+                const settled = outstanding <= 0;
+                return (
+                  <tr key={inv.id} className="border-b border-border align-top last:border-0 hover:bg-surface-sunken">
+                    <td className="px-4 py-3 font-mono text-sm font-semibold text-fg">{inv.number}</td>
+                    <td className="px-4 py-3 text-fg">
+                      {locale === "fr" ? inv.description_fr : inv.description_en}
                       {b.pending > 0 && (
-                        <p className="tnum font-mono text-xs text-fg-subtle">
+                        <p className="tnum mt-1 text-xs text-fg-muted">
                           {labels.pending} {fmt(b.pending, locale)} {labels.xaf}
                         </p>
                       )}
-                    </div>
-                  </div>
-
-                  {!settled && (
-                    <div className="mt-3">
-                      {openFor === inv.id ? (
-                        <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-sunken p-3">
-                          <div className="flex flex-wrap gap-2">
-                            <label className="flex flex-col gap-1 text-xs text-fg-muted">
-                              {labels.amount}
-                              <input
-                                inputMode="numeric"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="tnum min-h-[44px] w-36 rounded-lg border border-border bg-surface px-2 font-mono text-sm text-fg"
-                              />
-                            </label>
-                            <label className="flex flex-col gap-1 text-xs text-fg-muted">
-                              {labels.method}
-                              <select
-                                value={method}
-                                onChange={(e) => setMethod(e.target.value)}
-                                className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-sm text-fg"
-                              >
-                                {Object.entries(labels.methods).map(([k, v]) => (
-                                  <option key={k} value={k}>
-                                    {v}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="flex flex-1 flex-col gap-1 text-xs text-fg-muted">
-                              {labels.reference}
-                              <input
-                                value={reference}
-                                onChange={(e) => setReference(e.target.value)}
-                                placeholder={labels.referenceHint}
-                                className="min-h-[44px] rounded-lg border border-border bg-surface px-2 font-mono text-sm text-fg"
-                              />
-                            </label>
-                          </div>
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {labels.due} {inv.due_on ?? "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Pill tone={settled ? "green" : "amber"}>{settled ? copy.paid : copy.due}</Pill>
+                    </td>
+                    <td className="px-4 py-3">
+                      {settled ? (
+                        <span className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-soft px-4 text-sm font-semibold text-teal-text">
+                          {copy.paid}
+                        </span>
+                      ) : openFor === inv.id ? (
+                        <div className="flex min-w-[16rem] flex-col gap-2">
+                          <label className="text-xs text-fg-muted">
+                            {labels.amount}
+                            <input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} className="tnum mt-1 min-h-[44px] w-full rounded-lg border border-border px-2 font-mono text-sm" />
+                          </label>
+                          <label className="text-xs text-fg-muted">
+                            {labels.method}
+                            <select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 min-h-[44px] w-full rounded-lg border border-border px-2 text-sm">
+                              {Object.entries(labels.methods).map(([k, v]) => (
+                                <option key={k} value={k}>{v}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="text-xs text-fg-muted">
+                            {labels.reference}
+                            <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={labels.referenceHint} className="mt-1 min-h-[44px] w-full rounded-lg border border-border px-2 font-mono text-sm" />
+                          </label>
                           <div className="flex gap-2">
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void report(inv)}
-                              className="min-h-[44px] rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90 disabled:opacity-60"
-                            >
+                            <PrimaryButton disabled={busy} onClick={() => void report(inv)}>
                               {busy ? labels.submitting : labels.submit}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setOpenFor(null)}
-                              className="min-h-[44px] rounded-lg border border-border-strong px-3 text-sm font-semibold text-fg"
-                            >
-                              ✕
+                            </PrimaryButton>
+                            <button type="button" onClick={() => setOpenFor(null)} className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-3 text-sm font-semibold hover:bg-surface-sunken">
+                              {copy.cancel}
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => setOpenFor(inv.id)}
-                          className="min-h-[44px] rounded-lg border border-border-strong px-3 text-sm font-semibold text-fg hover:bg-surface-sunken"
-                        >
-                          {labels.record}
-                        </button>
+                        <PrimaryButton onClick={() => setOpenFor(inv.id)}>{copy.payNow}</PrimaryButton>
                       )}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      <section>
-        <h3 className="mb-3 font-display text-base font-semibold text-fg">{labels.history}</h3>
-        {payments.length === 0 ? (
-          <p className="text-sm text-fg-muted">—</p>
-        ) : (
-          <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+      <p className="text-xs text-fg-muted">{copy.paymentsNote}</p>
+
+      {payments.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-display text-base font-semibold text-fg">{labels.history}</h2>
+          <ul className="divide-y divide-border rounded-card border border-border bg-white">
             {payments.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+              <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5 hover:bg-surface-sunken">
                 <span className="tnum font-mono text-sm text-fg">
                   {fmt(p.amount_minor, locale)} {labels.xaf}
                 </span>
                 <span className="text-xs text-fg-muted">{labels.methods[p.method] ?? p.method}</span>
                 {p.provider_reference && (
-                  <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-xs text-fg-subtle">
-                    {p.provider_reference}
-                  </code>
+                  <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-xs text-fg-subtle">{p.provider_reference}</code>
                 )}
-                <span
-                  className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    p.status === "confirmed"
-                      ? "bg-teal-soft text-teal-text"
-                      : p.status === "rejected"
-                        ? "bg-danger-soft text-danger-text"
-                        : "bg-amber-soft text-amber-text"
-                  }`}
-                >
-                  {p.status === "confirmed"
-                    ? labels.statusConfirmed
-                    : p.status === "rejected"
-                      ? labels.statusRejected
-                      : labels.statusPending}
+                <span className="ml-auto">
+                  <Pill tone={p.status === "confirmed" ? "green" : p.status === "rejected" ? "danger" : "amber"}>
+                    {p.status === "confirmed" ? labels.statusConfirmed : p.status === "rejected" ? labels.statusRejected : labels.statusPending}
+                  </Pill>
                 </span>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }

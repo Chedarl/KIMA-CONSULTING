@@ -45,7 +45,7 @@ RPC: `portal_sign_in` (DEPRECATED). API: `POST /api/inquiry` (Resend).
 | CRM: segments, links, per-link access | `ClientsWorkspace` and `Client360` `/workspace/clients/[id]` (`linkedFiles`, `unreachable`) | — | REFLECTED |
 | Cases: stages, 4 dimensions, blocker, risk | `FirmDashboard`, `WorkQueue`, `CaseDetail` `/workspace/cases/[id]` (`advance`, `recordFiling`, four dimensions) | `ClientDashboard` and `/app/declarations/[id]` use the five `clientStatus()` labels only | REFLECTED. The client never sees firm stage names. |
 | Events: timeline, visibility, `drift()` | dashboard feed | dashboard feed (client-visible only) | PARTIAL — no audit/drift surface |
-| `activity_events` (legacy) | — | — | Writes revoked in `20261023050000`. The table remains. New events go to `case_events`. |
+| `activity_events` (legacy) | — | — | Writes revoked in `20261023044730`. The table remains. New events go to `case_events`. |
 | Document review: 3 verdicts | `InboxWorkspace` `/workspace/inbox` records `documents.acceptance` before accept | `DocumentsPanel` uploads a file and shows received separately from accepted | REFLECTED. A client upload lands as `submitted`, never `accepted`. |
 | Document naming: buckets, references | `FilingFramework` `/workspace/filing` | — | PARTIAL — grammar not applied to document centre / archive |
 | Rules: obligations, deadlines, prorogations | `/workspace/calendar` labels statutory, prorogued, and unconfirmed | Client compliance, declarations, archive | REFLECTED |
