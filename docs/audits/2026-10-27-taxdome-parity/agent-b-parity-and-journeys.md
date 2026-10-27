@@ -2,9 +2,9 @@
 
 *Agent B (Claude Code), 27 Oct 2026. Agent B owns the product-parity and user-journey
 conclusions (`AGENTS.md`). This file reviews Agent A's `taxdome-feature-parity.md` and
-`user-journey-gaps.md` (draft PR #11, branch `audit/2026-10-27-taxdome-parity`, written
+`user-journey-gaps.md` (PR #11, merged as `4ab8177`, written
 at `main` @ `26d1ac7`) against the code at **`main` @ `d6f9cca`** (PR #6 merged after
-Agent A's audit). Agent A's files are not edited. Line numbers are at `d6f9cca`.*
+Agent A's audit). Agent A's files are not edited. Line numbers are at `d6f9cca`; rechecked on `729a7ad` (#11 and #12 are docs and config only).*
 
 *Scope of my checking: the repository code only. I did not query the database, so every
 finding Agent A marks "verified live" is reported here as **not independently verified**.
