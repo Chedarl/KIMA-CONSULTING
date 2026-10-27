@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ledgerBalance } from "@/lib/billing";
 import { audit, demoIds, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { usePortalCopy } from "@/components/client-portal/copy";
@@ -130,13 +131,9 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
   /** Balances are derived, never stored: a stored balance drifts. */
   const balances = useMemo(() => {
     const out: Record<string, { confirmed: number; pending: number }> = {};
-    for (const p of payments) {
-      const slot = (out[p.invoice_id] ??= { confirmed: 0, pending: 0 });
-      if (p.status === "confirmed") slot.confirmed += p.amount_minor;
-      if (p.status === "pending_confirmation") slot.pending += p.amount_minor;
-    }
+    for (const inv of invoices ?? []) out[inv.id] = ledgerBalance(payments, inv.id);
     return out;
-  }, [payments]);
+  }, [invoices, payments]);
 
   async function report(invoice: Invoice) {
     if (!ids) return;

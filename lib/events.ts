@@ -420,8 +420,10 @@ export const EVENT_KINDS: Record<EventKind, KindSpec> = {
     dimension: "engagement",
     clientVisible: true,
     tracks: null,
-    fr: (e) => `Mission révoquée : ${subject(e)}`,
-    en: (e) => `Engagement revoked: ${subject(e)}`,
+    fr: (e) =>
+      `Mission révoquée : ${subject(e)}${e.reason ? ` — ${e.reason}` : ""}`,
+    en: (e) =>
+      `Engagement revoked: ${subject(e)}${e.reason ? ` — ${e.reason}` : ""}`,
   },
 
   note_added: {

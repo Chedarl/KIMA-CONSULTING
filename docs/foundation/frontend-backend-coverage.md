@@ -51,7 +51,9 @@ RPC: `portal_sign_in` (DEPRECATED). API: `POST /api/inquiry` (Resend).
 | Rules: obligations, deadlines, prorogations | `/workspace/calendar` labels statutory, prorogued, and unconfirmed | Client compliance, declarations, archive | REFLECTED |
 | Diagnostics (pre-approval gate) | `ReviewsPanel` `/workspace/reviews` | — | REFLECTED — queue is `compliance_cases`; approve calls `commandAdvanceCase` (SoD); filing evidence is one `commandRecordFiling` step |
 | Permissions: capabilities, SoD, denial reasons | Firm shell shows the OTP session and `capabilitiesOf()`. Case, inbox, reviews and messages refuse without that member. | portal OTP login | REFLECTED for the firm workspace. Writes still need the Auth session minted by `verifyFirmCode`. |
-| Payments / billing dimension | nav `ready:false` | `PaymentsPanel` `/app/payments` | PARTIAL — firm billing missing |
+| Payments / billing dimension | `BillingWorkspace` `/workspace/billing` reads `invoices`, `service_payments` and case `billing_status`. Confirm or reject calls `reviewServicePayment` and needs `billing.manage`. The case dimension is displayed with `billingLabel` and is not written — there is no `recordBilling`. Issuing an invoice has no insert policy, so the screen does not offer it. | `PaymentsPanel` `/app/payments` reports a payment as `pending_confirmation`. Balances use `ledgerBalance`. | PARTIAL — firm confirms a reported fee. The case fee dimension and invoice issuance stay closed. |
+| Engagement authority | `EngagementsWorkspace` `/workspace/engagements` lists every engagement. Authorise, revoke and draft call `authorizeEngagement`, `revokeEngagement` and `draftEngagement`, which write the timestamps `authorityCheck` reads. Client acceptance (`accepted_at`) is shown and not written by the firm. | Client 360 engagements tab, per taxpayer | REFLECTED |
+| Evidence vault | `VaultWorkspace` `/workspace/vault` lists documents with `review_status = accepted` and filings `filingEvidence` accepts (verified, with a reference). Pending and returned documents stay in the inbox. A failing verdict does not drop the row. | Client archive uses the same filing rule | REFLECTED |
 | Messages | `MessagesWorkspace` | `MessageThread` | REFLECTED (realtime) |
 | Organizer (documents only) | `OnboardingWizard` | in registration flow | REFLECTED |
 | DSF Bridge (`validation_findings`, declarations) | — | — | MISSING — Priority 1 after MVP 1 spine |
@@ -68,7 +70,7 @@ RPC: `portal_sign_in` (DEPRECATED). API: `POST /api/inquiry` (Resend).
    (delivery gap stated, not faked).
 4. **E:** Storage upload; naming grammar applied to documents/archive.
 5. **F:** F6 triage · deadlines calendar (statutory/prorogued badges) · firm
-   billing · F5 error states · F7 KPI view.
+   billing, vault and engagements list · F5 error states · F7 KPI view.
 
 ## Non-negotiables per screen
 
