@@ -1,0 +1,69 @@
+# Coordination board
+_Triaged 2026-10-27T20:33+01:00 (Africa/Douala) against main @ 5a188c1. Current gate: 3 (as written in `AGENTS.md`; see decision D1)._
+
+## Decisions needed (owner)
+| # | Decision | Options (recommended first) | Blocks | Source |
+|---|---|---|---|---|
+| D1 | Application code has merged while `AGENTS.md` still says gate 3: #13 (P0 fixes, `app/api/**`, `lib/**`, `supabase/**`), #14 (mock-data incident prototype) and #15 (Edge Function source). Do you move the gate to 4 (Development)? | **(a) Declare gate 4. One agent PR changes `AGENTS.md` line 45 to "Current gate: 4 (Development)" and lists the approved PRs by number. That gives a written record, since GitHub shows 0 reviews on #6 and #11–#15.** (b) Keep gate 3 and treat #13, #14 and #15 as one-off approvals; every later dev PR then needs its own named approval. | Every next dev PR: the incident migration (D3) and B's gate-5 integration | `AGENTS.md:45`; #13, #14, #15 |
+| D2 | #6 came from a legacy `cursor/*` branch (Cursor, before the two-agent assignment). It wrote Agent A-only paths: `supabase/migrations/20261023052631_*`, `20261023052633_*`, `lib/events.ts` and `scripts/engine-check.mjs`. It merged today. Do you ratify it after the fact? | **(a) Ratify, and have Agent A review the A-owned parts of #6 and report findings in a handoff (action A4).** (b) Revert those parts. Not advised: both migrations are already recorded remotely and are forward-only. | Nothing urgent; it settles who answers for those files | #6; `AGENTS.md` path table |
+| D3 | Do you approve backlog P1-2, the incident migration, using Agent A's reconciled contract? The contract keeps the column name `payment_evidence_status` with the new type `tax_payment_state`, maps `requested→unknown` and `received→reference_recorded`, and lands the payment `verified` CHECK in the same migration as the P1-8 expert-comptable credential. | **(a) Approve the reconciled contract with the credential in the same migration, after Agent B's reply note (B1).** (b) Approve the payment states sooner, with `verified` refused for everyone until P1-8 lands. (c) Hold P1-2. | Agent A's incident migration; Agent B's gate-5 integration of `/[locale]/prototype/incident` | `docs/agents/handoffs/2026-10-27-a-to-b-p0-contract.md` §4 "Reconciliation"; `2026-10-27-b-to-a-incident-schema.md` points 2 and 5 |
+| D4 | When a `payment_step_error` incident later shows a debit, should its type switch to `debit_not_recognised`? | **(a) Switch the type and record an event. The resolve gate (payment must be `verified`) then applies once money has left the account. This matches journeys "switch to Variant 2".** (b) Keep the original type, as the prototype does now. | Resolve-gate trigger in the incident migration | `agent-b/state-machine.md` §5 Q1 |
+| D5 | How long is the waiting period before a payment may be marked `disputed`? | **(a) No fixed number for now. The reviewer judges, and the screen never shows a day count until research item S-3 finds the DGI/Trésor procedure.** (b) Set a fixed number of days now. | `disputed` transition rules | `agent-b/state-machine.md` §5 Q2; `security-and-sources.md` S-3 |
+| D6 | Should clients be able to report fee payments? Today RLS refuses a client insert into `service_payments`, so the client "report a payment" action always shows the failure toast. | **(a) Yes. Agent A adds a client insert limited to the `reported` state (`feePaymentState()` already models "Paiement signalé — à confirmer"), and Agent B hides the button until that lands.** (b) No. Agent B removes the client action. | Client payments panel (`components/live/payments-panel.tsx`) | A→B handoff §3; owner question |
+| D7 | Organisation scoping before a second firm: when is it built? | **(a) Keep accounting-firm sign-up hidden (as #10 did). Make organisation scoping an Agent A item that must merge before any second firm is onboarded.** (b) Build it now, ahead of the incident work. | Onboarding a second firm | #10; owner question |
+| D8 | PR #8 (official brand lockups, "KIMA OS" product name) has been open and untouched for 4 days. It comes from a legacy `cursor/*` branch and edits Agent A-only files (`app/api/inquiry/route.ts`, `lib/auth-mail.ts`) and `CLAUDE.md`. It was branched before #6 and #13, which changed `lib/auth-mail.ts` (`mayRevealCode()`) and `lib/i18n-public.ts`. Do you want it merged? | **(a) First confirm the brand and "KIMA OS" name. Then have Agent B rebuild it on a fresh `agent-b/*` branch from main, with the `app/api/**` and `lib/auth-mail.ts` string changes sent to Agent A in a handoff, and close #8.** (b) Rebase #8 as it is and merge it. (c) Close it with no replacement. | Brand assets in the app chrome | PR #8 |
+
+## Actions — Agent A
+| # | Action | Why | Source | Age |
+|---|---|---|---|---|
+| A1 | Explain why the `auth-codes` Edge Function went from v3 to v5 with no recorded v4. Read the function's version history (read-only), find out who deployed v4, when, and from what source, and write it in `docs/deployment.md` "Deploy the auth-codes Edge Function". Confirm that the live v5 is byte-identical to `supabase/functions/auth-codes/index.ts` @ 5a188c1 (download and diff). | An unrecorded deploy of the sign-in function is the same kind of drift that `AGENTS.md` forbids for SQL | #15; `docs/deployment.md` §Deploy the auth-codes Edge Function | 0 d |
+| A2 | Confirm where the downloaded v3 rollback copy is kept, and name the location in `docs/deployment.md`. | The documented rollback is "redeploy the downloaded v3". Without the copy there is no rollback. | `docs/deployment.md` (deploy step 1, "Roll back") | 0 d |
+| A3 | Update your handoff `2026-10-27-a-to-b-p0-contract.md`. Its "Blocks" line still says "not merged, awaiting owner approval". #13 merged, and migration `20261027120000` was applied by run 40568424407. Mark §1–3 answered and keep §4 (incident contract) open. | The note's status no longer matches main | handoff a→b; #13 | 0 d |
+| A4 | Review the A-owned parts of #6 (`supabase/migrations/20261023052631_document_acceptance_snapshot.sql`, `20261023052633_firm_confirms_service_payments.sql`, `lib/events.ts`, `scripts/engine-check.mjs`). Report any defect in a handoff. Depends on D2. | Wrong-writer merge; Agent A owns these paths | #6; D2 | 0 d |
+| A5 | Write the tests of the `CLAUDE.md` rules for `lib/incidents.ts` and `lib/next-best-action.ts` (merged in #14 with only Agent B's `scripts/journey-check.mjs`). | `AGENTS.md`: "B writes the logic; A reviews and owns their tests" | #14; `AGENTS.md` path table | 0 d |
+| A6 | Pin the Supabase CLI version in both migration workflows. | `docs/deployment.md` says to pin "once the first migration has gone through successfully". Three runs went green today. | `docs/deployment.md` Risks; runs 40554572314, 40568424407, 40569635571 | 0 d |
+| A7 | If D8 = (a), take the `app/api/inquiry/route.ts` and `lib/auth-mail.ts` string changes from PR #8 in your own PR, keeping `mayRevealCode()` from #13 intact. | Agent A-only paths in a `cursor/*` PR | PR #8; D8 | 4 d (PR) |
+
+## Actions — Agent B
+| # | Action | Why | Source | Age |
+|---|---|---|---|---|
+| B1 | Write a reply handoff (`2026-10-27-b-to-a-incident-contract-reply.md` or similar). Confirm that Agent A's reconciled contract (§4 "Reconciliation") covers the journey, or list the fields you need changed. Accept or reject the counter-proposal to keep `payment_evidence_status` and rename your mirror to `paymentEvidenceStatus`. | The a→b "Done when" requires this before Agent A writes the migration, and D3 waits on it | handoff a→b §4; handoff b→a points 2 and 6 | 0 d |
+| B2 | After B1, align `lib/incidents.ts` and `lib/mocks/incidents.ts` to the agreed contract. That covers the payment field name (`PaymentState` → the agreed name), payment held on the case rather than the incident (state-machine §5 Q3, agreed by both), and the accepted additions (`added_by_role`, `counterparty`, `unresolved`, masked `ticket_ref`). | A single contract source; the prototype carries payment on the incident "for isolation" | `lib/incidents.ts:31`; state-machine §5 Q3 | 0 d |
+| B3 | Set the status of your handoff `2026-10-27-b-to-a-incident-schema.md` from `open` to `answered`. Agent A answered points 1–6 in the a→b reconciliation table. | The note's status no longer matches the reply | handoff b→a | 0 d |
+| B4 | Review for tone the honest-copy wording Agent A put into your client screens in #13 (`components/client-portal/*`, `components/live/*`, `lib/organizer.ts`, `lib/i18n-portal.ts`, `lib/i18n-public.ts`). Keep it honest if you change it. | Agent A asked for it in its handoff §3; Agent B owns FR/EN copy | handoff a→b §3; #13 | 0 d |
+| B5 | Check that every client screen uses `clientStatus()`, `clientStep()` and `feePaymentState()` and keeps no status mapping of its own, and that none shows "Filed", "Paid" or "Complete" unless that dimension is verified. Report the result in the B1 reply. | a→b "Done when", first bullet | handoff a→b §1 | 0 d |
+| B6 | Depends on D6: either hide the client "report a payment" action until Agent A's insert lands (D6 a), or remove it (D6 b). | The action always fails today (RLS refuses the insert) | handoff a→b §3; D6 | 0 d |
+| B7 | PR #8 has not been updated for 4 days. If D8 = (a), rebuild the brand change on `agent-b/*` from main, without `app/api/**`, `lib/auth-mail.ts` or `CLAUDE.md`, and hand those to Agent A. | Stale PR; wrong-writer paths on a legacy `cursor/*` branch | PR #8; D8 | 4 d |
+
+## Info
+- Merged on 27 Oct (UTC): #9 14:10, #10 16:54, #6 17:51, #11 18:33, #12 18:33, #14 18:41, #13 19:21, #15 19:29. The session reported six (#6 and #11–#15). #9 and #10 also merged today; both were approved earlier as docs or owner answers.
+- The `Supabase migrations` workflow ran green **three** times today, not two: 40554572314 after #6 (d6f9cca), 40568424407 after #13 (2254cc9), and 40569635571 after #15 (5a188c1, "Remote database is up to date", a no-op). The four failures on 23 Oct came before them.
+- Migration drift check: the latest run's `migration list --linked` shows every local version paired with the same remote version, through `20261027120000`. There is no drift.
+- CI on main @ 5a188c1 is green (run 40569635583). The latest CI and `Verify migrations` runs on `agent-a/p0-security`, `agent-a/edge-function-deployed` and `agent-b/incident-prototype` are green.
+- #13 and #14 still have "do not merge" / "awaiting owner approval" in their titles and commit subjects, though both are merged. The #13 commit body says the migration is "not applied anywhere" and the function is "NOT deployed". Both have since happened. This is a historical record only; D1 (a) fixes it going forward.
+- Path ownership, #13: Agent A edited Agent B-owned `components/**` files. This is allowed (a security or honesty defect, in Agent A's own PR, announced in handoff §3).
+- Path ownership, #14: Agent B stayed in its own paths plus docs, `package.json` and `scripts/journey-check.mjs`. Agent A added `npm run test:journey` to CI in #13.
+- No Agent B action for #6 (D2): Cursor wrote it before the two-agent assignment, and no current Agent B branch touches A-only paths.
+- #11 (Agent A audit, docs only) and #12 (agent definitions) merged. Nothing to act on.
+- Gate check: GitHub has no review approving #6 or #11–#15. Approval was given in chat, as reported by the launching session. D1 asks for a written record.
+- The state-machine §5 Q3 question (payment on the case) is agreed by both agents. It is closed in substance, pending D3 and B2.
+- Not fetched: the Supabase Edge Function version history. It is outside the chief of staff's channels, so the v3→v5 gap is unexplained here (A1).
+- skip: Vercel preview comment on #8 (deploy ready); "Supabase Preview" check skipped.
+
+## Follow-through from the previous board
+| Item | Status | Evidence |
+|---|---|---|
+| — | first board | No earlier `docs/agents/coordination-board.md` existed. Every item above is new today, except those tied to PR #8 (open since 23 Oct). |
+
+## Draft replies (not posted)
+### Handoff b→a (to Agent B, for B1)
+Agent A answered all six of your points in the "Reconciliation" table at the end of `2026-10-27-a-to-b-p0-contract.md` §4. Before Agent A writes the incident migration (and before the owner decides D3), please add a reply note that (1) accepts or rejects keeping the column name `payment_evidence_status` (your mirror becomes `paymentEvidenceStatus`), (2) confirms that the accepted additions and the client-update rules cover the prototype, or lists what is missing, and (3) reports whether your screens use `clientStatus()`, `clientStep()` and `feePaymentState()` only. Then set your b→a note to `answered`.
+
+### #15 / auth-codes (to Agent A, for A1–A2)
+Production `auth-codes` is reported as v5, but the repository records only v3 (deployed by hand) and the deploy from this file. Please read the version history (read-only, no deploy) and record what v4 was: who deployed it, when, and from what source. Diff the live v5 against `supabase/functions/auth-codes/index.ts` @ 5a188c1, and note in `docs/deployment.md` where the v3 rollback copy is kept.
+
+### PR #8 (for the owner to post if D8 = a)
+Thanks for this. The two-agent rules (`AGENTS.md`) now give `app/api/**` and `lib/auth-mail.ts` to Agent A, and this branch is from before #6 and #13, which changed `lib/auth-mail.ts`. We will rebuild the brand change on an `agent-b/*` branch from current main and move the API and mail string changes into an Agent A PR. Closing this one in favour of those.
+
+### `AGENTS.md` gate line (proposal for D1 a, written by an agent PR, not by the chief of staff)
+`**Current gate: 4 (Development).** Approved by the owner on 27 Oct 2026: #6, #11, #12, #13 (P0 fixes), #14 (mock-data incident prototype), #15 (auth-codes v5 record). The incident migration (P1-2) and integration (gate 5) still need their own approval.`
