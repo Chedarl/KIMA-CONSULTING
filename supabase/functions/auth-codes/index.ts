@@ -16,6 +16,7 @@
  *   refused.
  * - A portal account with no contact cannot sign in (nothing to bind).
  * - Error responses no longer echo internal error text to the caller.
+ * - v6: brand strings (D8)
  *
  * WHY THIS EXISTS. `portal_issue_code` and `firm_issue_code` are revoked from
  * anon and authenticated: they hand back a plaintext one-time code, so only a
@@ -41,7 +42,7 @@
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const MAIL_FROM = Deno.env.get("KIMA_MAIL_FROM") ?? "Kima Consulting <onboarding@resend.dev>";
+const MAIL_FROM = Deno.env.get("KIMA_MAIL_FROM") ?? "KIMA CONSULTING <onboarding@resend.dev>";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -126,7 +127,7 @@ async function sendCode(to: string, code: string, locale: string, audience: stri
     body: JSON.stringify({
       from: MAIL_FROM,
       to: [to],
-      subject: fr ? "Kima — votre code d'accès" : "Kima — your access code",
+      subject: fr ? "KIMA OS — votre code d'accès" : "KIMA OS — your access code",
       text: [
         fr ? "Bonjour," : "Hello,",
         "",
@@ -136,7 +137,7 @@ async function sendCode(to: string, code: string, locale: string, audience: stri
           ? "Il expire dans dix minutes et ne peut servir qu'une fois."
           : "It expires in ten minutes and can be used only once.",
         "",
-        `— Kima Consulting (${audience})`,
+        `— KIMA CONSULTING (${audience})`,
         "",
         fr
           ? "Message de démonstration. Aucune intégration DGI n'est établie."

@@ -1,7 +1,7 @@
 # Product-name strings in Agent A's files (rebuild of PR #8)
 
 - **From → to:** Agent B → Agent A
-- **Status:** open
+- **Status:** closed (Agent A, branch `agent-a/brand-strings`: all strings above applied, plus `supabase/functions/auth-codes/index.ts` lines 44, 129, 139 under the owner's D8 redeploy approval; `inquiry/route.ts` 152–153 left as proposed)
 - **Blocks:** nothing (the mails still send; they show the old name until applied)
 
 ## What is needed / what changed

@@ -14,7 +14,7 @@ type Body = { taxpayerId?: string; locale?: "fr" | "en"; note?: string };
 
 export async function POST(request: Request) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.KIMA_MAIL_FROM ?? "Kima Consulting <onboarding@resend.dev>";
+  const from = process.env.KIMA_MAIL_FROM ?? "KIMA CONSULTING <onboarding@resend.dev>";
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -99,8 +99,8 @@ export async function POST(request: Request) {
     .join("\n");
 
   const subject = fr
-    ? `Kima — pièces encore attendues pour ${taxpayer.legal_name}`
-    : `Kima — documents still needed for ${taxpayer.legal_name}`;
+    ? `KIMA OS — pièces encore attendues pour ${taxpayer.legal_name}`
+    : `KIMA OS — documents still needed for ${taxpayer.legal_name}`;
 
   const text = [
     `${fr ? "Bonjour" : "Hello"} ${taxpayer.contact_name ?? ""}`.trim() + ",",
@@ -113,10 +113,10 @@ export async function POST(request: Request) {
     "",
     safeNote ? `${safeNote}\n` : "",
     fr
-      ? "Vous pouvez les déposer directement dans votre espace Kima."
-      : "You can upload them directly in your Kima portal.",
+      ? "Vous pouvez les déposer directement dans votre espace KIMA OS."
+      : "You can upload them directly in your KIMA OS portal.",
     "",
-    "— Kima Consulting",
+    "— KIMA CONSULTING",
     "",
     fr
       ? "Message de démonstration. Aucune valeur fiscale n'est calculée et aucune intégration DGI n'est établie."
