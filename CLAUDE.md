@@ -1,8 +1,8 @@
-# KIMA Compliance OS
+# KIMA OS
 
 Tax compliance management, accounting workflow automation and digital taxpayer
 services. Initial market Cameroon, expansion CEMAC. Currency XAF. French and
-English at launch. Company: Kima Consulting. Product: KIMA Compliance OS.
+English at launch. Company: KIMA CONSULTING. Product: KIMA OS (owner decision D8).
 
 **Tagline (canonical, confirmed 2026-10-20):**
 - EN: **Clear Records. Confident Compliance.**

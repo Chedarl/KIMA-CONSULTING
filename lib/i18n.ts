@@ -15,8 +15,8 @@ export function isLocale(value: string): value is Locale {
 }
 
 const fr = {
-  brand: "KIMA Compliance OS",
-  company: "Kima Consulting",
+  brand: "KIMA OS",
+  company: "KIMA CONSULTING",
   tagline: "Vos comptes en ordre. Vos obligations maîtrisées.",
   proposition: "Votre partenaire en conformité fiscale",
   nav: {
@@ -242,8 +242,8 @@ const fr = {
 type Dictionary = typeof fr;
 
 const en: Dictionary = {
-  brand: "KIMA Compliance OS",
-  company: "Kima Consulting",
+  brand: "KIMA OS",
+  company: "KIMA CONSULTING",
   tagline: "Clear Records. Confident Compliance.",
   proposition: "Your Tax Compliance Partner",
   nav: {

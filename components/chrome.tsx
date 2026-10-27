@@ -70,10 +70,13 @@ export function Chrome({ locale, labels }: { locale: Locale; labels: ChromeLabel
           href={`/${locale}`}
           className="flex min-h-[44px] items-center gap-2.5"
         >
+          {/* Colour mark on light chrome, white mark when the surface is dark. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />
+          <img src="/brand/mark-color.svg" alt="" width={28} height={28} className="brand-mark-light h-7 w-7" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/mark-white.svg" alt="" width={28} height={28} className="brand-mark-dark h-7 w-7" />
           <span className="text-sm font-bold tracking-tight text-fg">
-            KIMA<span className="font-normal text-fg-muted"> Compliance OS</span>
+            KIMA<span className="font-normal text-fg-muted"> OS</span>
           </span>
         </Link>
 
