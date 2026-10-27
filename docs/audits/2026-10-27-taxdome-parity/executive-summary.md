@@ -54,7 +54,7 @@ tests"), **none yet**. What does work reliably:
 
 ## Where are the most serious technical risks?
 
-1. **Database updates have not reached production since 23 October.** The deployment
+1. ~~**Database updates have not reached production since 23 October.**~~ **Resolved 27 Oct**: PR #6 merged; production is in sync again. The deployment
    pipeline fails on every push, so any fix merged now would not reach production. The repair
    already exists in Cursor's open PR #6.
 2. **File storage is open to anonymous visitors and closed to real users.** Anyone can
