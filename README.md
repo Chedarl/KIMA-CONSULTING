@@ -307,6 +307,9 @@ direct SQL write, not only through the interface:
 | A self-approval is permitted but can never be silent | `self_approval_must_be_disclosed` |
 | An approval records who and when, together | `approval_is_dated` |
 | A deactivated member carries the date they left | `inactive_has_a_date` |
+| A fee payment is never confirmed without a reference, a person and a time | `confirmed_requires_evidence` |
+| A client may report a fee payment only as `pending_confirmation`, for an issued invoice of their own taxpayer, and reads only their own payments | policies `client reports fee payments`, `client reads own payments` |
+| A confirmed or rejected fee payment is final; a review changes only status and confirmation, and the database stamps who confirmed and when | trigger `service_payment_review_guard` |
 
 **`case_events` is append-only.** No UPDATE or DELETE policy exists, and
 UPDATE, DELETE and TRUNCATE are revoked from `anon` and `authenticated`. The
@@ -327,6 +330,21 @@ under their remote versions, verified on every PR and applied on push to `main`
 ---
 
 ## Where the work stands
+
+**Fee payments: clients report, the firm confirms (27 Oct 2026, Agent A, owner D6 and
+D2).** A signed-in client can now report a payment of KIMA's own fees from
+`/app/payments` (`components/live/payments-panel.tsx`). The row lands as
+`pending_confirmation` / `reported_by = 'taxpayer'` and reads "Paiement signalé — à
+confirmer", never "Paid". RLS refuses a report on another taxpayer's invoice, on a draft
+invoice, with any confirmation field, or backdated. A client reads only their own
+payments. A partner (`billing.manage`) confirms or rejects once. After that the payment is
+final, and the database writes the confirmer's name and the time (migrations
+`20261027210000`, `20261027210100`; tests `supabase/tests/fee_payments_test.sql`, engine
+check T-21). Staff can record a payment only as the firm, and only as pending. **Not yet
+organisation-scoped.** `member_has()` is firm-wide, which is why a second firm stays
+blocked (backlog P2-5, risk R-47, owner D7). Review of #6:
+`docs/agents/handoffs/2026-10-27-a-review-of-pr6.md`. auth-codes version history:
+`docs/deployment.md`.
 
 **P0 security and honesty fixes (27 Oct 2026, draft PR, not merged).** One forward-only
 migration (`20261027120000`) scopes storage to the taxpayer segment of the path, limits
