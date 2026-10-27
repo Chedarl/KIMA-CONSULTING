@@ -37,6 +37,7 @@ CEMAC thesis — is in the approved plan (see **Where the work stands**).
 |---|---|
 | `docs/blueprint/` | The product baseline — Business Concept Note, PRD and AI Development Blueprint v1.0 |
 | `docs/foundation/` | Sitemap, ERD, permissions matrix, risk register and the research below |
+| `docs/audits/` | Dated audits. **`2026-10-27-taxdome-parity/`** — TaxDome feature parity, verified module status, journey stop points, security reassessment (incl. the migration pipeline failing since 23 Oct), roadmap; start with `executive-summary.md` |
 | `docs/strategy/` | Dated strategy responses. **`2026-10-27-taxpayer-first/`** answers the owner's taxpayer-first brief: thesis, gap matrix, journeys, backlog, sources, test protocol — a proposal awaiting approval |
 | `docs/design/` | Generated design system — **superseded**; it predates the blueprint, and blueprint §9 is the authority |
 | `app/`, `components/`, `lib/` | The Next.js application |
@@ -301,6 +302,8 @@ not work end to end for any signed-in user** (storage policies are anon-only),
 that clients can forge `case_events`, and several screens that state completion
 that is not true. Those are the P0 items in `backlog.md`; nothing is built until
 the owner approves that proposal.
+
+**Audit (27 Oct 2026).** `docs/audits/2026-10-27-taxdome-parity/` finds that nothing is yet end-to-end WORKING (engines are; no DB or E2E tests), that firms cannot create cases, tasks, contacts or invoices and registered taxpayers cannot get a sign-in, and that **production migrations have failed since 23 Oct** (repair is in open PR #6). Awaiting owner approval; nothing applied.
 
 **Owner answers (27 Oct 2026, second round).** The reviewer is an expert-comptable;
 incident recovery is part of the engagement; the system itself should fetch the
