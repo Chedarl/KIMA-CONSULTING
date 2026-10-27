@@ -42,7 +42,12 @@ when they may act**. Set by the owner on 27 Oct 2026 (two-agent assignment).
 
 Branches: Agent A `agent-a/*`, Agent B `agent-b/*`, each in its own git worktree.
 
-**Current gate: 3 (Approval).** Audit PR #11 (Agent A) awaits comparison with Agent B's report.
+**Current gate: 4 (Development)** — declared by the owner on 27 Oct 2026 ("work with the
+recommendations", accepting decision D1 of `docs/agents/coordination-board.md`). PRs the
+owner approved and the session merged on 27 Oct: #6 (ratified after the fact, D2), #9, #10,
+#11, #12, #13, #14, #15, #16. The Edge Function redeploy (v5) was approved separately.
+Owner decisions D1–D8 are recorded in `docs/agents/decisions/2026-10-27-owner-decisions.md`.
+Gate 5 (integration with the real backend) still needs the owner's go per PR.
 
 ## Hard rules for every agent
 
