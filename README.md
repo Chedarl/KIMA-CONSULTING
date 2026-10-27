@@ -37,8 +37,8 @@ CEMAC thesis — is in the approved plan (see **Where the work stands**).
 |---|---|
 | `docs/blueprint/` | The product baseline — Business Concept Note, PRD and AI Development Blueprint v1.0 |
 | `docs/foundation/` | Sitemap, ERD, permissions matrix, risk register and the research below |
-| `docs/audits/` | Dated audits. **`2026-10-27-taxdome-parity/`** — TaxDome feature parity, verified module status, journey stop points, security reassessment (incl. the migration pipeline failing since 23 Oct), roadmap; start with `executive-summary.md` |
-| `docs/strategy/` | Dated strategy responses. **`2026-10-27-taxpayer-first/`** answers the owner's taxpayer-first brief: thesis, gap matrix, journeys, backlog, sources, test protocol — a proposal awaiting approval |
+| `docs/audits/` | Dated audits. **`2026-10-27-taxdome-parity/`** — TaxDome feature parity, verified module status, journey stop points, security reassessment (incl. the migration pipeline failing since 23 Oct), roadmap; start with `executive-summary.md`. `agent-b-parity-and-journeys.md` is Agent B's review of Agent A's parity and journey findings |
+| `docs/strategy/` | Dated strategy responses. **`2026-10-27-taxpayer-first/`** answers the owner's taxpayer-first brief: thesis, gap matrix, journeys, backlog, sources, test protocol — a proposal awaiting approval. Its `agent-b/` folder holds Agent B's incident-recovery plan (journey, wireframes, component specs, state machine, implementation plan, acceptance tests) |
 | `docs/design/` | Generated design system — **superseded**; it predates the blueprint, and blueprint §9 is the authority |
 | `app/`, `components/`, `lib/` | The Next.js application |
 | `supabase/` | Forward-only migrations in `supabase/migrations/` (applied by CI on push to `main`) and backend notes — see Backend and `docs/deployment.md` |
@@ -108,6 +108,7 @@ Every route is locale-prefixed; `/` redirects to `/fr`.
 | `/fr/workspace/filing` | The filing framework — reference builder, folder tree, filename reader |
 | `/fr/workspace/{messages,reviews}` | Messaging and approvals |
 | `/fr/design` | Design system — tokens, contrast, status honesty, components |
+| `/fr/prototype/incident`, `/en/prototype/incident` | **Incident-recovery prototype (Agent B) — synthetic data, local state only.** "Debited, payment not recognised" for the fictional Boutique Ndolo: five status dimensions, one next action with its source, "record what happened", masked references, escalation log, taxpayer/reviewer switch. Not linked from any nav, `noindex`, no backend. Plan: `docs/strategy/2026-10-27-taxpayer-first/agent-b/` |
 
 Nav entries marked `ready: false` in `app/[locale]/workspace/layout.tsx` are
 visible but disabled on purpose, so the shape of the product stays legible
@@ -208,6 +209,19 @@ directory and runs Node assertions (rule activation, proposeCases, permissions,
 command layer, three verdicts). CI runs the same command. **Add assertions with
 every rule or permission change.** Expanding coverage toward the earlier F2–F4
 counts remains open work.
+
+```bash
+npm run test:journey
+```
+
+`scripts/journey-check.mjs` does the same for the incident prototype
+(`lib/incidents.ts`, `lib/next-best-action.ts`, fixtures F-1…F-4 in
+`lib/mocks/incidents.ts`): test-protocol A-2 (no `verified` without official
+evidence; a debit never reaches `verified`), A-7 (exactly one next action, each
+with a verified source or the "not yet confirmed — ask your tax centre"
+fallback), A-8 (never suggests paying again while a debit is unresolved), and
+"a taxpayer can never set verified or resolved". Each check counts its own
+assertions and fails if none ran. Not yet in CI — `.github/workflows/` is Agent A's.
 
 ### Verifying UI
 

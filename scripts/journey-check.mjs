@@ -84,7 +84,8 @@ const blank = (payment, status = "open", evidence = [], type = "debit_not_recogn
   id: "INC-TEST",
   type,
   status,
-  detectedAt: AT,
+  observedAt: AT,
+  amountMinor: null,
   portalKey: null,
   attemptedStep: null,
   reportedError: null,
@@ -252,7 +253,7 @@ try {
   // A-7 / A-8 — next best action
   // -------------------------------------------------------------------------
   const certs = ["not_requested", "requested", "blocked", "obtained", "expired"];
-  const types = ["portal_unavailable", "payment_step_error", "debit_not_recognised", "certificate_blocked", "other"];
+  const types = ["payment_step_error", "debit_not_recognised", "certificate_blocked"];
   const contactsSets = [[], [{ id: "C", at: AT, channel: "phone", counterparty: "x", ticketMasked: null, response: null, unresolved: null, recordedBy: "taxpayer" }]];
 
   /** Every combination the engine can see, plus the four fixtures. */

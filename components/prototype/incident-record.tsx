@@ -19,9 +19,9 @@ export function IncidentSummary({ incident, t }: { incident: Incident | null; t:
           <dd className="font-semibold text-fg">{t.status[incident.status]}</dd>
         </div>
         <div>
-          <dt className="text-xs text-fg-muted">{t.detectedAt}</dt>
+          <dt className="text-xs text-fg-muted">{t.observedAt}</dt>
           <dd>
-            <Stamp iso={incident.detectedAt} zone={t.timeZone} /> <span className="text-xs text-fg-subtle">({t.timeZone})</span>
+            <Stamp iso={incident.observedAt} zone={t.timeZone} /> <span className="text-xs text-fg-subtle">({t.timeZone})</span>
           </dd>
         </div>
         {incident.attemptedStep && (

@@ -37,9 +37,10 @@ const CHANNELS: ContactChannel[] = ["phone", "in_person", "email", "online_form"
 export function newIncident(debit: boolean, at: string): Incident {
   return {
     id: `INC-LOCAL-${at}`,
-    type: debit ? "debit_not_recognised" : "other",
+    type: debit ? "debit_not_recognised" : "payment_step_error",
     status: "open",
-    detectedAt: at,
+    observedAt: at,
+    amountMinor: null,
     portalKey: null,
     attemptedStep: null,
     reportedError: null,

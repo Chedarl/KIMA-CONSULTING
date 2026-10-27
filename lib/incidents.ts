@@ -62,12 +62,8 @@ export const INCIDENT_STATUSES: IncidentStatus[] = [
   "closed_unresolved",
 ];
 
-export type IncidentType =
-  | "portal_unavailable"
-  | "payment_step_error"
-  | "debit_not_recognised"
-  | "certificate_blocked"
-  | "other";
+/** Interim contract (coordinator, 27 Oct): three types only. */
+export type IncidentType = "payment_step_error" | "debit_not_recognised" | "certificate_blocked";
 
 /** The certificate (ACF) dimension. KIMA never issues or imitates one. */
 export type CertificateStatus = "not_requested" | "requested" | "blocked" | "obtained" | "expired";
@@ -135,8 +131,8 @@ export type IncidentEventKind =
   | "payment_changed"
   | "reference_recorded"
   | "incident_status_changed"
-  | "evidence_added"
-  | "contact_logged";
+  | "incident_evidence_added"
+  | "support_contact_logged";
 
 export type IncidentEvent = {
   at: string;
@@ -160,7 +156,9 @@ export type Incident = {
   id: string;
   type: IncidentType;
   status: IncidentStatus;
-  detectedAt: string;
+  observedAt: string;
+  /** Amount the taxpayer says was debited, integer XAF. Declared, never verified here. Null in every fixture. */
+  amountMinor: number | null;
   /** Key into `HARMONY_PORTALS` in `lib/rules.ts`, or null. */
   portalKey: string | null;
   attemptedStep: string | null;
@@ -363,7 +361,7 @@ export function addEvidence(incident: Incident, input: EvidenceInput): Result {
       { evidence: [...incident.evidence, evidence] },
       {
         at: input.at ?? now(),
-        kind: "evidence_added",
+        kind: "incident_evidence_added",
         actorRole: input.actor.role,
         actorLabel: input.actor.label,
         basis: basisFor(input.actor, false),
@@ -387,7 +385,7 @@ export function logContact(incident: Incident, input: ContactInput): Result {
     { contacts: [...incident.contacts, contact] },
     {
       at: contact.at,
-      kind: "contact_logged",
+      kind: "support_contact_logged",
       actorRole: input.actor.role,
       actorLabel: input.actor.label,
       basis: basisFor(input.actor, false),

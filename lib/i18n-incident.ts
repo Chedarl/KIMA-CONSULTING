@@ -64,7 +64,7 @@ const fr = {
   doNotPayAgain: "Attention",
   incidentTitle: "Incident",
   incidentNone: "Aucun incident ouvert.",
-  detectedAt: "Constaté le",
+  observedAt: "Constaté le",
   step: "Étape tentée",
   reportedError: "Message affiché (selon vous)",
   reference: "Référence de transaction",
@@ -137,11 +137,9 @@ const fr = {
     closed_unresolved: "Clos sans solution",
   } satisfies Record<IncidentStatus, string>,
   type: {
-    portal_unavailable: "Portail indisponible",
     payment_step_error: "Erreur à l'étape de paiement",
     debit_not_recognised: "Débité, paiement non reconnu",
     certificate_blocked: "Attestation bloquée",
-    other: "Autre",
   } satisfies Record<IncidentType, string>,
   certificate: {
     not_requested: "Non demandée",
@@ -171,8 +169,8 @@ const fr = {
     payment_changed: "Paiement",
     reference_recorded: "Référence notée",
     incident_status_changed: "Incident",
-    evidence_added: "Preuve ajoutée",
-    contact_logged: "Contact enregistré",
+    incident_evidence_added: "Preuve ajoutée",
+    support_contact_logged: "Contact enregistré",
   } satisfies Record<IncidentEventKind, string>,
   actor: { taxpayer: "Contribuable", reviewer: "Réviseur" },
   refusal: {
@@ -235,7 +233,7 @@ const en: typeof fr = {
   doNotPayAgain: "Warning",
   incidentTitle: "Incident",
   incidentNone: "No open incident.",
-  detectedAt: "Noticed on",
+  observedAt: "Noticed on",
   step: "Step attempted",
   reportedError: "Message shown (as you reported it)",
   reference: "Transaction reference",
@@ -308,11 +306,9 @@ const en: typeof fr = {
     closed_unresolved: "Closed unresolved",
   },
   type: {
-    portal_unavailable: "Portal unavailable",
     payment_step_error: "Error at the payment step",
     debit_not_recognised: "Debited, payment not recognised",
     certificate_blocked: "Certificate blocked",
-    other: "Other",
   },
   certificate: {
     not_requested: "Not requested",
@@ -342,8 +338,8 @@ const en: typeof fr = {
     payment_changed: "Payment",
     reference_recorded: "Reference noted",
     incident_status_changed: "Incident",
-    evidence_added: "Evidence added",
-    contact_logged: "Contact logged",
+    incident_evidence_added: "Evidence added",
+    support_contact_logged: "Contact logged",
   },
   actor: { taxpayer: "Taxpayer", reviewer: "Reviewer" },
   refusal: {
