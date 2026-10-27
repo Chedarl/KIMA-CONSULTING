@@ -50,6 +50,11 @@ not build its items until the owner approves it. The owner kept the blueprint โ€
 taxpayer may start alone and *declare* what happened; only a reviewer moves filing,
 tax payment or certificate to `verified`.
 
+**Agents (27 Oct 2026).** Work is split between Agent A (security and data), Agent B
+(taxpayer journey) and a chief of staff, all Claude Code subagents in `.claude/agents/`.
+`AGENTS.md` sets who may write which path, the current approval gate and the handoff
+protocol. Read it before any change.
+
 Still outstanding from blueprint ยง20: A (software PRD), B (backlog with acceptance
 tests), D (journey diagrams), G (component UI/UX specification), H (technical
 architecture and API plan), J (phased implementation plan).
