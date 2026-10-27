@@ -64,6 +64,19 @@ assign names before Phase 3.
 | R-38 | A statutory deadline is shown as fixed when a ministerial communiqué has moved it | **H** | M | **[NEW] 2026-10-21.** Prorogations are routine, not exceptional — the Minister may extend deadlines under art. 16 LF 2025 and does so most years. `Prorogation` is first-class data carrying its own communiqué reference; a resolved date always reports whether it is statutory or prorogued, and every DSF date returns `needsConfirmation`, because the three-date split rests on secondary commentary while the only citable official date is 15 March | Tax reviewer | Mitigated — needs the year's communiqué loaded |
 | R-39 | Document acceptance is recorded as a single verdict, losing the accounting/tax distinction | M | M | **[NEW] 2026-10-21, from the practitioner session.** "A document might not be good for accounting but be recorded for taxation." Three independent verdicts — accounting, charge deductibility, VAT recovery — each with its own reasons and citations, in `lib/document-review.ts` and the `document_verdicts` table. A failed accounting verdict never discards the document | Tax reviewer + Eng | Mitigated |
 
+## Taxpayer-first incidents (added 2026-10-27)
+
+From the owner's taxpayer-first brief; analysis in
+`docs/strategy/2026-10-27-taxpayer-first/security-and-sources.md`.
+
+| ID | Risk | L | I | Mitigation | Owner | Status |
+|---|---|---|---|---|---|---|
+| R-40 | A tax payment is shown as paid on the strength of a debit, not an official receipt | M | **H** | Payment states keep debit observed, reference recorded, DGI receipt and disputed apart; `verified` requires reviewer + evidence, enforced by a CHECK. Today `payment_evidence_status` has **no** evidence CHECK | Eng lead + Tax reviewer | Open |
+| R-41 | A DGI or Trésor outage, or a reconciliation failure, is presented to the taxpayer as their own error — or as resolved | M | **H** | Incident record keeps DGI-controlled steps separate; filing stays `attempted`; next action never claims an outcome | Eng lead | Open |
+| R-42 | A KIMA case file is presented by a taxpayer as if it were an ACF | M | **H** | No seal, QR or "conforme"; fixed "not an ACF" line in both locales; link to the DGI service (carries the 22 Oct "Dossier fiscal" decision) | Founder | Open |
+| R-43 | Escalation guidance paraphrases unverified commentary and is wrong | M | **H** | Guidance strings may cite only `verified` sources; otherwise a fixed "not yet confirmed" fallback | Tax reviewer | Open |
+| R-44 | Incident evidence captures DGI credentials or one-time codes | M | **H** | KIMA never asks for DGI credentials; capture warning; code-shaped strings rejected in free text | Eng lead | Open |
+
 ## Phase gates
 
 A phase does not close while a **blocking** item against it remains open.

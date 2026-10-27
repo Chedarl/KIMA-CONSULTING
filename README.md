@@ -37,9 +37,10 @@ CEMAC thesis — is in the approved plan (see **Where the work stands**).
 |---|---|
 | `docs/blueprint/` | The product baseline — Business Concept Note, PRD and AI Development Blueprint v1.0 |
 | `docs/foundation/` | Sitemap, ERD, permissions matrix, risk register and the research below |
+| `docs/strategy/` | Dated strategy responses. **`2026-10-27-taxpayer-first/`** answers the owner's taxpayer-first brief: thesis, gap matrix, journeys, backlog, sources, test protocol — a proposal awaiting approval |
 | `docs/design/` | Generated design system — **superseded**; it predates the blueprint, and blueprint §9 is the authority |
 | `app/`, `components/`, `lib/` | The Next.js application |
-| `supabase/` | Backend notes. **The SQL lives in Supabase, not in this repo** — see Backend |
+| `supabase/` | Forward-only migrations in `supabase/migrations/` (applied by CI on push to `main`) and backend notes — see Backend and `docs/deployment.md` |
 
 Read `CLAUDE.md` before changing anything. It carries the hard constraints: no
 invented tax rules, no claimed government integration, four axes never
@@ -56,7 +57,7 @@ filing status, tenant isolation.
 | `harmony2-dgi-platform-research.md` | The DGI's Harmony 2 portals, what they streamline, and the line between retrieval and integration |
 | `portal-patterns-research.md` | PwC Connect, EY Canvas, KPMG Clara, TaxDome, Canopy, Karbon — adopt / adapt / reject |
 | `sage-dsf-ingestion-research.md` | Sage export formats, DSF workbooks, parsing rules |
-| `risk-register.md` | 39 risks with phase gates. **R-36 blocks real taxpayer data** |
+| `risk-register.md` | 44 risks with phase gates. **R-36 blocks real taxpayer data** |
 
 ---
 
@@ -81,8 +82,11 @@ platforms are national. So: one engine, six thin rule packs.
 | `lib/i18n.ts`, `lib/i18n-workspace.ts` | Bilingual dictionaries. `en` is typed against `typeof fr`, so locale parity cannot silently drift |
 
 Current rule-pack coverage, from `packCoverage("CM")`: **14 rules, 1 verified,
-13 inferred.** Only the patente renewal date is actionable. That ratio is the
-constraint working, not a gap to paper over.
+13 inferred.** Only the patente renewal date is actionable as an obligation.
+(`packCoverage` counts regimes, centres and obligations; the verified VAT rate and
+cash-threshold sources sit outside that count.) That ratio is the constraint
+working, not a gap to paper over — and it means an IGS taxpayer currently sees
+**no** active obligation, because every IGS rule is `inferred`.
 
 ---
 
@@ -94,7 +98,7 @@ Every route is locale-prefixed; `/` redirects to `/fr`.
 |---|---|
 | `/fr`, `/en` | Public overview |
 | `/fr/register` | **Public application** — four intake paths (online / WhatsApp / agency / referral). The only anonymous write path in the system |
-| `/fr/login` | Portal sign-in — name plus taxpayer number (demo posture, see R-36) |
+| `/fr/login` | Portal sign-in — name plus identifier, then an 8-digit one-time code (R-36 close-out) |
 | `/fr/app` | Taxpayer portal — one next action, checklist, progress |
 | `/fr/app/{compliance,declarations,documents,messages,payments,archive}` | Client surfaces |
 | `/fr/workspace` | Firm workspace — portfolio, intake queue, review gate |
@@ -276,11 +280,9 @@ that is worth catching before a client is told their declaration was accepted.
 A dimension the log is silent about is *not* drift; silence is missing
 coverage, not a contradiction.
 
-**Migration export is partial — see `supabase/migrations/README.md`**, which
-lists all 28 applied migrations and marks which twelve are in the repo. The rest
-exist only in `supabase_migrations.schema_migrations`, and a policy that is not
-in version control cannot be reviewed in a pull request. That README carries the
-query to finish the export and two cautions about replaying these files.
+**Every migration is in the repo** — `supabase/migrations/` holds the full set
+under their remote versions, verified on every PR and applied on push to `main`
+(see `supabase/migrations/README.md` and `docs/deployment.md`).
 
 ---
 
@@ -288,6 +290,17 @@ query to finish the export and two cautions about replaying these files.
 
 The approved plan is at `~/.claude/plans/i-think-i-have-glowing-quasar.md` on
 the owner's machine — ask for a copy if you do not have it.
+
+**Latest (27 Oct 2026): the taxpayer-first brief.** The owner's handoff
+repositions Kima around the taxpayer when the DGI's own systems fail them
+(payment-stage errors, a debit not recognised, an ACF refused). The answer is in
+`docs/strategy/2026-10-27-taxpayer-first/`. **The blueprint stands** — a taxpayer
+may start alone and record what happened, but only a reviewer moves anything to
+verified. It also records an audit of `main` that found **document upload does
+not work end to end for any signed-in user** (storage policies are anon-only),
+that clients can forge `case_events`, and several screens that state completion
+that is not true. Those are the P0 items in `backlog.md`; nothing is built until
+the owner approves that proposal.
 
 **Done**
 
@@ -379,7 +392,7 @@ Still open, and it is the honest limit of this increment:
   delivers it through Resend (or `KIMA_DEMO_OTP_REVEAL=1` for synthetic demos),
   verifies it, and mints a Supabase Auth session. `portal_sign_in` is revoked.
   The anon demo branch of `can_see_taxpayer` is off unless
-  `app.allow_demo_anon = on`.
+  the `allow_demo_anon` row in `app_flags` is true.
 - **`case_tasks` is now firm-only**, so with no firm session the work queue's
   task fetch returns empty and the derived blocker falls back to requests.
   Correct behaviour, and a visible consequence of the above.
@@ -427,6 +440,11 @@ moved the request out of the client's action list (2 to 1), raised "documents
 sent" (2 to 3), and the firm's activity feed showed *"Document received: Bank
 statement — September · Mboa Traders SARL · Client sees this"* — with no
 refresh, and nobody re-keying anything.
+
+> **Superseded (27 Oct 2026).** That check predates the auth close-out. Under the
+> current schema a signed-in client's file upload is refused by storage, and an
+> anonymous one cannot write the `documents` row — see
+> `docs/strategy/2026-10-27-taxpayer-first/gap-matrix.md` §2. Fixing it is P0-1.
 
 Three rules the screen enforces in its own right:
 
@@ -530,7 +548,6 @@ structurally-valid value.
 
 **Known open items**
 
-- Export the Supabase migrations into this repo
 - `SUPABASE_SERVICE_ROLE_KEY` is still unset — the one thing standing between
   the screens and a real session (the migration is applied and the emails are
   seeded)
@@ -538,8 +555,6 @@ structurally-valid value.
 - `docs/design/.../MASTER.md` is stale and contradicts blueprint §9
 - Drop the `activity_events` table once the live project has run long enough on
   `case_events` alone (writers now prefer `recordCaseEvent`)
-- Client `/app/compliance|declarations|archive` still use `lib/demo-data` and
-  are marked `ready: false` until live-wired
 - **A write that reads back its own row now fails for an anonymous caller.**
   `.insert(...).select()` needs SELECT, and several tables no longer grant it.
   Nothing in the codebase does this today — every insert uses the default
@@ -552,4 +567,4 @@ structurally-valid value.
   policy, so it is deliberate work rather than a quick patch
 - `portal_sign_in` execute grants are revoked by the auth-closeout migration
 - `demo_taxpayer_id()` remains executable; the anon branch that uses it is off
-  unless `app.allow_demo_anon = on`
+  unless the `allow_demo_anon` row in `app_flags` is true
