@@ -15,6 +15,16 @@
  *    `resolved`, and only by citing evidence of an official kind.
  * 3. A debit is not a payment. `debit_observed` has no edge to `verified`, and a
  *    wallet SMS or bank statement is never accepted as verifying evidence.
+ *
+ * Owner decisions of 27 Oct 2026 (`docs/agents/decisions/2026-10-27-owner-decisions.md`):
+ *
+ * - D4. A `payment_step_error` incident that later shows a debit switches type
+ *   to `debit_not_recognised`, once, and the switch is its own event
+ *   (`incident_type_changed`). From then on the resolve gate applies: the
+ *   payment must be `verified` by a reviewer before the incident is resolved.
+ * - D5. There is no waiting period before `disputed`. A credentialed reviewer
+ *   judges when to dispute; nothing here counts days, and no copy may show a
+ *   number of days until research item S-3 finds the official procedure.
  */
 
 // ---------------------------------------------------------------------------
@@ -128,6 +138,7 @@ export type Basis = "declared" | "recorded" | "verified";
 
 export type IncidentEventKind =
   | "incident_reported"
+  | "incident_type_changed"
   | "payment_changed"
   | "reference_recorded"
   | "incident_status_changed"
@@ -184,6 +195,9 @@ export type Incident = {
  * The payment graph. There is deliberately no `debit_observed → verified`
  * edge: a debit alone never reaches verified. A reference must be recorded
  * first, and then official evidence cited.
+ *
+ * The moves to `disputed` take no date and no waiting period (owner decision
+ * D5): a credentialed reviewer judges when a debit is disputed.
  */
 export const PAYMENT_FLOW: Record<PaymentState, PaymentState[]> = {
   not_applicable: ["unknown"],
@@ -194,6 +208,30 @@ export const PAYMENT_FLOW: Record<PaymentState, PaymentState[]> = {
   disputed: ["verified", "reference_recorded"],
   verified: [],
 };
+
+/**
+ * Payment states that mean money left the taxpayer's account (owner decision D4).
+ * `disputed` and `verified` are reachable only through `debit_observed` or
+ * `reference_recorded`, so they count too.
+ */
+export const DEBIT_SHOWN_STATES: PaymentState[] = [
+  "debit_observed",
+  "reference_recorded",
+  "disputed",
+  "verified",
+];
+
+export const showsDebit = (p: PaymentState): boolean => DEBIT_SHOWN_STATES.includes(p);
+
+/**
+ * Whether resolving this incident needs the payment `verified` first. True for
+ * `debit_not_recognised`, and also for a `payment_step_error` whose payment
+ * already shows a debit (a row loaded before its switch was recorded): the gate
+ * follows the money, not only the label.
+ */
+export const requiresVerifiedPayment = (incident: Incident): boolean =>
+  incident.type === "debit_not_recognised" ||
+  (incident.type === "payment_step_error" && showsDebit(incident.payment));
 
 /** States a taxpayer may declare. Everything else needs a reviewer. */
 export const TAXPAYER_PAYMENT_TARGETS: PaymentState[] = [
@@ -295,20 +333,44 @@ export function recordPayment(incident: Incident, input: PaymentInput): Result {
     patch.verifiedBy = input.actor.label;
     patch.verifiedAt = at;
   }
-  return {
-    ok: true,
-    incident: append(incident, patch, {
+  const paid = append(incident, patch, {
+    at,
+    kind: "payment_changed",
+    actorRole: input.actor.role,
+    actorLabel: input.actor.label,
+    basis: basisFor(input.actor, verifying),
+    from: incident.payment,
+    to: input.to,
+    evidenceIds: input.evidenceIds ?? [],
+    note: input.note?.trim() || null,
+  });
+  return { ok: true, incident: switchTypeOnDebit(paid, input.actor, at) };
+}
+
+/**
+ * Owner decision D4. When a `payment_step_error` incident's payment first shows
+ * a debit, the incident becomes `debit_not_recognised` and one
+ * `incident_type_changed` event records the switch, with the basis of the act
+ * that caused it. The switch never runs the other way, and never twice: once
+ * the type is `debit_not_recognised` there is nothing left to switch.
+ */
+function switchTypeOnDebit(incident: Incident, actor: Actor, at: string): Incident {
+  if (incident.type !== "payment_step_error" || !showsDebit(incident.payment)) return incident;
+  return append(
+    incident,
+    { type: "debit_not_recognised" },
+    {
       at,
-      kind: "payment_changed",
-      actorRole: input.actor.role,
-      actorLabel: input.actor.label,
-      basis: basisFor(input.actor, verifying),
-      from: incident.payment,
-      to: input.to,
-      evidenceIds: input.evidenceIds ?? [],
-      note: input.note?.trim() || null,
-    }),
-  };
+      kind: "incident_type_changed",
+      actorRole: actor.role,
+      actorLabel: actor.label,
+      basis: basisFor(actor, false),
+      from: "payment_step_error",
+      to: "debit_not_recognised",
+      evidenceIds: [],
+      note: null,
+    },
+  );
 }
 
 /**
@@ -411,8 +473,8 @@ export type StatusInput = {
 
 /**
  * Move the incident. `resolved` needs a credentialed reviewer, official
- * evidence and a stated outcome; a `debit_not_recognised` incident also needs
- * the payment verified first. `closed_unresolved` needs a reviewer and a reason.
+ * evidence and a stated outcome; a `debit_not_recognised` incident (including
+ * one switched from `payment_step_error`, D4) also needs the payment verified first. `closed_unresolved` needs a reviewer and a reason.
  */
 export function setIncidentStatus(incident: Incident, input: StatusInput): Result {
   if (!INCIDENT_FLOW[incident.status].includes(input.to)) return { ok: false, reason: "not_allowed" };
@@ -430,7 +492,7 @@ export function setIncidentStatus(incident: Incident, input: StatusInput): Resul
   if (resolving) {
     const gate = officialEvidenceGate(incident, input.evidenceIds);
     if (gate) return { ok: false, reason: gate };
-    if (incident.type === "debit_not_recognised" && incident.payment !== "verified") {
+    if (requiresVerifiedPayment(incident) && incident.payment !== "verified") {
       return { ok: false, reason: "payment_not_verified" };
     }
   }

@@ -64,6 +64,8 @@ const fr = {
   doNotPayAgain: "Attention",
   incidentTitle: "Incident",
   incidentNone: "Aucun incident ouvert.",
+  typeSwitched:
+    "Un débit a été noté : cet incident est devenu « débité, paiement non reconnu ». Un réviseur doit vérifier le paiement avant de le clore.",
   observedAt: "Constaté le",
   step: "Étape tentée",
   reportedError: "Message affiché (selon vous)",
@@ -166,6 +168,7 @@ const fr = {
   } satisfies Record<ContactChannel, string>,
   event: {
     incident_reported: "Incident signalé",
+    incident_type_changed: "Type d'incident (débit noté)",
     payment_changed: "Paiement",
     reference_recorded: "Référence notée",
     incident_status_changed: "Incident",
@@ -233,6 +236,8 @@ const en: typeof fr = {
   doNotPayAgain: "Warning",
   incidentTitle: "Incident",
   incidentNone: "No open incident.",
+  typeSwitched:
+    "A debit was recorded, so this incident is now \"debited, payment not recognised\". A reviewer must verify the payment before closing it.",
   observedAt: "Noticed on",
   step: "Step attempted",
   reportedError: "Message shown (as you reported it)",
@@ -335,6 +340,7 @@ const en: typeof fr = {
   },
   event: {
     incident_reported: "Incident reported",
+    incident_type_changed: "Incident type (debit recorded)",
     payment_changed: "Payment",
     reference_recorded: "Reference noted",
     incident_status_changed: "Incident",

@@ -6,7 +6,8 @@
  * and lib/mocks/incidents.ts with tsc (the same way scripts/engine-check.mjs
  * does) and asserts the rules from docs/strategy/2026-10-27-taxpayer-first/
  * test-protocol.md: A-2, A-7, A-8, plus "a taxpayer can never set verified or
- * resolved". Acceptance IDs are in agent-b/acceptance-tests.md.
+ * resolved". Acceptance IDs are in agent-b/acceptance-tests.md. D4-* and D5-*
+ * hold the owner decisions of 27 Oct 2026 (type switch on debit; no day count).
  *
  * Every check counts its own assertions, so a vacuous pass shows up as 0.
  */
@@ -67,11 +68,12 @@ const check = (name, fn) => {
   console.log(`ok  ${name} (${n} assertions)`);
 };
 
-const out = compile(["lib/incidents.ts", "lib/next-best-action.ts", "lib/mocks/incidents.ts"]);
+const out = compile(["lib/incidents.ts", "lib/next-best-action.ts", "lib/mocks/incidents.ts", "lib/i18n-incident.ts"]);
 const require = createRequire(import.meta.url);
 const inc = require(join(out, "incidents.js"));
 const nba = require(join(out, "next-best-action.js"));
 const mocks = require(join(out, "mocks", "incidents.js"));
+const copy = require(join(out, "i18n-incident.js"));
 if (!existsSync(join(out, "mocks", "incidents.js"))) throw new Error("mocks not compiled");
 
 const T = mocks.TAXPAYER_ACTOR;
@@ -329,6 +331,142 @@ try {
     }
     ok(held > 100, `held-debit cases checked: ${held}`);
     ok(/second time|seconde fois/.test(nba.DO_NOT_PAY_AGAIN.en + nba.DO_NOT_PAY_AGAIN.fr), "warning text present");
+  });
+
+  // -------------------------------------------------------------------------
+  // D4 — a payment_step_error that shows a debit becomes debit_not_recognised
+  // -------------------------------------------------------------------------
+  const typeEvents = (i) => i.events.filter((e) => e.kind === "incident_type_changed");
+  const step = (payment, evidence = []) => blank(payment, "open", evidence, "payment_step_error");
+
+  check("D4-a the type switches when a debit is recorded, by any route and either actor", () => {
+    for (const a of [T, R]) {
+      for (const [from, to] of [["unknown", "debit_observed"], ["attempted", "debit_observed"], ["attempted", "reference_recorded"]]) {
+        const r = inc.recordPayment(step(from), { to, actor: a, at: AT });
+        ok(r.ok, `${a.label} ${from} → ${to} accepted`);
+        eq(r.incident.type, "debit_not_recognised", `${from} → ${to} by ${a.label} must switch the type`);
+      }
+      const viaRef = inc.recordReference(step("attempted"), { reference: "SYNTH-REF-0000", actor: a, at: AT });
+      eq([viaRef.incident.payment, viaRef.incident.type], ["reference_recorded", "debit_not_recognised"], "recordReference switches too");
+    }
+    // No debit, no switch.
+    for (const to of ["attempted", "not_applicable"]) {
+      const r = inc.recordPayment(step("unknown"), { to, actor: R, at: AT });
+      ok(r.ok, `unknown → ${to}`);
+      eq([r.incident.type, typeEvents(r.incident).length], ["payment_step_error", 0], `${to} must not switch`);
+    }
+    const unknownRef = inc.recordReference(step("unknown"), { reference: "SYNTH-REF-0000", actor: T, at: AT });
+    eq(unknownRef.incident.type, "payment_step_error", "a reference with no payment move does not switch");
+    // A refused act switches nothing.
+    const refused = inc.recordPayment(blank("attempted", "resolved", [], "payment_step_error"), { to: "debit_observed", actor: T, at: AT });
+    eq(refused.reason, "closed");
+    // Other types never switch.
+    for (const type of ["debit_not_recognised", "certificate_blocked"]) {
+      const r = inc.recordPayment(blank("attempted", "open", [], type), { to: "debit_observed", actor: T, at: AT });
+      eq([r.incident.type, typeEvents(r.incident).length], [type, 0], `${type} keeps its type`);
+    }
+    // The F-2 fixture, as a taxpayer would do it on screen.
+    const f2 = inc.recordPayment(mocks.fixture("F-2").incident, { to: "debit_observed", actor: T, at: AT });
+    eq(f2.incident.type, "debit_not_recognised", "F-2 switches when the taxpayer declares the debit");
+  });
+
+  check("D4-b the switch produces exactly one event, declared when the taxpayer caused it", () => {
+    const a = inc.recordPayment(step("attempted", [SMS, RECEIPT]), { to: "debit_observed", actor: T, at: AT }).incident;
+    eq(typeEvents(a).length, 1, "one type event");
+    const e = typeEvents(a)[0];
+    eq([e.from, e.to, e.basis, e.actorRole], ["payment_step_error", "debit_not_recognised", "declared", "taxpayer"]);
+    eq(a.events.at(-2).kind, "payment_changed", "the payment event comes first, then the switch");
+    // Every later act, including verification and resolution, adds no second switch.
+    const b = inc.recordReference(a, { reference: "SYNTH-REF-0000", actor: T, at: AT }).incident;
+    const c = inc.recordPayment(b, { to: "disputed", actor: R, at: AT }).incident;
+    const d = inc.recordPayment(c, { to: "verified", actor: R, evidenceIds: [RECEIPT.id], at: AT }).incident;
+    const done = inc.setIncidentStatus(d, {
+      to: "resolved",
+      actor: R,
+      evidenceIds: [RECEIPT.id],
+      resolution: { outcome: "payment_confirmed", reason: "receipt checked" },
+      at: AT,
+    });
+    ok(done.ok, "resolves once verified");
+    eq(typeEvents(done.incident).length, 1, "still exactly one type event");
+    const byReviewer = inc.recordPayment(step("attempted"), { to: "debit_observed", actor: R, at: AT }).incident;
+    eq(typeEvents(byReviewer).map((x) => x.basis), ["recorded"], "a reviewer-caused switch is recorded, not verified");
+  });
+
+  check("D4-c a switched incident cannot be resolved until a reviewer verifies the payment", () => {
+    const res = { outcome: "payment_confirmed", reason: "receipt checked" };
+    // Before any debit, a payment_step_error resolves without a verified payment.
+    const before = inc.setIncidentStatus(step("attempted", [RECEIPT]), { to: "resolved", actor: R, evidenceIds: [RECEIPT.id], resolution: res, at: AT });
+    ok(before.ok, "no debit yet, so no payment gate");
+    // After the debit, every unverified payment state blocks resolution.
+    const switched = inc.recordPayment(step("attempted", [SMS, RECEIPT]), { to: "debit_observed", actor: T, at: AT }).incident;
+    const refs = inc.recordReference(switched, { reference: "SYNTH-REF-0000", actor: T, at: AT }).incident;
+    const disputed = inc.recordPayment(refs, { to: "disputed", actor: R, at: AT }).incident;
+    for (const i of [switched, refs, disputed]) {
+      const r = inc.setIncidentStatus(i, { to: "resolved", actor: R, evidenceIds: [RECEIPT.id], resolution: res, at: AT });
+      eq([r.ok, r.reason], [false, "payment_not_verified"], `resolve at ${i.payment} must wait for verification`);
+    }
+    // A taxpayer cannot unblock it, and an uncredentialed reviewer cannot verify.
+    eq(inc.recordPayment(refs, { to: "verified", actor: T, evidenceIds: [RECEIPT.id], at: AT }).ok, false);
+    eq(inc.recordPayment(refs, { to: "verified", actor: R_NO_CRED, evidenceIds: [RECEIPT.id], at: AT }).reason, "reviewer_not_credentialed");
+    const verified = inc.recordPayment(refs, { to: "verified", actor: R, evidenceIds: [RECEIPT.id], at: AT }).incident;
+    const done = inc.setIncidentStatus(verified, { to: "resolved", actor: R, evidenceIds: [RECEIPT.id], resolution: res, at: AT });
+    ok(done.ok, "resolves after a reviewer verifies");
+    // The gate follows the money even on a row whose switch was never recorded.
+    const stale = blank("reference_recorded", "open", [RECEIPT], "payment_step_error");
+    ok(inc.requiresVerifiedPayment(stale), "an unswitched row with a debit still needs verification");
+    eq(inc.setIncidentStatus(stale, { to: "resolved", actor: R, evidenceIds: [RECEIPT.id], resolution: res, at: AT }).reason, "payment_not_verified");
+  });
+
+  // -------------------------------------------------------------------------
+  // D5 — no waiting period before disputed; no screen shows a day count
+  // -------------------------------------------------------------------------
+  const NUM =
+    "(?:\\d+|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|quinze|vingt|trente|one|two|three|four|five|seven|eight|nine|ten|fifteen|twenty|thirty)";
+  const QUAL = "(?:[\\s-]+(?:working|business|calendar|clear|full|ouvrables?|ouvrés?|calendaires?|francs?|pleins?))?";
+  const UNIT = "(?:jours?|j|days?|semaines?|weeks?|mois|months?)";
+  const DAY_COUNT = new RegExp(`(?<![\\p{L}\\d])${NUM}[\\s-]*${UNIT}${QUAL}(?![\\p{L}])|(?<![\\p{L}\\d])${NUM}${QUAL}[\\s-]*${UNIT}(?![\\p{L}])`, "iu");
+  const strings = (v) => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : []);
+
+  check("D5-a the day-count detector catches the shapes it must catch", () => {
+    for (const bad of ["Attendez 30 jours", "wait 10 working days", "sous huit jours", "within two weeks", "dans 15 j", "3 jours ouvrables", "a 45-day period", "1 mois"]) {
+      ok(DAY_COUNT.test(bad), `detector misses "${bad}"`);
+    }
+    for (const fine of ["les 4 derniers caractères", "last 4 characters", "Le délai de réponse n'est pas connu", "une seconde fois", "a second time", "un journal des contacts"]) {
+      ok(!DAY_COUNT.test(fine), `detector flags "${fine}"`);
+    }
+  });
+
+  check("D5-b no next-action text, warning or prototype copy contains a number of days", () => {
+    let n = 0;
+    for (const input of allInputs()) {
+      const a = nba.nextBestAction(input);
+      for (const text of [a.title.fr, a.title.en, a.why.fr, a.why.en, nba.sourceText(a.source, "fr"), nba.sourceText(a.source, "en")]) {
+        ok(!DAY_COUNT.test(text), `${a.id} shows a day count: ${text}`);
+        n += 1;
+      }
+    }
+    const fixed = [
+      ...strings(nba.DO_NOT_PAY_AGAIN),
+      ...strings(nba.NOT_YET_CONFIRMED),
+      ...strings(copy.getIncidentCopy("fr")),
+      ...strings(copy.getIncidentCopy("en")),
+    ];
+    for (const text of fixed) {
+      ok(!DAY_COUNT.test(text), `copy shows a day count: ${text}`);
+      n += 1;
+    }
+    ok(fixed.length > 100, `prototype strings checked: ${fixed.length}`);
+    ok(n > 1000, `texts checked: ${n}`);
+  });
+
+  check("D5-c a reviewer may dispute at once: no waiting period, no date input", () => {
+    for (const p of ["debit_observed", "reference_recorded"]) {
+      const i = blank(p);
+      const r = inc.recordPayment(i, { to: "disputed", actor: R, at: i.observedAt });
+      ok(r.ok, `${p} → disputed at the moment of the debit must be allowed`);
+      eq(inc.recordPayment(i, { to: "disputed", actor: T, at: i.observedAt }).reason, "reviewer_required", "the taxpayer does not dispute");
+    }
   });
 
   // -------------------------------------------------------------------------

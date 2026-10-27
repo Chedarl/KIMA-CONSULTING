@@ -228,9 +228,14 @@ npm run test:journey
 `lib/mocks/incidents.ts`): test-protocol A-2 (no `verified` without official
 evidence; a debit never reaches `verified`), A-7 (exactly one next action, each
 with a verified source or the "not yet confirmed — ask your tax centre"
-fallback), A-8 (never suggests paying again while a debit is unresolved), and
-"a taxpayer can never set verified or resolved". Each check counts its own
-assertions and fails if none ran. Not yet in CI — `.github/workflows/` is Agent A's.
+fallback), A-8 (never suggests paying again while a debit is unresolved),
+"a taxpayer can never set verified or resolved", and the owner decisions of
+27 Oct: D4 (a `payment_step_error` incident that shows a debit becomes
+`debit_not_recognised`, with exactly one `incident_type_changed` event, and
+cannot then be resolved until a reviewer verifies the payment) and D5 (no
+waiting period before `disputed`; no next action or prototype string shows a
+number of days). Each check counts its own assertions and fails if none ran.
+CI runs it on every push (`.github/workflows/ci.yml`, Agent A's).
 
 ### Verifying UI
 
