@@ -31,7 +31,11 @@ standard is "less painful, more accurate", not more screens.
 | P1-4 | Client screen on `/app/declarations/[caseId]`: five dimensions, next action, "record what happened", evidence upload | BUILD | P1-1–3 | M | M | Taxpayer can answer "what is still unresolved?" (metric 5) |
 | P1-5 | Case-file export (JSON + printable HTML), hashed document list, "not an official document / not an ACF" | BUILD | P1-2 | M | M — must not resemble an ACF | Support-ready packet in one tap |
 | P1-6 | Firm view of incidents in `case-detail.tsx`; reviewer-only verification | ADAPT | P1-2 | S | M | Professional confirmation without re-keying |
-| P1-7 | Escalation guidance content — only from sources verified in E §2 | BUILD (content) | E S-1…S-5 | S per item | H | Guidance that is right, or honestly absent |
+| P1-7 | Escalation guidance content — only from sources verified in E §2 | BUILD (content) | E S-1…S-5, P1-9a | S per item | H | Guidance that is right, or honestly absent |
+| P1-8 | Reviewer credential: a `firm_reviewer` can verify only with a recorded expert-comptable registration (number, body, checked-by, checked-on); `canApproveReview()` refuses otherwise | ADAPT | — | S | H — an uncredentialed "reviewer" verifying a filing is the failure the blueprint exists to prevent | Every "verified" names a qualified professional (owner answer 1) |
+| P1-9a | **Official-text register**: watch the official publishers (impots.cm, minfi.gov.cm, dgb.cm), store each text with URL, fetch date, `sha256` and the original file; a reviewer marks it `verified` and links it to the rules it supports | BUILD | P0-1 | M | H — a scraped page mistaken for the official text (R-46) | The primary texts S-1…S-5 actually get into the system (owner answer 3) |
+| P1-9b | **Plain-language bulletins ("news")**: FR + EN summary of one official text, who it affects (regime, taxpayer type, centre), what changes and from when, link to the original. Draft → expert-comptable review → published; withdrawn when the text changes. Shown in the taxpayer workspace, matched to their declared profile | BUILD | P1-8, P1-9a | M | H — a wrong summary (R-45) | Taxpayer learns of a change in words they understand, with the source one tap away |
+| P1-9c | Machine-drafted summaries for the reviewer (never shown to taxpayers unapproved; the diff against the source is shown to the reviewer) | BUILD | P1-9b | M | H | Reviewer time per bulletin goes down; accuracy does not |
 
 ## P2 — after the slice
 
@@ -41,7 +45,7 @@ standard is "less painful, more accurate", not more screens.
 | P2-2 | Variant 1 (portal error before deadline) as incident type with deadline-risk warning | ADAPT | P1-2, a verified IGS deadline |
 | P2-3 | Link `filing_evidence_ref` to `documents.id`; compute `sha256` on upload | ADAPT | P0-1 |
 | P2-4 | Assisted / WhatsApp / paper intake of incident evidence (`arrived_via`, captured-by provenance) | ADAPT | P1-2 |
-| P2-5 | Organisation scoping in `member_has()` — **blocking before a second firm** | ADAPT | — |
+| P2-5 | Organisation scoping in `member_has()` — **blocking before a second firm**. Until it lands the firm sign-up option stays hidden (`OPEN_WORKSPACE_KINDS`, done 27 Oct) | ADAPT | — |
 | P2-6 | Quarter-keyed periods so quarter-specific prorogations match | ADAPT | — |
 
 ## P3 — validation and reach

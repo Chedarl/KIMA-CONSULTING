@@ -57,7 +57,7 @@ filing status, tenant isolation.
 | `harmony2-dgi-platform-research.md` | The DGI's Harmony 2 portals, what they streamline, and the line between retrieval and integration |
 | `portal-patterns-research.md` | PwC Connect, EY Canvas, KPMG Clara, TaxDome, Canopy, Karbon — adopt / adapt / reject |
 | `sage-dsf-ingestion-research.md` | Sage export formats, DSF workbooks, parsing rules |
-| `risk-register.md` | 44 risks with phase gates. **R-36 blocks real taxpayer data** |
+| `risk-register.md` | 46 risks with phase gates. **R-36 blocks real taxpayer data** |
 
 ---
 
@@ -301,6 +301,14 @@ not work end to end for any signed-in user** (storage policies are anon-only),
 that clients can forge `case_events`, and several screens that state completion
 that is not true. Those are the P0 items in `backlog.md`; nothing is built until
 the owner approves that proposal.
+
+**Owner answers (27 Oct 2026, second round).** The reviewer is an expert-comptable;
+incident recovery is part of the engagement; the system itself should fetch the
+current official texts and turn them into plain-language news in the taxpayer
+workspace, published only after an expert-comptable approves (backlog P1-9); 5-10
+real IGS taxpayers can join the comprehension test; and the **accounting-firm
+sign-up option is now hidden** (`OPEN_WORKSPACE_KINDS` in
+`lib/public-onboarding.ts`) until firms are scoped to their own clients.
 
 **Done**
 

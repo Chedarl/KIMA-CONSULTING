@@ -107,6 +107,19 @@ export function isWorkspaceKind(value: string | undefined): value is WorkspaceKi
   return WORKSPACE_KINDS.includes(value as WorkspaceKind);
 }
 
+/**
+ * Kinds a visitor may pick today. `accounting_firm` stays a valid stored value
+ * but is not offered: `member_has()` has no organisation scope yet, so a second
+ * firm's members would see every taxpayer (backlog P2-5). Owner decision,
+ * 27 Oct 2026 — reopen it when organisation scoping lands.
+ */
+export const OPEN_WORKSPACE_KINDS = ["individual", "business"] as const satisfies readonly WorkspaceKind[];
+export type OpenWorkspaceKind = (typeof OPEN_WORKSPACE_KINDS)[number];
+
+export function isOpenWorkspaceKind(value: string | undefined): value is OpenWorkspaceKind {
+  return OPEN_WORKSPACE_KINDS.includes(value as OpenWorkspaceKind);
+}
+
 /** Coarse type the existing registrations column already understands. */
 export function taxpayerTypeFor(kind: WorkspaceKind): TaxpayerType {
   return kind === "individual" ? "individual_pit" : "business_moral";

@@ -61,8 +61,20 @@ Added to `docs/foundation/risk-register.md` in this PR as **Open**:
 | R-42 | A KIMA export is presented by a taxpayer as if it were an ACF | M | **H** |
 | R-43 | Escalation guidance paraphrases unverified commentary and is wrong | M | **H** |
 | R-44 | Incident evidence captures DGI credentials or one-time codes | M | **H** |
+| R-45 | A plain-language bulletin misstates the official text it summarises | M | **H** |
+| R-46 | An official text changes or is withdrawn and the bulletin or rule built on it goes stale | M | **H** |
 
-## 4. Open questions for the owner
+R-45 and R-46 were added after owner answer 3 (P1-9).
+
+## 4. Questions for the owner — answered 27 Oct 2026
+
+Answers are recorded in [`README.md`](README.md) ("Owner answers"). In short: (1) the
+reviewer is an expert-comptable; (2) recovery is part of the engagement; (3) the system
+fetches and simplifies the official text, published by an expert-comptable (P1-9);
+(4) 5–10 IGS taxpayers can be reached; (5) the firm sign-up option is hidden.
+
+The questions as asked:
+
 
 1. **Who is the reviewer for a taxpayer with no firm?** The blueprint requires one. Is it
    a Kima-employed reviewer (`kima_admin` today has *no* professional authority — by

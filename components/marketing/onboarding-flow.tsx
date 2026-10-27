@@ -11,8 +11,9 @@ import {
   EMPTY_ONBOARDING,
   inviteEmailIssue,
   issuesFor,
-  isWorkspaceKind,
+  isOpenWorkspaceKind,
   needsLegalName,
+  OPEN_WORKSPACE_KINDS,
   SIDEBAR_STEPS,
   type OnboardingDraft,
   type OnboardingIssue,
@@ -24,7 +25,7 @@ import {
 
 type Copy = ReturnType<typeof getPublicCopy>;
 
-const KINDS: WorkspaceKind[] = ["individual", "business", "accounting_firm"];
+const KINDS: readonly WorkspaceKind[] = OPEN_WORKSPACE_KINDS;
 const KIND_ICON: Record<WorkspaceKind, ServiceIconName> = {
   individual: "person",
   business: "people",
@@ -47,7 +48,7 @@ export function OnboardingFlow({
   const [draft, setDraft] = useState<OnboardingDraft>({
     ...EMPTY_ONBOARDING,
     language: locale,
-    kind: isWorkspaceKind(initialKind) ? initialKind : "",
+    kind: isOpenWorkspaceKind(initialKind) ? initialKind : "",
   });
   const [step, setStep] = useState<OnboardingStep>("type");
   const [issues, setIssues] = useState<OnboardingIssue[]>([]);

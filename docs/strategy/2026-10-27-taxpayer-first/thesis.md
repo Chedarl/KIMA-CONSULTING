@@ -70,6 +70,10 @@ reviewer.
   active IGS obligation (`IGS_QUARTERLY` is `inferred`, `lib/rules.ts:577-596`). That
   is the constraint working; the fix is source verification, not activation.
 - **No AI tax advice**, no tax optimisation, no country expansion in this iteration.
+  Owner answer 3 adds plain-language bulletins built from official texts (P1-9). A
+  machine may *draft* a summary for the reviewer; only an expert-comptable's approved
+  text, linked to the original document, ever reaches a taxpayer. A bulletin informs —
+  it never creates an obligation; obligations still come only from `verified` rules.
 
 ## 5. TaxDome — hypotheses, not claims
 

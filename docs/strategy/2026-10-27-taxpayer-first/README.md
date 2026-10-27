@@ -4,9 +4,10 @@ Response to the owner's handoff brief *KIMA Compliance OS — Taxpayer-first str
 evidence review, end-to-end journeys and coding-agent decision brief* (27 Oct 2026).
 The brief is not in the repo; this folder is its working answer.
 
-**Status: proposal (Gate 3). No code, schema or configuration has changed.** Nothing here
-authorises a build. Step 2 of the plan — a P0 safety patch, then one incident-recovery
-slice — waits for the owner's explicit approval of these documents.
+**Status: proposal (Gate 3).** Nothing here authorises a build. Step 2 of the plan — a
+P0 safety patch, then one incident-recovery slice — waits for the owner's explicit
+approval of these documents. The one code change made so far is the owner-ordered
+hiding of the accounting-firm sign-up option (answer 5 below).
 
 Audited against `main` @ `62405fa`. Every claim about the code cites a file and line;
 every claim about Cameroon tax practice carries a status (`verified` / `inferred` /
@@ -30,6 +31,16 @@ every claim about Cameroon tax practice carries a status (`verified` / `inferred
 3. **The unfinished Edge-Function sign-in work** found uncommitted in a second local
    checkout is finished as part of P0, not discarded.
 4. **These deliverables live here**, merged through a pull request.
+
+## Owner answers to the open questions (27 Oct 2026, second round)
+
+| # | Question (`security-and-sources.md` §4) | Answer | Consequence |
+|---|---|---|---|
+| 1 | Who reviews for a taxpayer with no firm? | **A certified accountant — an expert-comptable** | The reviewer is a credentialed person, not a role name. `firm_reviewer` must carry a recorded professional registration before it can verify anything (backlog P1-8). A taxpayer with no firm is reviewed by an expert-comptable engaged through Kima |
+| 2 | Is incident recovery paid? | **Part of the engagement** | A taxpayer may *record* an incident alone (declared, free). Recovery — reviewer work, escalation, verification — runs under an engagement; `authorityCheck` → `no_engagement` already models the gate |
+| 3 | Who obtains the primary texts? | **The system must help** — fetch the current official text, simplify it, and show it to taxpayers in their workspace as news | New item P1-9 (official-text register + plain-language bulletins). An expert-comptable publishes every bulletin; a machine draft is never shown. See `backlog.md` and R-45/R-46 |
+| 4 | Real IGS taxpayers for the comprehension test? | **Yes, 5–10 can be reached** | `test-protocol.md` §4 can run. Participants work on synthetic scenarios, never their own records (R-32 / R-36 still hold) |
+| 5 | Hide the accounting-firm sign-up until organisation scoping? | **Yes** | Done: `OPEN_WORKSPACE_KINDS` in `lib/public-onboarding.ts`; the option is gone from onboarding, the contact form and the pricing cards. `?type=accounting_firm` no longer preselects it. Reopen after P2-5 |
 
 ## The approval question
 

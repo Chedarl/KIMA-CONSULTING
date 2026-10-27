@@ -41,7 +41,7 @@ FR and EN at 375 / 768 / 1024 / 1440, throttled "Slow 3G" for 375. Walk F-2 and 
 end to end as taxpayer, then as reviewer. Record: time to first meaningful render on slow
 3G, whether the next action is visible without scrolling at 375, focus order, contrast.
 
-## 4. Comprehension protocol (needs real people — owner question 4)
+## 4. Comprehension protocol (real people — owner confirmed 5–10 IGS taxpayers can be reached)
 
 From the brief §10. Baseline (DGI instructions + a notes app) vs guided (KIMA prototype),
 same participants, counterbalanced order, synthetic scenarios F-2, F-3, F-4.
@@ -54,6 +54,9 @@ same participants, counterbalanced order, synthetic scenarios F-2, F-3, F-4.
 | 4. False completion | Count of "filed / paid / compliant" conclusions that are untrue | **Zero** |
 | 5. Clarity | "What is still unresolved?" asked after the task | ≥ 80% state it correctly |
 | 6. Trust and intent | Willingness to reuse / pay — stated, not observed | Qualitative only; no demand claim |
+
+Participants use the synthetic scenarios only. Nobody enters their own NIU, records or
+DGI screens (R-32, R-36). Written consent, and a note of who recruited each participant.
 
 Conditions: bilingual participants in their preferred language; mobile only; at least one
 session on a throttled connection. Every failure case and unresolved legal question is
