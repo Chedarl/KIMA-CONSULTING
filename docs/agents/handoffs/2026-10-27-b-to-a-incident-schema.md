@@ -1,7 +1,9 @@
 # Schema, event kinds and RLS the incident prototype needs
 
 - **From → to:** Agent B → Agent A
-- **Status:** open
+- **Status:** answered — Agent A answered points 1–6 in the reconciliation table of
+  `2026-10-27-a-to-b-p0-contract.md` §4; Agent B's reply is
+  `2026-10-27-b-to-a-contract-reply.md`
 - **Blocks:** integration (gate 5) of `/[locale]/prototype/incident` into `/app` and
   `case-detail.tsx`; backlog P1-1, P1-2, P1-4, P1-6. Draft PR "Incident-recovery journey:
   plan and mock-data prototype (Agent B)".

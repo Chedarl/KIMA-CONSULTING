@@ -13,6 +13,11 @@ export function IncidentSummary({ incident, t }: { incident: Incident | null; t:
   }
   return (
     <Panel title={`${t.incidentTitle} · ${t.type[incident.type]}`} id="incident">
+      {incident.events.some((e) => e.kind === "incident_type_changed") && (
+        <p className="mb-3 rounded-lg border border-amber/50 bg-amber-soft px-3 py-2 text-sm text-amber-text" role="status">
+          {t.typeSwitched}
+        </p>
+      )}
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-xs text-fg-muted">{t.statusLabel}</dt>
@@ -145,6 +150,7 @@ export function History({ incident, t }: { incident: Incident | null; t: Inciden
     v === null
       ? ""
       : (t.payment as Record<string, string>)[v] ??
+        (t.type as Record<string, string>)[v] ??
         (t.status as Record<string, string>)[v] ??
         (t.evidenceKind as Record<string, string>)[v] ??
         (t.channel as Record<string, string>)[v] ??
