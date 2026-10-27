@@ -219,9 +219,10 @@ export function ClientPortalShell({
 
   const rail = (
     <div className="flex h-full flex-col bg-[#0D1B2A] text-white">
-      <div className="px-5 pb-4 pt-6">
-        <p className="font-display text-[1.35rem] font-bold leading-none tracking-tight">KiMA</p>
-        <p className="mt-1 text-[10px] font-semibold tracking-[0.22em] text-white/70">COMPLIANCE</p>
+      <div className="flex items-center gap-2.5 px-4 pb-4 pt-6">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/mark-white.svg" alt="" width={36} height={36} className="h-9 w-9 shrink-0" />
+        <p className="font-display text-base font-bold leading-none tracking-tight">KIMA OS</p>
       </div>
       <nav aria-label={copy.menu} className="flex-1 overflow-y-auto px-3 pb-6">
         <ul className="flex flex-col gap-1">

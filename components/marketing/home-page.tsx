@@ -177,7 +177,7 @@ export function HomePage({ locale }: { locale: PublicLocale }) {
       </main>
       <footer className="border-t border-border bg-white">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-          <p className="font-display text-sm font-semibold text-fg">Kima Consulting</p>
+          <p className="font-display text-sm font-semibold text-fg">KIMA CONSULTING</p>
           <p className="mt-1 text-sm text-fg-muted">{t.aboutTagline}</p>
           <p className="mt-4 max-w-3xl text-xs leading-relaxed text-fg-subtle">{copy.footer.disclaimer}</p>
         </div>

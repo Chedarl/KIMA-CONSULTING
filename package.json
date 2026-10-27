@@ -2,7 +2,7 @@
   "name": "kima-compliance-os",
   "version": "0.1.0",
   "private": true,
-  "description": "KIMA Compliance OS \u2014 design system and interface prototype",
+  "description": "KIMA OS \u2014 design system and interface prototype",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

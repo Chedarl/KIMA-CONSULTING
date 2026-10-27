@@ -1,4 +1,4 @@
-# KIMA Compliance OS
+# KIMA OS
 
 Tax compliance management, accounting workflow automation and digital taxpayer
 services. Initial market Cameroon, expansion CEMAC. French and English, XAF.
@@ -246,6 +246,17 @@ Blueprint §9 is the authority: deep navy `#163B66`, teal green `#1E9E74`,
 white, soft gray `#E9EEF3`, dark text `#142235`, amber reserved for genuine
 warnings. Tokens live in `app/globals.css` as CSS variables, so light and dark
 swap without touching component code.
+
+**Brand (owner decision D8, 27 Oct 2026).** The company is **KIMA CONSULTING** and
+the product name in the interface is **KIMA OS**. The official lockups live in
+`public/brand/`: `logo-color.svg` (light surfaces), `logo-white.svg` (navy and
+dark surfaces), `logo-charcoal.svg` (light, gold accent in the A), the square
+marks `mark-color.svg` / `mark-white.svg` / `mark-charcoal.svg`, and PNG
+exports of each. `app/icon.svg` (same art as `public/brand/app-icon.svg`) is the
+favicon; `public/logo.svg` keeps the colour mark at the old path. Light chrome
+switches between the colour and white marks with `.brand-mark-light` /
+`.brand-mark-dark` in `app/globals.css`. The old intelligent-K files
+(`logo-horizontal`, `logo-dark`, `logo-mono`) are gone; do not reintroduce them.
 
 Note the split between a brand colour and its text colour: teal is about 3:1 on
 white, so `--teal` is a fill and `--teal-text` is the type colour. Never use a

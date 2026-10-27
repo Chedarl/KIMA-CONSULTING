@@ -140,7 +140,7 @@ export function OnboardingFlow({
         <>
           <header className="bg-white">
             <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6">
-              <Link href={`/${locale}`} className="inline-flex min-h-[44px] items-center" aria-label="KIMA Compliance">
+              <Link href={`/${locale}`} className="inline-flex min-h-[44px] items-center" aria-label="KIMA CONSULTING">
                 <KimaWordmark tone="dark" layout="stack" />
               </Link>
               <div className="ml-auto flex items-center gap-2">
@@ -237,7 +237,7 @@ export function OnboardingFlow({
         <main id="main" className="mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-8">
           <div className="overflow-hidden rounded-card border border-border bg-white shadow-card lg:grid lg:grid-cols-[240px_1fr]">
             <aside className="border-b border-border p-5 lg:border-b-0 lg:border-r">
-              <Link href={`/${locale}`} className="inline-flex min-h-[44px] items-center" aria-label="KIMA Compliance">
+              <Link href={`/${locale}`} className="inline-flex min-h-[44px] items-center" aria-label="KIMA CONSULTING">
                 <KimaWordmark tone="dark" layout="stack" />
               </Link>
               <p className="mt-6 inline-flex min-h-[44px] w-full items-center rounded-lg bg-[#0D1B2A] px-4 text-sm font-semibold text-white">
