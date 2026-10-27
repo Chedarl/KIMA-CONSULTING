@@ -111,7 +111,9 @@ export async function verifyPortalCode(
       };
     };
 
-    if (!res.ok || !body.session) {
+    // No token means no database session: every policy would refuse this
+    // client, so a "signed-in" screen would be a lie. Treat it as a failure.
+    if (!res.ok || !body.session || !body.tokenHash) {
       const err = body.error ?? "error";
       if (err === "wrong_code" || err === "expired" || err === "too_many_attempts") {
         return { ok: false, reason: err };
@@ -122,13 +124,11 @@ export async function verifyPortalCode(
       return { ok: false, reason: "error" };
     }
 
-    if (body.tokenHash) {
-      const { error } = await supabase().auth.verifyOtp({
-        token_hash: body.tokenHash,
-        type: "magiclink",
-      });
-      if (error) return { ok: false, reason: "error" };
-    }
+    const { error } = await supabase().auth.verifyOtp({
+      token_hash: body.tokenHash,
+      type: "magiclink",
+    });
+    if (error) return { ok: false, reason: "error" };
 
     return {
       ok: true,

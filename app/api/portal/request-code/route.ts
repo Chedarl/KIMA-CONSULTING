@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { callAuthCodes, edgeAuthConfigured } from "@/lib/auth-codes";
 import { deliverOneTimeCode } from "@/lib/auth-mail";
 import { isSupabaseAdminConfigured, supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -7,7 +8,8 @@ export const runtime = "nodejs";
 type Body = { name?: string; identifier?: string; locale?: "fr" | "en" };
 
 export async function POST(request: Request) {
-  if (!isSupabaseAdminConfigured()) {
+  const viaEdge = !isSupabaseAdminConfigured();
+  if (viaEdge && !edgeAuthConfigured()) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
 
@@ -23,6 +25,13 @@ export async function POST(request: Request) {
   const locale = body.locale === "en" ? "en" : "fr";
   if (!name || !identifier) {
     return NextResponse.json({ error: "incomplete" }, { status: 400 });
+  }
+
+  // No service-role key here: the Edge Function holds the privilege instead,
+  // and answers in the same shape.
+  if (viaEdge) {
+    const relayed = await callAuthCodes({ action: "request", audience: "portal", name, identifier, locale });
+    return NextResponse.json(relayed.body, { status: relayed.status });
   }
 
   const db = supabaseAdmin();
@@ -64,7 +73,7 @@ export async function POST(request: Request) {
 
   if (delivery.delivered === "none") {
     return NextResponse.json(
-      { error: delivery.reason, detail: delivery.detail ?? null },
+      { error: delivery.reason },
       { status: 503 },
     );
   }

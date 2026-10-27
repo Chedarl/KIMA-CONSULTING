@@ -15,7 +15,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -66,11 +66,14 @@ const out = compile([
   "lib/engagements.ts",
   "lib/vault.ts",
   "lib/public-onboarding.ts",
+  "lib/auth-mail.ts",
 ]);
 
 const require = createRequire(import.meta.url);
 const rules = require(join(out, "rules.js"));
 const cases = require(join(out, "cases.js"));
+const events = require(join(out, "events.js"));
+const authMail = require(join(out, "auth-mail.js"));
 const permissions = require(join(out, "permissions.js"));
 const commands = require(join(out, "commands.js"));
 const review = require(join(out, "document-review.js"));
@@ -88,14 +91,16 @@ try {
   });
 
   check("obligationsFor excludes inactive by default", () => {
-    const active = rules.obligationsFor({ type: "sarl", regime: "reel" });
+    const active = rules.obligationsFor({ type: "business_moral", regime: "reel" });
     assert.ok(active.every((o) => rules.isActive(o.source)));
-    const all = rules.obligationsFor({ type: "sarl", regime: "reel", includeInactive: true });
-    assert.ok(all.length >= active.length);
+    const all = rules.obligationsFor({ type: "business_moral", regime: "reel", includeInactive: true });
+    // Non-vacuous: a valid type and regime reach real obligations, and the
+    // inactive ones are really filtered out rather than never matched.
+    assert.ok(all.length > active.length, "inactive obligations must exist and be excluded");
   });
 
   check("proposeCases only uses active obligations", () => {
-    const proposed = cases.proposeCases({ type: "sarl", regime: "reel", year: 2026 });
+    const proposed = cases.proposeCases({ type: "business_moral", regime: "reel", year: 2026 });
     for (const p of proposed) {
       const o = rules.OBLIGATIONS.find((x) => x.code === p.obligation_code);
       assert.ok(o);
@@ -146,7 +151,7 @@ try {
       filing_attempted_at: null,
       filing_verified_at: null,
       payment_evidence_status: "unknown",
-      billing_status: "not_quoted",
+      billing_status: "quotation_pending",
       prepared_by: null,
       prepared_at: null,
       approved_by: null,
@@ -293,6 +298,183 @@ try {
     assert.equal(vault.filingEvidence({ filing_status: "verified", filing_evidence_ref: "  " }), false);
     assert.equal(vault.filingEvidence({ filing_status: "attempted", filing_evidence_ref: "ACK-1" }), false);
   });
+
+  // -------------------------------------------------------------------------
+  // P0 (security-and-integrity-review.md section 4, T-16 .. T-20)
+  // -------------------------------------------------------------------------
+
+  check("T-20 fixtures use valid enum values", () => {
+    const types = new Set(rules.TAXPAYER_TYPES.map((t) => t.key));
+    assert.ok(types.has("business_moral"));
+    assert.ok(!types.has("sarl"), "sarl is a legal form, not a taxpayer type");
+    assert.ok("quotation_pending" in cases.BILLING_LABELS);
+    assert.ok(!("not_quoted" in cases.BILLING_LABELS));
+    assert.ok("not_submitted" in cases.FILING_LABELS);
+    assert.ok("unknown" in cases.PAYMENT_LABELS);
+    assert.ok("documents" in cases.STAGE_LABELS);
+  });
+
+  check("T-16 CLIENT_EVENT_KINDS equals SQL client_may_record(), all client-visible", () => {
+    const dir = join(root, "supabase", "migrations");
+    // The latest migration that (re)defines the function is the one in force.
+    const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+    let sqlKinds = null;
+    for (const f of files) {
+      const sql = readFileSync(join(dir, f), "utf8");
+      const m = sql.match(
+        /function\s+client_may_record\s*\([\s\S]*?any\s*\(\s*array\s*\[([\s\S]*?)\]/i,
+      );
+      if (m) sqlKinds = [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]);
+    }
+    assert.ok(sqlKinds && sqlKinds.length > 0, "client_may_record() not found in migrations");
+    assert.deepEqual([...sqlKinds].sort(), [...events.CLIENT_EVENT_KINDS].sort());
+    // Not derived from visibility: client-WRITABLE is a strict subset of
+    // client-VISIBLE. payment_verified is visible to the client and must never
+    // be writable by one, so the two lists cannot be equal.
+    const visible = new Set(events.clientVisibleKinds());
+    assert.ok(events.CLIENT_EVENT_KINDS.length < visible.size, "writable list must be narrower than visible list");
+    assert.ok(visible.has("payment_verified") && visible.has("filing_verified"));
+    for (const k of events.CLIENT_EVENT_KINDS) {
+      assert.ok(events.EVENT_KINDS[k], `${k} is not a known event kind`);
+      assert.equal(events.EVENT_KINDS[k].clientVisible, true, `${k} must be client-visible`);
+    }
+    for (const k of ["filing_verified", "payment_verified", "fee_paid", "document_accepted", "stage_advanced"]) {
+      assert.ok(!events.CLIENT_EVENT_KINDS.includes(k), `${k} must not be client-writable`);
+    }
+  });
+
+  check("T-17 no stage x filing shows complete unless verified; abandoned never does", () => {
+    const stages = Object.keys(cases.STAGE_LABELS);
+    const filings = Object.keys(cases.FILING_LABELS);
+    assert.ok(stages.length >= 8 && filings.length >= 5);
+    for (const stage of stages) {
+      for (const filing_status of filings) {
+        for (const owed of [true, false]) {
+          const s = cases.clientStatus({ stage, filing_status }, owed);
+          assert.ok(s in cases.CLIENT_STATUS_LABELS, `${stage}/${filing_status} -> ${s}`);
+          if (s === "complete") {
+            assert.equal(filing_status, "verified", `${stage}/${filing_status} shown complete`);
+          }
+          if (stage === "abandoned") assert.notEqual(s, "complete");
+          if (filing_status !== "verified") {
+            assert.notEqual(s, "filing_verified", `${stage}/${filing_status} shown verified`);
+          }
+        }
+      }
+    }
+    assert.equal(cases.clientStatus({ stage: "abandoned", filing_status: "verified" }, false), "closed");
+    assert.equal(cases.clientStatus({ stage: "delivered", filing_status: "verified" }, false), "complete");
+    assert.equal(cases.clientStatus({ stage: "filing", filing_status: "not_submitted" }, false), "not_yet_filed");
+    for (const s of Object.keys(cases.CLIENT_STATUS_LABELS)) {
+      const step = cases.clientStep(s);
+      if (s === "closed") assert.equal(step, -1);
+      else assert.ok(step >= 0 && step <= 4, `${s} -> ${step}`);
+    }
+    assert.equal(cases.clientStep("complete"), 4);
+  });
+
+  check("T-17 canDeliver only on a verified filing", () => {
+    for (const filing_status of Object.keys(cases.FILING_LABELS)) {
+      for (const payment_evidence_status of Object.keys(cases.PAYMENT_LABELS)) {
+        assert.equal(
+          cases.canDeliver({ filing_status, payment_evidence_status }),
+          filing_status === "verified",
+          `${filing_status}/${payment_evidence_status}`,
+        );
+      }
+    }
+  });
+
+  check("T-18 a code is revealed only for an undeliverable address outside production", () => {
+    const reveal = (revealFlag, vercelEnv, destination) =>
+      authMail.mayRevealCode({ revealFlag, vercelEnv, destination });
+    assert.equal(reveal("1", "preview", "amina@example.com"), true);
+    assert.equal(reveal("1", undefined, "demo@demo.kima.cm"), true);
+    assert.equal(reveal("1", "production", "amina@example.com"), false, "production");
+    assert.equal(reveal("1", "preview", "amina@gmail.com"), false, "real address");
+    assert.equal(reveal("1", "preview", "amina@kima.cm"), false, "real address");
+    assert.equal(reveal("1", "preview", "amina@notexample.com"), false, "lookalike domain");
+    assert.equal(reveal("1", "preview", "example.com@gmail.com"), false, "local part is not the domain");
+    assert.equal(reveal(undefined, "preview", "amina@example.com"), false, "flag off");
+    assert.equal(reveal("true", "preview", "amina@example.com"), false, "flag must be exactly 1");
+  });
+
+  check("T-19 a fee with only a reported payment is never Paid", () => {
+    assert.equal(billing.feePaymentState(10000, { confirmed: 0, pending: 10000 }), "reported");
+    assert.equal(billing.feePaymentState(10000, { confirmed: 4000, pending: 6000 }), "reported");
+    assert.equal(billing.feePaymentState(10000, { confirmed: 4000, pending: 0 }), "due");
+    assert.equal(billing.feePaymentState(10000, { confirmed: 10000, pending: 0 }), "paid");
+    assert.equal(billing.feePaymentState(10000, { confirmed: 0, pending: 0 }), "due");
+    for (let pending = 0; pending <= 20000; pending += 2500) {
+      assert.notEqual(billing.feePaymentState(10000, { confirmed: 5000, pending }), "paid");
+    }
+  });
+
+  // deliverOneTimeCode with a stubbed fetch: a send failure to a real address
+  // is a failure, never a reveal, even with the flag on outside production.
+  {
+    const saved = {
+      fetch: globalThis.fetch,
+      key: process.env.RESEND_API_KEY,
+      flag: process.env.KIMA_DEMO_OTP_REVEAL,
+      env: process.env.VERCEL_ENV,
+      err: console.error,
+    };
+    try {
+      process.env.RESEND_API_KEY = "test-key";
+      process.env.KIMA_DEMO_OTP_REVEAL = "1";
+      process.env.VERCEL_ENV = "preview";
+      console.error = () => {};
+      let calls = 0;
+      globalThis.fetch = async () => {
+        calls += 1;
+        return new Response("boom", { status: 500 });
+      };
+      const failed = await authMail.deliverOneTimeCode({
+        to: "amina@gmail.com", code: "12345678", locale: "fr", audience: "portal",
+      });
+      check("T-18 a failed send to a real address never reveals the code", () => {
+        assert.equal(calls, 1);
+        assert.equal(failed.delivered, "none");
+        assert.equal(failed.reason, "send_failed");
+        assert.ok(!("code" in failed));
+      });
+
+      process.env.VERCEL_ENV = "production";
+      calls = 0;
+      const prod = await authMail.deliverOneTimeCode({
+        to: "amina@example.com", code: "12345678", locale: "en", audience: "firm",
+      });
+      check("T-18 production never reveals, even for an example.* address", () => {
+        assert.equal(calls, 1);
+        assert.equal(prod.delivered, "none");
+      });
+
+      delete process.env.RESEND_API_KEY;
+      process.env.VERCEL_ENV = "preview";
+      const unconfigured = await authMail.deliverOneTimeCode({
+        to: "amina@gmail.com", code: "12345678", locale: "en", audience: "portal",
+      });
+      const demo = await authMail.deliverOneTimeCode({
+        to: "demo@demo.kima.cm", code: "12345678", locale: "en", audience: "portal",
+      });
+      check("T-18 no mail configured: real address refused, demo address revealed", () => {
+        assert.deepEqual(unconfigured, { delivered: "none", reason: "not_configured" });
+        assert.deepEqual(demo, { delivered: "demo_reveal", code: "12345678" });
+      });
+    } finally {
+      globalThis.fetch = saved.fetch;
+      console.error = saved.err;
+      for (const [k, v] of [
+        ["RESEND_API_KEY", saved.key],
+        ["KIMA_DEMO_OTP_REVEAL", saved.flag],
+        ["VERCEL_ENV", saved.env],
+      ]) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  }
 
   check("public onboarding stays a private application", () => {
     const draft = {

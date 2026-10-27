@@ -176,6 +176,51 @@ then waits for approval.
 
 Worth doing, because of the next section.
 
+### SQL negative tests
+
+`supabase/tests/*.sql` are pgTAP tests (T-01 … T-14 in
+`docs/audits/2026-10-27-taxdome-parity/security-and-integrity-review.md` §4): storage
+paths, which events, messages and documents a client or firm member may write, the
+delivery check, and the sign-in code rules. The verify workflow runs them with
+`supabase test db` against the throwaway local stack, after the replay. Locally:
+`supabase start && supabase test db` (needs Docker). They never touch production.
+
+## Deploy the auth-codes Edge Function
+
+> **Needs an owner go. Nobody deploys this without one.** Merging the PR that changes
+> `supabase/functions/auth-codes/index.ts` does not deploy it: no workflow deploys Edge
+> Functions.
+
+`supabase/functions/auth-codes/index.ts` is the source of the `auth-codes` Edge
+Function. Version 3 in production was deployed by hand and was in no repository; the
+committed source is v3 plus the binding check (a refused or empty
+`firm_members`/`contacts.auth_user_id` PATCH now returns `binding_failed` instead of a
+token) and no internal error text in responses. The Next.js sign-in routes relay to it
+through `lib/auth-codes.ts` when `SUPABASE_SERVICE_ROLE_KEY` is not set on Vercel, so
+the service-role key stays inside Supabase.
+
+When the owner approves, from a checkout of the approved commit:
+
+```bash
+# 1. Compare with what is live (read-only), and keep a copy of v3.
+supabase functions download auth-codes --project-ref vhrnrbnjhmxrygvyfirf
+
+# 2. Deploy. verify_jwt stays off: the caller is not signed in yet; possession
+#    of the one-time code is the authentication.
+supabase functions deploy auth-codes --project-ref vhrnrbnjhmxrygvyfirf --no-verify-jwt
+```
+
+Then check it:
+- a synthetic firm member (`*@demo.kima.cm`) signs in and the response carries a
+  `tokenHash`;
+- a code is shown on screen only for `demo.kima.cm` / `example.*` addresses with
+  `app_flags.demo_otp_reveal` on, never for a real address;
+- the function's logs show no `bind …` errors.
+
+Roll back by redeploying the downloaded v3. Secrets it reads (set in Supabase, never in
+the repo): `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (injected by Supabase),
+`RESEND_API_KEY`, `KIMA_MAIL_FROM`.
+
 ## Risks
 
 **Migrations are irreversible and the free plan has no point-in-time

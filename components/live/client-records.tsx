@@ -10,6 +10,7 @@ import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
   awaitingClient,
   clientStatus,
+  clientStep,
   clientStatusLabel,
   obligationLabel,
   type CaseRequest,
@@ -309,13 +310,6 @@ export function ClientCompliance({
   );
 }
 
-const STEP_ORDER: ClientStatus[] = [
-  "waiting_on_you",
-  "in_progress",
-  "in_review",
-  "filed_awaiting_proof",
-  "complete",
-];
 
 /** Board 6/10 data: progress in the client's vocabulary, history from `case_events`. */
 export function ClientDeclarations({
@@ -344,7 +338,7 @@ export function ClientDeclarations({
         <div className="grid gap-5 lg:grid-cols-2">
           {(records?.cases ?? []).map((cs) => {
             const status = statusOf(cs, byCase);
-            const at = STEP_ORDER.indexOf(status);
+            const at = clientStep(status);
             const steps = stepLabels.map((label, i) => ({
               label,
               state: i < at ? ("done" as const) : i === at ? ("current" as const) : ("todo" as const),

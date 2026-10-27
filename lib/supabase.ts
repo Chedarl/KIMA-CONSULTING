@@ -128,6 +128,32 @@ export async function demoIds(): Promise<{ taxpayerId: string; organizationId: s
   return { taxpayerId: tp.id as string, organizationId: org.id as string };
 }
 
+/**
+ * The taxpayer a client WRITE may name: the portal session's own, and only
+ * while a Supabase Auth session exists. Never a guess.
+ *
+ * `demoIds()` above falls back to the oldest taxpayer and the oldest
+ * organisation, which is tolerable for a synthetic read and wrong for a write:
+ * a document or a profile change would be filed against somebody else's file.
+ * Write paths use this instead and get null rather than a fallback. The
+ * organisation for a write comes from the row being answered (a request's own
+ * `organization_id`), never from "the first organisation".
+ *
+ * Callers: components/client-portal/profile-board.tsx and requests-board.tsx.
+ */
+export async function sessionTaxpayerId(): Promise<string | null> {
+  let taxpayerId: string | null = null;
+  try {
+    const raw = sessionStorage.getItem("kima.portal.session");
+    if (raw) taxpayerId = (JSON.parse(raw) as { taxpayerId?: string }).taxpayerId ?? null;
+  } catch {
+    taxpayerId = null;
+  }
+  if (!taxpayerId) return null;
+  const { data } = await supabase().auth.getSession();
+  return data.session ? taxpayerId : null;
+}
+
 /** Append-only. Written on every state change a user can see. */
 export async function audit(entry: {
   taxpayerId: string;

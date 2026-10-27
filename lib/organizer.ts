@@ -432,9 +432,9 @@ export function deriveRequests(answers: Record<string, string>): DerivedRequest[
     fr: "Déclarations des exercices précédents",
     en: "Previous periods' declarations",
     reasonFr:
-      "Disponibles en ligne auprès de la DGI : nous nous en chargeons, vous n'avez rien à envoyer.",
+      "Disponibles en ligne auprès de la DGI avec votre accès : nous essayons de les récupérer, et vous les demanderons si nous ne pouvons pas.",
     reasonEn:
-      "Available online from the DGI: we handle these, you have nothing to send.",
+      "Available online from the DGI with your access: we try to retrieve them, and will ask you for them if we cannot.",
     retrievedBy: "firm",
   });
   out.push({
@@ -442,9 +442,9 @@ export function deriveRequests(answers: Record<string, string>): DerivedRequest[
     fr: "DSF de l'exercice précédent",
     en: "Previous year's DSF",
     reasonFr:
-      "Disponible en ligne auprès de la DGI : nous nous en chargeons, vous n'avez rien à envoyer.",
+      "Disponible en ligne auprès de la DGI avec votre accès : nous essayons de la récupérer, et vous la demanderons si nous ne pouvons pas.",
     reasonEn:
-      "Available online from the DGI: we handle this, you have nothing to send.",
+      "Available online from the DGI with your access: we try to retrieve it, and will ask you for it if we cannot.",
     retrievedBy: "firm",
   });
 

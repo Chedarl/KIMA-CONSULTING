@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { draftEngagement } from "@/lib/engagements";
 import { audit, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import {
@@ -133,8 +134,19 @@ export function OnboardingWizard({
     setBusy(true);
     try {
       const db = supabase();
-      const { data: org } = await db.from("organizations").select("id").limit(1).maybeSingle();
-      if (!org?.id) throw new Error("no organization");
+      // The firm is the signed-in member's own organisation. Never
+      // `organizations … limit(1)`: with a second firm that attached every new
+      // taxpayer to whichever organisation happened to sort first.
+      const { data: auth } = await db.auth.getUser();
+      if (!auth.user) throw new Error("not signed in");
+      const { data: member, error: memErr } = await db
+        .from("firm_members")
+        .select("organization_id")
+        .eq("auth_user_id", auth.user.id)
+        .eq("active", true)
+        .maybeSingle();
+      if (memErr || !member?.organization_id) throw memErr ?? new Error("no organization");
+      const org = { id: member.organization_id as string };
 
       const { data: taxpayer, error: tpErr } = await db
         .from("taxpayers")
@@ -162,17 +174,26 @@ export function OnboardingWizard({
         .single();
       if (tpErr || !taxpayer) throw tpErr ?? new Error("insert failed");
 
-      await db
+      // Awaiting authorisation, not authorised. Opening a file is not the
+      // authorisation: that is a separate, recorded act on the engagements
+      // screen (authorizeEngagement). draftEngagement sets authorized_at to
+      // null explicitly — the column defaults to now(), so leaving it out
+      // would make the row look authorised the moment it existed.
+      const draft = draftEngagement({ taxpayerId: taxpayer.id as string });
+      if (!draft.ok) throw new Error(draft.reason);
+      const { error: engErr } = await db
         .from("engagements")
-        .insert({ organization_id: org.id, taxpayer_id: taxpayer.id, status: "authorized" });
+        .insert({ ...draft.row, organization_id: org.id });
+      if (engErr) throw engErr;
 
-      await db.from("organizer_answers").insert(
+      const { error: ansErr } = await db.from("organizer_answers").insert(
         Object.entries(answers).map(([question_key, answer]) => ({
           taxpayer_id: taxpayer.id,
           question_key,
           answer,
         })),
       );
+      if (ansErr) throw ansErr;
 
       // Fourteen days is a working default the accountant can change, not a
       // statutory date. Statutory dates come only from verified rules.
@@ -180,7 +201,7 @@ export function OnboardingWizard({
       due.setDate(due.getDate() + 14);
       const dueOn = due.toISOString().slice(0, 10);
 
-      await db.from("document_requests").insert(
+      const { error: reqErr } = await db.from("document_requests").insert(
         derived.map((d) => ({
           taxpayer_id: taxpayer.id,
           organization_id: org.id,
@@ -196,6 +217,7 @@ export function OnboardingWizard({
           due_on: dueOn,
         })),
       );
+      if (reqErr) throw reqErr;
 
       const { recordCaseEvent } = await import("@/lib/record-event");
       await recordCaseEvent({

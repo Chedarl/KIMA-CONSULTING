@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { LoadingRows, OfflineNote, PageHeading, PrimaryButton } from "@/components/client-portal/ui";
 import type { Contact, ContactLink } from "@/lib/crm";
-import { demoIds, supabase } from "@/lib/supabase";
+import { updateById } from "@/lib/db-write";
+import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 
 type Taxpayer = {
@@ -37,12 +38,15 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      const ids = await demoIds();
-      if (!ids) {
+      // The session's own taxpayer — never the oldest row (demoIds). A save
+      // below writes to whatever this resolves to.
+      const taxpayerId = await sessionTaxpayerId();
+      if (!taxpayerId) {
         setOffline(true);
         setReady(true);
         return;
       }
+      const ids = { taxpayerId };
       const tp = await db.from("taxpayers").select("id, legal_name, niu").eq("id", ids.taxpayerId).maybeSingle();
       if (tp.error) throw tp.error;
       const row = (tp.data as Taxpayer | null) ?? null;
@@ -90,27 +94,29 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
       return;
     }
     setBusy(true);
-    const db = supabase();
     let failed = 0;
     let tried = 0;
     try {
+      // updateById asks for the changed rows back: a write RLS refused matches
+      // zero rows and returns no error, and must not be shown as "Saved".
       if (dirtyName) {
         tried += 1;
-        const { error } = await db.from("taxpayers").update({ legal_name: legalName.trim() }).eq("id", taxpayer.id);
-        if (error) failed += 1;
+        const r = await updateById("taxpayers", taxpayer.id, { legal_name: legalName.trim() });
+        if (!r.ok) failed += 1;
       }
       if (dirtyContact && contact) {
         tried += 1;
-        const { error } = await db
-          .from("contacts")
-          .update({ full_name: fullName.trim(), phone: phone.trim() || null, email: email.trim() || null })
-          .eq("id", contact.id);
-        if (error) failed += 1;
+        const r = await updateById("contacts", contact.id, {
+          full_name: fullName.trim(),
+          phone: phone.trim() || null,
+          email: email.trim() || null,
+        });
+        if (!r.ok) failed += 1;
       }
       if (dirtyNotes && link) {
         tried += 1;
-        const { error } = await db.from("contact_account_links").update({ notifications: emailOn }).eq("id", link.id);
-        if (error) failed += 1;
+        const r = await updateById("contact_account_links", link.id, { notifications: emailOn });
+        if (!r.ok) failed += 1;
       }
       if (failed === 0) toast(copy.saved);
       else if (failed < tried) toast(copy.savePartial, "error");

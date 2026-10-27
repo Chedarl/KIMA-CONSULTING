@@ -53,6 +53,17 @@ jobs:
         if: steps.check.outputs.present == 'true'
         run: supabase db reset
 
+      # SQL negative tests (pgTAP): one JWT per role — anon, client A, client B,
+      # firm reviewer. A policy that lets the wrong caller in fails the PR.
+      - name: Run SQL negative tests
+        if: steps.check.outputs.present == 'true'
+        run: |
+          if [ -n "$(find supabase/tests -name '*.sql' -print -quit 2>/dev/null)" ]; then
+            supabase test db
+          else
+            echo "No SQL tests in supabase/tests."
+          fi
+
       - name: Check for schema drift against committed migrations
         if: steps.check.outputs.present == 'true'
         run: |
