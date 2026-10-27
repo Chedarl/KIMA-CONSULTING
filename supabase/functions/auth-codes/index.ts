@@ -4,9 +4,9 @@
  * SOURCE OF RECORD. This file is the source of the `auth-codes` Edge Function
  * on project vhrnrbnjhmxrygvyfirf. Version 3 was deployed by hand and existed
  * in no repository; it was fetched read-only on 27 Oct 2026 and committed
- * here, with the fixes below. THIS VERSION IS NOT DEPLOYED. Deploying it needs
- * the owner's go — see docs/deployment.md, "Deploy the auth-codes Edge
- * Function".
+ * here, with the fixes below. Deployed from this file on 27 Oct 2026 with the
+ * owner's approval. Redeploy only from this file — see docs/deployment.md,
+ * "Deploy the auth-codes Edge Function".
  *
  * Changes from deployed v3:
  * - The PATCH that binds firm_members/contacts.auth_user_id is checked. A
