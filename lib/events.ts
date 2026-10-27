@@ -446,6 +446,22 @@ export const visibilityOf = (kind: EventKind): Visibility =>
 
 export const dimensionOf = (kind: EventKind): EventDimension => EVENT_KINDS[kind].dimension;
 
+/**
+ * What a client session may write to the log: their own acts, as themselves.
+ * Everything else — a stage move, a verified filing, a fee paid — is the
+ * firm's to record. The database enforces the same list
+ * (`client_may_record()`, migration 20261027120000); the engine check fails if
+ * the two drift.
+ */
+export const CLIENT_EVENT_KINDS = [
+  "document_uploaded",
+  "request_submitted",
+  "engagement_authorized",
+  "engagement_accepted",
+  "engagement_revoked",
+  "note_added",
+] as const satisfies readonly EventKind[];
+
 // ---------------------------------------------------------------------------
 // The record
 // ---------------------------------------------------------------------------
@@ -553,7 +569,7 @@ const isBackwards = (fromStage: CaseStage, toStage: CaseStage) => {
  * the log cannot record a move the engine refused, or miss one it allowed.
  */
 export function eventsFromAdvance(
-  before: Pick<ComplianceCase, "id" | "stage" | "owner" | "blocker" | "prepared_by">,
+  before: Pick<ComplianceCase, "id" | "stage" | "owner" | "blocker" | "prepared_by" | "filing_status">,
   input: AdvanceInput,
   actor: Actor,
 ): NewCaseEvent[] {
@@ -613,7 +629,7 @@ export function eventsFromAdvance(
   // log cannot claim a client-facing change the engine did not make.
   const owed = awaitingClient(input.requests ?? []);
   const wasShown = clientStatus(before, owed);
-  const nowShown = clientStatus({ stage: next }, owed);
+  const nowShown = clientStatus({ ...before, stage: next }, owed);
   if (wasShown !== nowShown) {
     out.push(e({ kind: "client_status_changed", from: wasShown, to: nowShown }));
   }

@@ -16,6 +16,7 @@ import {
 import {
   awaitingClient,
   clientStatus,
+  clientStatusLabel,
   obligationLabel,
   type CaseRequest,
   type ClientStatus,
@@ -121,7 +122,8 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
   const visible = cards.filter((c) => {
     if (filter === "action" && c.status !== "waiting_on_you") return false;
     if (filter === "done" && c.status !== "complete") return false;
-    if (filter === "active" && (c.status === "complete" || c.status === "not_started")) return false;
+    if (filter === "active" && (c.status === "complete" || c.status === "closed" || c.status === "not_started"))
+      return false;
     if (q.trim() && !`${c.title} ${c.period}`.toLowerCase().includes(q.trim().toLowerCase())) return false;
     return true;
   });
@@ -135,8 +137,14 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       ];
     if (status === "in_progress") return [{ label: copy.badgeActive, tone: "green-outline" as const }, { label: copy.badgeProgress, tone: "amber-outline" as const }];
     if (status === "in_review") return [{ label: copy.badgeReview, tone: "amber-outline" as const }];
-    if (status === "filed_awaiting_proof") return [{ label: copy.badgeFiling, tone: "green-outline" as const }];
-    return [{ label: copy.badgeDone, tone: "green" as const }];
+    // Only `complete` earns the green "done" badge. A filing that nobody has
+    // confirmed, or a file closed without finishing, is never shown as done.
+    if (status === "complete") return [{ label: copy.badgeDone, tone: "green" as const }];
+    if (status === "closed") return [{ label: clientStatusLabel(status, locale), tone: "muted" as const }];
+    return [
+      { label: copy.badgeFiling, tone: "amber-outline" as const },
+      { label: clientStatusLabel(status, locale), tone: status === "filing_verified" ? ("green-outline" as const) : ("muted" as const) },
+    ];
   }
 
   async function sendRequest() {

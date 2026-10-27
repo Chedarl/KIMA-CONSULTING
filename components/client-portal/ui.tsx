@@ -1,19 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { clientStep, type ClientStatus } from "@/lib/cases";
 
-/** Display position of the five client-facing states. Not a stored percent. */
-export const CLIENT_STEP_INDEX = [
-  "waiting_on_you",
-  "in_progress",
-  "in_review",
-  "filed_awaiting_proof",
-  "complete",
-] as const;
-
-export function progressPercent(status: (typeof CLIENT_STEP_INDEX)[number]): number {
-  const at = CLIENT_STEP_INDEX.indexOf(status);
-  return [20, 40, 60, 80, 100][at] ?? 0;
+/** Display position of the client-facing states. Not a stored percent. */
+export function progressPercent(status: ClientStatus): number {
+  return [20, 40, 60, 80, 100][clientStep(status)] ?? 0;
 }
 
 export function formatDay(iso: string | null | undefined, locale: "fr" | "en"): string {

@@ -11,6 +11,7 @@ import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
   awaitingClient,
   clientStatus,
+  clientStep,
   obligationLabel,
   requestIsOutstanding,
   risk,
@@ -42,13 +43,6 @@ import {
  */
 type Dict = ReturnType<typeof getWorkspaceDictionary>;
 
-const STEPS: ClientStatus[] = [
-  "waiting_on_you",
-  "in_progress",
-  "in_review",
-  "filed_awaiting_proof",
-  "complete",
-];
 
 const todayISO = () => todayInDouala();
 
@@ -382,7 +376,7 @@ export function ClientDashboard({
           <StatusStepper
             title={`${obligationLabel(featured.obligation_code, locale)} (${featured.period_token})`}
             labels={stepLabels}
-            current={STEPS.indexOf(featuredStatus)}
+            current={clientStep(featuredStatus)}
           />
           {featured.due_needs_confirmation && (
             <p className="mt-2 text-xs text-amber-text">{copy.provisional}</p>

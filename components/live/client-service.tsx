@@ -8,6 +8,7 @@ import { submitRequestFile } from "@/lib/submit-request";
 import {
   awaitingClient,
   clientStatus,
+  clientStep,
   clientStatusLabel,
   obligationLabel,
   requestIsOutstanding,
@@ -32,13 +33,6 @@ import { PrimaryButton, StatusStepper } from "@/components/client-portal/ui";
 type Dict = ReturnType<typeof getWorkspaceDictionary>["clientService"];
 type Dash = ReturnType<typeof getWorkspaceDictionary>["clientDash"];
 
-const STEPS: ClientStatus[] = [
-  "waiting_on_you",
-  "in_progress",
-  "in_review",
-  "filed_awaiting_proof",
-  "complete",
-];
 
 const CASE_COLUMNS =
   "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
@@ -181,7 +175,7 @@ export function ClientService({
     );
   }
 
-  const at = STEPS.indexOf(status);
+  const at = clientStep(status);
 
   return (
     <div className="flex flex-col gap-5">

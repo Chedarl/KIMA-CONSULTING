@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { callAuthCodes, edgeAuthConfigured } from "@/lib/auth-codes";
 import { mintAuthSession, isSupabaseAdminConfigured, supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -6,7 +7,8 @@ export const runtime = "nodejs";
 type Body = { reference?: string; code?: string };
 
 export async function POST(request: Request) {
-  if (!isSupabaseAdminConfigured()) {
+  const viaEdge = !isSupabaseAdminConfigured();
+  if (viaEdge && !edgeAuthConfigured()) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
 
@@ -21,6 +23,18 @@ export async function POST(request: Request) {
   const code = (body.code ?? "").replace(/\D/g, "");
   if (!/^[0-9a-f-]{36}$/i.test(reference) || code.length < 6) {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  }
+
+  // No service-role key here: the Edge Function holds the privilege instead,
+  // and returns the same `session` shape this route builds below.
+  if (viaEdge) {
+    const relayed = await callAuthCodes({
+      action: "verify",
+      audience: "portal",
+      reference,
+      code,
+    });
+    return NextResponse.json(relayed.body, { status: relayed.status });
   }
 
   const db = supabaseAdmin();
@@ -59,15 +73,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "taxpayer_missing" }, { status: 500 });
   }
 
-  let tokenHash: string | null = null;
-  if (row.contact_email) {
-    const minted = await mintAuthSession(row.contact_email);
-    if (minted.ok) {
-      tokenHash = minted.tokenHash;
-      if (row.contact_id) {
-        await db.from("contacts").update({ auth_user_id: minted.userId }).eq("id", row.contact_id);
-      }
-    }
+  // A sign-in is a session bound to this client's contact. Without both, the
+  // browser would hold a "signed-in" screen that every policy then refuses, so
+  // say it failed instead of answering ok.
+  if (!row.contact_email || !row.contact_id) {
+    return NextResponse.json({ error: "no_destination" }, { status: 422 });
+  }
+
+  const minted = await mintAuthSession(row.contact_email);
+  if (!minted.ok) {
+    return NextResponse.json({ error: "session_failed" }, { status: 502 });
+  }
+  const tokenHash = minted.tokenHash;
+
+  // The binding is what makes client_taxpayer_ids() answer for this session.
+  // It can be refused (auth_identity_is_single: the sign-in already belongs to
+  // a firm member) or match no row; either way the sign-in has not happened.
+  const { data: bound, error: bindErr } = await db
+    .from("contacts")
+    .update({ auth_user_id: minted.userId })
+    .eq("id", row.contact_id)
+    .select("id");
+  if (bindErr || !bound || bound.length !== 1) {
+    return NextResponse.json({ error: "binding_failed" }, { status: 409 });
   }
 
   return NextResponse.json({

@@ -316,15 +316,32 @@ export type ClientStatus =
   | "waiting_on_you"
   | "in_progress"
   | "in_review"
+  | "not_yet_filed"
   | "filed_awaiting_proof"
-  | "complete";
+  | "filing_verified"
+  | "correction_requested"
+  | "complete"
+  | "closed";
 
+/**
+ * `filed_awaiting_proof` keeps its key because past `client_status_changed`
+ * events carry it, but no longer says "Filed": it covers a submission that was
+ * attempted or is waiting for the administration's acknowledgment, and
+ * neither is a filing anyone has confirmed.
+ */
 export const CLIENT_STATUS_LABELS: Record<ClientStatus, { fr: string; en: string }> = {
   waiting_on_you: { fr: "Nous attendons vos pièces", en: "We are waiting for your documents" },
   in_progress: { fr: "Travail en cours", en: "Work in progress" },
   in_review: { fr: "En cours de revue", en: "Under review" },
-  filed_awaiting_proof: { fr: "Déposé — preuve en attente", en: "Filed — awaiting proof" },
+  not_yet_filed: { fr: "Pas encore déposé", en: "Not filed yet" },
+  filed_awaiting_proof: {
+    fr: "Dépôt en attente de confirmation",
+    en: "Filing awaiting confirmation",
+  },
+  filing_verified: { fr: "Dépôt vérifié", en: "Filing verified" },
+  correction_requested: { fr: "Correction demandée", en: "Correction requested" },
   complete: { fr: "Terminé", en: "Complete" },
+  closed: { fr: "Dossier clos sans aboutissement", en: "Closed — not completed" },
 };
 
 /**
@@ -351,7 +368,7 @@ export const CLIENT_STATUS_LABELS: Record<ClientStatus, { fr: string; en: string
  * they owe something, raise a request — which is what requests are for.
  */
 export function clientStatus(
-  c: Pick<ComplianceCase, "stage">,
+  c: Pick<ComplianceCase, "stage" | "filing_status">,
   awaitingClient: boolean,
 ): ClientStatus {
   switch (c.stage) {
@@ -362,14 +379,52 @@ export function clientStatus(
       return "in_progress";
     case "review":
       return "in_review";
+    // From here the stage says what the firm is doing; only the filing
+    // dimension says what the administration has acknowledged.
     case "filing":
     case "evidence":
-      return "filed_awaiting_proof";
+      return FILING_TO_CLIENT[c.filing_status];
     case "delivered":
+      // The database refuses delivery without a verified filing; reading the
+      // filing here too keeps a bad row from saying "Complete".
+      return c.filing_status === "verified" ? "complete" : FILING_TO_CLIENT[c.filing_status];
     case "abandoned":
-      return "complete";
+      return "closed";
   }
 }
+
+/**
+ * Position on the five-step progress bar (documents, work, review, filing,
+ * done). Every filing-phase status sits on the filing step — the label says
+ * which one — and `closed` sits nowhere, because it did not finish.
+ */
+export function clientStep(s: ClientStatus): number {
+  switch (s) {
+    case "waiting_on_you":
+      return 0;
+    case "in_progress":
+      return 1;
+    case "in_review":
+      return 2;
+    case "not_yet_filed":
+    case "filed_awaiting_proof":
+    case "filing_verified":
+    case "correction_requested":
+      return 3;
+    case "complete":
+      return 4;
+    case "closed":
+      return -1;
+  }
+}
+
+const FILING_TO_CLIENT: Record<FilingStatus, ClientStatus> = {
+  not_submitted: "not_yet_filed",
+  attempted: "filed_awaiting_proof",
+  awaiting_verification: "filed_awaiting_proof",
+  verified: "filing_verified",
+  correction_required: "correction_requested",
+};
 
 export const clientStatusLabel = (s: ClientStatus, locale: "fr" | "en") =>
   locale === "fr" ? CLIENT_STATUS_LABELS[s].fr : CLIENT_STATUS_LABELS[s].en;
@@ -653,15 +708,15 @@ export function recordFiling(
  * Can this case be delivered to the client?
  *
  * Delivering before the administration has acknowledged the filing hands over
- * a pack that implies an outcome nobody has confirmed. The exception is an
- * obligation with nothing to file, which is why `not_applicable` exists on the
- * payment dimension rather than being faked on the filing one.
+ * a pack that implies an outcome nobody has confirmed. There used to be an
+ * exception when tax payment was `not_applicable`; it let an unfiled case be
+ * delivered, so it is gone (P0-4). The database constraint
+ * `delivery_requires_filing_outcome` says the same.
  */
 export function canDeliver(
   c: Pick<ComplianceCase, "filing_status" | "payment_evidence_status">,
 ): boolean {
-  if (c.payment_evidence_status === "not_applicable") return true;
-  return c.filing_status === "verified" || c.filing_status === "correction_required";
+  return c.filing_status === "verified";
 }
 
 export const FILING_LABELS: Record<FilingStatus, { fr: string; en: string }> = {

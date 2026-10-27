@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ledgerBalance } from "@/lib/billing";
-import { audit, demoIds, supabase } from "@/lib/supabase";
+import { feePaymentState, ledgerBalance } from "@/lib/billing";
+import { audit, sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { EmptyState, FilterBar, PageHeading, Pill, PrimaryButton, xaf } from "@/components/client-portal/ui";
@@ -62,6 +62,7 @@ type Invoice = {
   description_en: string;
   total_minor: number;
   status: string;
+  organization_id: string;
   issued_on: string | null;
   due_on: string | null;
 };
@@ -87,7 +88,7 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
   const [q, setQ] = useState("");
   const [invoices, setInvoices] = useState<Invoice[] | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
+  const [ids, setIds] = useState<{ taxpayerId: string } | null>(null);
   const [error, setError] = useState(false);
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
@@ -98,7 +99,10 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      const resolved = await demoIds();
+      // The session's own taxpayer, never the oldest row (demoIds): a reported
+      // payment is filed against it, under the invoice's own firm.
+      const taxpayerId = await sessionTaxpayerId();
+      const resolved = taxpayerId ? { taxpayerId } : null;
       if (!resolved) {
         setError(true);
         return;
@@ -163,7 +167,7 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
       const { error: e } = await db.from("service_payments").insert({
         invoice_id: invoice.id,
         taxpayer_id: ids.taxpayerId,
-        organization_id: ids.organizationId,
+        organization_id: invoice.organization_id,
         amount_minor: minor,
         method,
         // The client reports; only the firm confirms.
@@ -176,7 +180,7 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
       const { recordCaseEvent } = await import("@/lib/record-event");
       await recordCaseEvent({
         taxpayerId: ids.taxpayerId,
-        organizationId: ids.organizationId,
+        organizationId: invoice.organization_id,
         actor: { role: "client", label: "Client" },
         kind: "note_added",
         subject: invoice.number,
@@ -184,7 +188,7 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
       });
       await audit({
         taxpayerId: ids.taxpayerId,
-        organizationId: ids.organizationId,
+        organizationId: invoice.organization_id,
         actor: "taxpayer",
         action: "payment.reported",
         resourceType: "invoice",
@@ -285,8 +289,11 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
             <tbody>
               {shown.map((inv) => {
                 const b = balances[inv.id] ?? { confirmed: 0, pending: 0 };
-                const outstanding = inv.total_minor - b.confirmed - b.pending;
-                const settled = outstanding <= 0;
+                // Paid means the firm confirmed it. A payment the client only
+                // reported covers the balance but is not yet money received.
+                const state = feePaymentState(inv.total_minor, b);
+                const settled = state === "paid";
+                const reported = state === "reported";
                 return (
                   <tr key={inv.id} className="border-b border-border align-top last:border-0 hover:bg-surface-sunken">
                     <td className="px-4 py-3 font-mono text-sm font-semibold text-fg">{inv.number}</td>
@@ -302,7 +309,9 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
                       {labels.due} {inv.due_on ?? "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <Pill tone={settled ? "green" : "amber"}>{settled ? copy.paid : copy.due}</Pill>
+                      <Pill tone={settled ? "green" : reported ? "amber-outline" : "amber"}>
+                        {settled ? copy.paid : reported ? copy.paymentReported : copy.due}
+                      </Pill>
                     </td>
                     <td className="px-4 py-3">
                       {settled ? (

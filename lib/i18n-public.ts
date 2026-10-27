@@ -31,7 +31,7 @@ const fr = {
       { title: "Déclarations fiscales", body: "Particuliers et sociétés" },
       { title: "Préparation de la DSF", body: "Sage, Excel ou manuel" },
       { title: "Accompagnement comptable", body: "Classement et revue" },
-      { title: "Calendrier de conformité", body: "Aucune échéance oubliée" },
+      { title: "Calendrier de conformité", body: "Échéances sourcées, signalées si non confirmées" },
       { title: "Assistance d'experts", body: "En ligne, WhatsApp ou au bureau" },
     ],
     howTitle: "Comment ça marche",
@@ -127,8 +127,8 @@ const fr = {
   },
   onboard: {
     steps: ["Vos informations", "Vérifier l'identité", "Préférences de services", "Commencer avec KIMA"],
-    title: "Créez votre espace isolé.",
-    subtitle: "Chaque client dispose d'un espace privé : vos données restent séparées.",
+    title: "Demandez votre espace.",
+    subtitle: "Votre demande reste privée : aucun autre demandeur ne peut la lire.",
     cards: {
       individual: {
         title: "Particulier",
@@ -167,7 +167,7 @@ const fr = {
       ready: "Espace prêt",
     },
     banner:
-      "Votre espace privé sera créé à la fin. Vos données restent isolées des autres clients.",
+      "À la fin, nous enregistrons votre demande. Un réviseur ouvre ensuite votre espace.",
     accountIntro: "Comment vous joindre. Un téléphone ou un e-mail suffit.",
     fields: {
       name: "Votre nom",
@@ -194,7 +194,7 @@ const fr = {
       { key: "tax", title: "Déclarations fiscales", body: "Particuliers et sociétés" },
       { key: "dsf", title: "Préparation de la DSF", body: "Sage, Excel ou manuel" },
       { key: "accounting", title: "Accompagnement comptable", body: "Classement et revue" },
-      { key: "calendar", title: "Calendrier de conformité", body: "Aucune échéance oubliée" },
+      { key: "calendar", title: "Calendrier de conformité", body: "Échéances sourcées, signalées si non confirmées" },
       { key: "expert", title: "Assistance d'experts", body: "En ligne, WhatsApp ou au bureau" },
     ],
     verifyTitle: "Relisez avant d'enregistrer",
@@ -204,9 +204,9 @@ const fr = {
     notProvided: "Non renseigné",
     create: "Créer mon espace",
     creating: "Enregistrement…",
-    readyTitle: "Votre espace privé est prêt",
-    readyIsolated: "L'espace {name} est isolé.",
-    readySeparate: "Vos données restent séparées des autres clients.",
+    readyTitle: "Votre demande est enregistrée",
+    readyIsolated: "La demande de {name} est privée.",
+    readySeparate: "Les autres demandeurs ne peuvent pas la lire.",
     readyHonest:
       "Un réviseur confirme le dossier avant l'ouverture de la connexion. Vous vous connecterez avec un code à usage unique, pas un mot de passe.",
     enterPortal: "Entrer dans l'espace client",
@@ -283,7 +283,7 @@ const en: PublicCopy = {
       { title: "Tax Declarations", body: "Personal & corporate" },
       { title: "DSF Preparation", body: "Sage, Excel or manual" },
       { title: "Accounting Support", body: "Organize & review" },
-      { title: "Compliance Calendar", body: "Never miss a deadline" },
+      { title: "Compliance Calendar", body: "Deadlines with their source, flagged when unconfirmed" },
       { title: "Expert Assistance", body: "Online, WhatsApp or office" },
     ],
     howTitle: "How it works",
@@ -379,8 +379,8 @@ const en: PublicCopy = {
   },
   onboard: {
     steps: ["Your Information", "Verify Identity", "Service Preferences", "Start using KIMA"],
-    title: "Create your isolated workspace.",
-    subtitle: "Each client gets a private tenant so your data stays separate.",
+    title: "Request your workspace.",
+    subtitle: "Your application stays private: no other applicant can read it.",
     cards: {
       individual: {
         title: "Individual",
@@ -419,7 +419,7 @@ const en: PublicCopy = {
       ready: "Workspace ready",
     },
     banner:
-      "Your private tenant workspace will be created when you finish. Your data stays isolated from other clients.",
+      "When you finish, we save your application. A reviewer then opens your workspace.",
     accountIntro: "How we reach you. A phone number or an email is enough.",
     fields: {
       name: "Your name",
@@ -446,7 +446,7 @@ const en: PublicCopy = {
       { key: "tax", title: "Tax Declarations", body: "Personal & corporate" },
       { key: "dsf", title: "DSF Preparation", body: "Sage, Excel or manual" },
       { key: "accounting", title: "Accounting Support", body: "Organize & review" },
-      { key: "calendar", title: "Compliance Calendar", body: "Never miss a deadline" },
+      { key: "calendar", title: "Compliance Calendar", body: "Deadlines with their source, flagged when unconfirmed" },
       { key: "expert", title: "Expert Assistance", body: "Online, WhatsApp or office" },
     ],
     verifyTitle: "Check this before we save it",
@@ -455,9 +455,9 @@ const en: PublicCopy = {
     notProvided: "Not provided",
     create: "Create my workspace",
     creating: "Saving…",
-    readyTitle: "Your private workspace is ready",
-    readyIsolated: "{name}'s tenant is isolated",
-    readySeparate: "Your data stays separate from other clients.",
+    readyTitle: "Your application is saved",
+    readyIsolated: "{name}'s application is private.",
+    readySeparate: "Other applicants cannot read it.",
     readyHonest:
       "A reviewer confirms the file before sign-in opens. You will sign in with a one-time code, not a password.",
     enterPortal: "Enter client portal",

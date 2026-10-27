@@ -53,6 +53,21 @@ export function outstandingMinor(totalMinor: number, balance: FeeBalance): numbe
 }
 
 /**
+ * What the client is shown for one fee invoice.
+ *
+ * `paid` only when the firm has CONFIRMED receipts covering the total. A
+ * payment the client reported covers the balance on paper but is not money
+ * received, so it reads `reported`, never `paid` (T-19).
+ */
+export type FeePaymentState = "paid" | "reported" | "due";
+
+export function feePaymentState(totalMinor: number, balance: FeeBalance): FeePaymentState {
+  if (totalMinor - balance.confirmed <= 0) return "paid";
+  if (outstandingMinor(totalMinor, balance) <= 0) return "reported";
+  return "due";
+}
+
+/**
  * An issued invoice whose due date has passed and whose confirmed receipts
  * do not cover it. Pending reports do not clear the alert: a report is not
  * a confirmation.

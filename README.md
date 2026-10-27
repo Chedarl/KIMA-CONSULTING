@@ -144,9 +144,13 @@ in `tailwind.config.ts` first.
 Copy `.env.example` to `.env.local` and fill it in. Required for the browser
 client: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Required
 for OTP sign-in and authenticated mail: `SUPABASE_SERVICE_ROLE_KEY`, plus
-`RESEND_API_KEY` and `KIMA_MAIL_FROM`. For synthetic demos without Resend, set
-`KIMA_DEMO_OTP_REVEAL=1` so OTP routes return the code in the response body —
-never with real taxpayer data. `.env.local` is gitignored.
+`RESEND_API_KEY` and `KIMA_MAIL_FROM`. Without the service-role key the sign-in
+routes relay to the `auth-codes` Edge Function instead (`lib/auth-codes.ts`).
+`KIMA_DEMO_OTP_REVEAL=1` shows a code on screen **only** when the deployment is not
+production (`VERCEL_ENV` is not `production`) **and** the address cannot receive
+mail (`demo.kima.cm` or an `example.*` domain). A real address is emailed or the
+request fails; a failed send never reveals the code (`mayRevealCode` in
+`lib/auth-mail.ts`). `.env.local` is gitignored.
 
 ---
 
@@ -206,8 +210,13 @@ npm test
 
 `scripts/engine-check.mjs` compiles the engines with `--strict` into a scratch
 directory and runs Node assertions (rule activation, proposeCases, permissions,
-command layer, three verdicts). CI runs the same command. **Add assertions with
-every rule or permission change.** Expanding coverage toward the earlier F2–F4
+command layer, three verdicts, fee ledger, engagements, vault) and the P0 checks
+T-16 … T-20: `CLIENT_EVENT_KINDS` equals the SQL `client_may_record()` list read from
+the migrations, no stage × filing combination shows "Complete" unless the filing is
+verified, `canDeliver`, the code-reveal rule, and a reported-only fee is never
+"Paid". CI runs the same command. The SQL negative tests (T-01 … T-14) are pgTAP files
+in `supabase/tests/`, run by the verify workflow with `supabase test db`. **Add
+assertions with every rule or permission change.** Expanding coverage toward the earlier F2–F4
 counts remains open work.
 
 ```bash
@@ -302,6 +311,21 @@ under their remote versions, verified on every PR and applied on push to `main`
 ---
 
 ## Where the work stands
+
+**P0 security and honesty fixes (27 Oct 2026, draft PR, not merged).** One forward-only
+migration (`20261027120000`) scopes storage to the taxpayer segment of the path, limits
+what a client may write (`client_may_record()` = `CLIENT_EVENT_KINDS`; no message as
+the firm, no non-pending document, only a request's status), refuses delivery without a
+verified filing, stops re-issued codes from resetting the failure count, revokes the
+verify functions from anon, and keeps one sign-in from being both a client and a firm
+member. On screen: statuses read the filing dimension (`clientStatus`, `clientStep`),
+"Paid" means confirmed money (`feePaymentState`), client writes use the session's own
+taxpayer (`sessionTaxpayerId`) and show refusals, the firm's new-client wizard uses the
+member's own organisation and leaves the engagement awaiting authorisation, and sign-in
+fails rather than answering ok without a bound session. The `auth-codes` Edge Function
+source is now in `supabase/functions/`; **redeploying it needs a separate owner go**
+(`docs/deployment.md`). Contract for Agent B:
+`docs/agents/handoffs/2026-10-27-a-to-b-p0-contract.md`.
 
 The approved plan is at `~/.claude/plans/i-think-i-have-glowing-quasar.md` on
 the owner's machine — ask for a copy if you do not have it.

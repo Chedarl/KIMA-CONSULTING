@@ -139,6 +139,7 @@ const fr = {
   due: "À payer",
   payNow: "Payer",
   paid: "Payée",
+  paymentReported: "Paiement signalé — à confirmer",
   paymentsNote:
     "Note : Mobile Money et virement acceptés. Vous signalez un paiement déjà effectué. Kima n'encaisse rien ici et ne règle pas vos impôts.",
   noInvoices: "Aucune facture.",
@@ -337,6 +338,7 @@ const en: typeof fr = {
   due: "Due",
   payNow: "Pay now",
   paid: "Paid",
+  paymentReported: "Payment reported — awaiting confirmation",
   paymentsNote:
     "Note: Mobile Money and bank transfer accepted. You report a payment you have already made. Kima does not collect money here and does not pay your taxes.",
   noInvoices: "No invoices.",

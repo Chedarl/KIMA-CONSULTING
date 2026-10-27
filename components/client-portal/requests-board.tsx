@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { EmptyState, FilterBar, LoadingRows, OfflineNote, PageHeading, Pill, PrimaryButton } from "@/components/client-portal/ui";
 import { obligationLabel, requestIsOutstanding, waitsOn, type ComplianceCase } from "@/lib/cases";
-import { demoIds, supabase, type DocumentRequestRow } from "@/lib/supabase";
+import { sessionTaxpayerId, supabase, type DocumentRequestRow } from "@/lib/supabase";
 import { submitRequestFile } from "@/lib/submit-request";
 import { useToast } from "@/components/toast";
 import { formatDay } from "@/components/client-portal/ui";
@@ -22,14 +22,17 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
+  const [ids, setIds] = useState<{ taxpayerId: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      const resolved = await demoIds();
+      // The session's own taxpayer — never the oldest rows (demoIds). Uploads
+      // below are filed against it, under each request's own firm.
+      const taxpayerId = await sessionTaxpayerId();
+      const resolved = taxpayerId ? { taxpayerId } : null;
       if (!resolved) {
         setOffline(true);
         setRows([]);
@@ -37,8 +40,8 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
       }
       setIds(resolved);
       const [rq, cs, tp] = await Promise.all([
-        db.from("document_requests").select("*").order("due_on"),
-        db.from("compliance_cases").select("id, obligation_code, period_token"),
+        db.from("document_requests").select("*").eq("taxpayer_id", resolved.taxpayerId).order("due_on"),
+        db.from("compliance_cases").select("id, obligation_code, period_token").eq("taxpayer_id", resolved.taxpayerId),
         db.from("taxpayers").select("legal_name").eq("id", resolved.taxpayerId).maybeSingle(),
       ]);
       setRows((rq.data ?? []) as DocumentRequestRow[]);
@@ -72,14 +75,16 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
 
   async function send(id: string, file: File) {
     const req = rows?.find((r) => r.id === id);
-    if (!req || !ids) return;
+    // A request is filed under its own taxpayer and firm. One that is not this
+    // session's taxpayer is not ours to answer.
+    if (!req || !ids || req.taxpayer_id !== ids.taxpayerId) return;
     if (!(requestIsOutstanding(req.status) && waitsOn(req) === "client")) return;
     setBusy(id);
     const result = await submitRequestFile({
       requestId: id,
       file,
       taxpayerId: ids.taxpayerId,
-      organizationId: ids.organizationId,
+      organizationId: req.organization_id,
       caseId: req.case_id ?? null,
       label: locale === "fr" ? req.label_fr : req.label_en,
       actorLabel: name || "Client",
