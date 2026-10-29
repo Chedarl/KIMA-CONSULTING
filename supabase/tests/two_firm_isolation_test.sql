@@ -1,30 +1,20 @@
--- T-22 .. T-29: two firms, two taxpayers. A member of one firm must never read
--- the other firm's records.
+-- T-22 .. T-32: two firms, two taxpayers. A member of one firm must never read
+-- or write the other firm's records.
 --
--- SIX OF THESE TESTS FAIL TODAY, ON PURPOSE. They are wrapped in pgTAP TODO
--- blocks, so the suite stays green and a real regression elsewhere is still
--- visible. When the phase 1 fix lands, pgTAP reports them as "unexpectedly
--- succeeded" — that is the signal to delete the todo_start/todo_end lines and
--- let them gate the build for good.
+-- These failed before 20261029213000 and gate the build now. The commit that
+-- added them wrapped six in pgTAP TODO blocks, because can_see_taxpayer(tp)
+-- began with member_has('case.view') — a check that was never passed the
+-- taxpayer or an organisation, and so was true for every taxpayer and every
+-- active firm member. That migration added the missing dimension, the TODO
+-- wrappers came off, and a regression here is now a red build.
 --
--- Why they fail. Reading taxpayers, compliance_cases, document_requests and
--- documents is gated by can_see_taxpayer(tp), whose first branch is:
+-- Reads and writes are both covered on purpose. Fixing only the read path
+-- would have turned the read tests green while a member of one firm could
+-- still update another firm's taxpayers.
 --
---     member_has('case.view')
---
--- member_has() is never passed the taxpayer or an organisation, and
--- current_firm_role() reads firm_members by auth_user_id alone, with no
--- organisation filter:
---
---     select role from firm_members where auth_user_id = auth.uid() and active limit 1
---
--- So the branch is true for any active firm member whose role holds
--- 'case.view' — which is every role, kima_admin included — and it is true for
--- every taxpayer, because no taxpayer is ever considered. Engagements are not
--- consulted on the read path at all.
---
--- The controls (T-22, T-26) must pass before and after the fix: each firm
--- keeps seeing the taxpayer it actually holds an engagement for.
+-- The controls (T-22, T-27, T-32) must pass before and after any further
+-- change: each firm keeps full access to the taxpayer it actually holds an
+-- engagement for, so a policy that simply refuses everything cannot pass here.
 --
 -- Run with `supabase test db` (pgTAP). Synthetic data only; rolled back.
 
@@ -32,7 +22,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(8);
+select plan(11);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: two unrelated firms, each with one taxpayer, one engagement and one
@@ -50,7 +40,7 @@ insert into taxpayers (id, legal_name) values
   ('00000000-0000-4000-a000-00000000a002', 'Taxpayer of Firm A'),
   ('00000000-0000-4000-a000-00000000b002', 'Taxpayer of Firm B');
 
--- The authorised grant, one per firm. This is what should carry access.
+-- The authorised grant, one per firm. This is what carries access.
 insert into engagements (organization_id, taxpayer_id) values
   ('00000000-0000-4000-a000-00000000a001', '00000000-0000-4000-a000-00000000a002'),
   ('00000000-0000-4000-a000-00000000b001', '00000000-0000-4000-a000-00000000b002');
@@ -87,8 +77,6 @@ select is(
   'T-22 Firm A reads its own taxpayer'
 );
 
-select todo_start('tenant isolation is not implemented on the read path (phase 1, backlog P2-5 / R-47)');
-
 -- T-23
 select is(
   (select count(*) from taxpayers where id = '00000000-0000-4000-a000-00000000b002'),
@@ -116,13 +104,43 @@ select ok(
   'T-26 can_see_taxpayer() refuses a taxpayer of another firm'
 );
 
-select todo_end();
+-- T-31 an INSERT carrying another firm's taxpayer is refused outright.
+select throws_ok(
+  $$ insert into document_requests (taxpayer_id, organization_id, label_fr, label_en, due_on)
+     values ('00000000-0000-4000-a000-00000000b002',
+             '00000000-0000-4000-a000-00000000a001',
+             'Injecté', 'Injected', '2026-03-15') $$,
+  '42501', null,
+  'T-31 Firm A cannot raise a request against Firm B''s taxpayer'
+);
+
+-- T-32 control: the same write succeeds for its own taxpayer, so the refusals
+-- above are scoping and not a blanket denial.
+select lives_ok(
+  $$ insert into document_requests (taxpayer_id, organization_id, label_fr, label_en, due_on)
+     values ('00000000-0000-4000-a000-00000000a002',
+             '00000000-0000-4000-a000-00000000a001',
+             'Autorisé', 'Allowed', '2026-03-15') $$,
+  'T-32 control: Firm A raises a request against its own taxpayer'
+);
+
+-- T-30 the write path. A denied UPDATE changes no rows rather than raising, so
+-- the attempt is made here and checked below, once the role no longer filters
+-- the row out of the read.
+update taxpayers set legal_name = 'Renamed by the wrong firm'
+ where id = '00000000-0000-4000-a000-00000000b002';
 
 reset role;
 
+select is(
+  (select legal_name from taxpayers where id = '00000000-0000-4000-a000-00000000b002'),
+  'Taxpayer of Firm B',
+  'T-30 Firm A cannot update Firm B''s taxpayer'
+);
+
 -- ---------------------------------------------------------------------------
--- As Reviewer B (Firm B) — the same hole, from the other side, so a fix that
--- merely special-cases one firm cannot pass.
+-- As Reviewer B (Firm B) — the same checks from the other side, so a fix that
+-- special-cases one firm cannot pass.
 -- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -134,8 +152,6 @@ select is(
   1::bigint,
   'T-27 Firm B reads its own taxpayer'
 );
-
-select todo_start('tenant isolation is not implemented on the read path (phase 1, backlog P2-5 / R-47)');
 
 -- T-28
 select is(
@@ -150,8 +166,6 @@ select is(
   0::bigint,
   'T-29 Firm B cannot read Firm A''s compliance case'
 );
-
-select todo_end();
 
 reset role;
 
