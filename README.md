@@ -345,9 +345,12 @@ invoice, with any confirmation field, or backdated. A client reads only their ow
 payments. A partner (`billing.manage`) confirms or rejects once. After that the payment is
 final, and the database writes the confirmer's name and the time (migrations
 `20261027210000`, `20261027210100`; tests `supabase/tests/fee_payments_test.sql`, engine
-check T-21). Staff can record a payment only as the firm, and only as pending. **Not yet
-organisation-scoped.** `member_has()` is firm-wide, which is why a second firm stays
-blocked (backlog P2-5, risk R-47, owner D7). Review of #6:
+check T-21). Staff can record a payment only as the firm, and only as pending.
+**Organisation scoping is written but not merged** (PR #22, migration
+`20261029213000`): `member_has(cap, taxpayer_id)` requires a live engagement between the
+caller's organisation and that taxpayer, and the fee-payment policies pass the row's
+taxpayer like every other. A second firm stays blocked until that merges (backlog P2-5,
+risk R-47, owner D7). Review of #6:
 `docs/agents/handoffs/2026-10-27-a-review-of-pr6.md`. auth-codes version history:
 `docs/deployment.md`.
 
