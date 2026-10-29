@@ -33,19 +33,27 @@
 --     so it is not reached for again by habit.
 
 -- ---------------------------------------------------------------------------
--- 1. A firm member must belong to an organisation.
+-- 1. Give the existing firm members an organisation.
 --
--- Every existing row has organization_id null, which is what made scoping
--- impossible. Backfill from the single organisation when there is exactly one
--- (true on the demo project, a no-op on a fresh database with no rows), then
--- make the column required so the state cannot come back.
+-- Every row on the demo project had organization_id null, which is part of why
+-- scoping was impossible: a member belonging to no firm cannot be scoped to
+-- one. Backfill from the single organisation where exactly one exists.
+--
+-- The column is deliberately NOT made not null. Earlier migrations seed
+-- firm_members rows, and a database built from migrations alone has no
+-- organisation to backfill them to, so the constraint cannot hold in every
+-- environment and would make the schema differ between them.
+--
+-- Leaving it nullable is safe because the scoping below fails closed: the join
+-- in member_has(cap, tp) is on fm.organization_id = e.organization_id, and null
+-- matches no engagement, so a member with no organisation reads nothing at all.
+-- T-36 in two_firm_isolation_test.sql holds that property, which is worth more
+-- than the constraint would have been.
 -- ---------------------------------------------------------------------------
 update firm_members
    set organization_id = (select id from organizations limit 1)
  where organization_id is null
    and (select count(*) from organizations) = 1;
-
-alter table firm_members alter column organization_id set not null;
 
 -- ---------------------------------------------------------------------------
 -- 2. The scoped primitives.

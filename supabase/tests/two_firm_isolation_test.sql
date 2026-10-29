@@ -1,5 +1,5 @@
--- T-22 .. T-32: two firms, two taxpayers. A member of one firm must never read
--- or write the other firm's records.
+-- T-22 .. T-35: two firms, two taxpayers. A member of one firm must never read
+-- or write the other firm's records, down to the stored file.
 --
 -- These failed before 20261029213000 and gate the build now. The commit that
 -- added them wrapped six in pgTAP TODO blocks, because can_see_taxpayer(tp)
@@ -12,7 +12,7 @@
 -- would have turned the read tests green while a member of one firm could
 -- still update another firm's taxpayers.
 --
--- The controls (T-22, T-27, T-32) must pass before and after any further
+-- The controls (T-22, T-27, T-32, T-35) must pass before and after any further
 -- change: each firm keeps full access to the taxpayer it actually holds an
 -- engagement for, so a policy that simply refuses everything cannot pass here.
 --
@@ -22,7 +22,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(11);
+select plan(15);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: two unrelated firms, each with one taxpayer, one engagement and one
@@ -30,7 +30,8 @@ select plan(11);
 -- ---------------------------------------------------------------------------
 insert into auth.users (id, email) values
   ('00000000-0000-4000-a000-00000000a003', 'reviewer-a@example.test'),
-  ('00000000-0000-4000-a000-00000000b003', 'reviewer-b@example.test');
+  ('00000000-0000-4000-a000-00000000b003', 'reviewer-b@example.test'),
+  ('00000000-0000-4000-a000-0000000c0003', 'orphan@example.test');
 
 insert into organizations (id, name) values
   ('00000000-0000-4000-a000-00000000a001', 'Firm A'),
@@ -51,6 +52,13 @@ insert into firm_members (id, organization_id, person_label, email, role, auth_u
   ('00000000-0000-4000-a000-00000000b004', '00000000-0000-4000-a000-00000000b001',
    'Reviewer B', 'reviewer-b@example.test', 'firm_reviewer', '00000000-0000-4000-a000-00000000b003');
 
+-- A member belonging to no organisation. Earlier migrations seed rows in this
+-- shape, so the state is reachable and has to be safe rather than merely
+-- forbidden. See T-36.
+insert into firm_members (id, organization_id, person_label, email, role, auth_user_id) values
+  ('00000000-0000-4000-a000-0000000c0004', null,
+   'Orphan Member', 'orphan@example.test', 'firm_partner', '00000000-0000-4000-a000-0000000c0003');
+
 insert into compliance_cases (id, organization_id, taxpayer_id, obligation_code, period_token) values
   ('00000000-0000-4000-a000-00000000a005', '00000000-0000-4000-a000-00000000a001',
    '00000000-0000-4000-a000-00000000a002', 'patente', '2026A'),
@@ -62,6 +70,23 @@ insert into document_requests (id, taxpayer_id, organization_id, label_fr, label
    '00000000-0000-4000-a000-00000000a001', 'Relevé A', 'Statement A', '2026-03-15'),
   ('00000000-0000-4000-a000-00000000b006', '00000000-0000-4000-a000-00000000b002',
    '00000000-0000-4000-a000-00000000b001', 'Relevé B', 'Statement B', '2026-03-15');
+
+-- A reviewed document and the file behind it, one per firm. These are the
+-- records a leak would actually hurt: the client's own paperwork.
+insert into documents (id, taxpayer_id, file_name, storage_path) values
+  ('00000000-0000-4000-a000-00000000a007', '00000000-0000-4000-a000-00000000a002',
+   'statement-a.pdf', '00000000-0000-4000-a000-00000000a002/r/statement-a.pdf'),
+  ('00000000-0000-4000-a000-00000000b007', '00000000-0000-4000-a000-00000000b002',
+   'statement-b.pdf', '00000000-0000-4000-a000-00000000b002/r/statement-b.pdf');
+
+-- Stored files are reached through the taxpayer segment of their path.
+insert into storage.objects (bucket_id, name) values
+  ('kima-demo', '00000000-0000-4000-a000-00000000a002/r/statement-a.pdf'),
+  ('kima-demo', '00000000-0000-4000-a000-00000000b002/r/statement-b.pdf');
+
+-- The anonymous demo branch of can_see_taxpayer() is irrelevant to a signed-in
+-- firm member, but switch it off so nothing here depends on it either way.
+update app_flags set enabled = false where key = 'allow_demo_anon';
 
 -- ---------------------------------------------------------------------------
 -- As Reviewer A (Firm A)
@@ -102,6 +127,30 @@ select is(
 select ok(
   not can_see_taxpayer('00000000-0000-4000-a000-00000000b002'),
   'T-26 can_see_taxpayer() refuses a taxpayer of another firm'
+);
+
+-- T-33 the document row itself.
+select is(
+  (select count(*) from documents where id = '00000000-0000-4000-a000-00000000b007'),
+  0::bigint,
+  'T-33 Firm A cannot read Firm B''s document'
+);
+
+-- T-34 the stored file behind it.
+select is(
+  (select count(*) from storage.objects
+    where name = '00000000-0000-4000-a000-00000000b002/r/statement-b.pdf'),
+  0::bigint,
+  'T-34 Firm A cannot read Firm B''s stored file'
+);
+
+-- T-35 control: its own client's file is still reachable, so T-34 is scoping
+-- and not the storage policy refusing everyone.
+select is(
+  (select count(*) from storage.objects
+    where name = '00000000-0000-4000-a000-00000000a002/r/statement-a.pdf'),
+  1::bigint,
+  'T-35 control: Firm A reads its own client''s stored file'
 );
 
 -- T-31 an INSERT carrying another firm's taxpayer is refused outright.
@@ -165,6 +214,24 @@ select is(
   (select count(*) from compliance_cases where id = '00000000-0000-4000-a000-00000000a005'),
   0::bigint,
   'T-29 Firm B cannot read Firm A''s compliance case'
+);
+
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- As a member of no organisation. firm_partner holds every capability, so if
+-- the scoping leaned on capabilities rather than on the engagement join, this
+-- caller would see everything.
+-- ---------------------------------------------------------------------------
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-a000-0000000c0003","role":"authenticated"}', true);
+
+-- T-36
+select is(
+  (select count(*) from taxpayers),
+  0::bigint,
+  'T-36 a firm member with no organisation reads no taxpayer at all'
 );
 
 reset role;
