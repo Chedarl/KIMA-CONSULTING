@@ -38,7 +38,7 @@ CEMAC thesis — is in the approved plan (see **Where the work stands**).
 | `docs/blueprint/` | The product baseline — Business Concept Note, PRD and AI Development Blueprint v1.0 |
 | `docs/foundation/` | Sitemap, ERD, permissions matrix, risk register and the research below |
 | `docs/audits/` | Dated audits. **`2026-10-27-taxdome-parity/`** — TaxDome feature parity, verified module status, journey stop points, security reassessment (incl. the migration pipeline failing since 23 Oct), roadmap; start with `executive-summary.md`. `agent-b-parity-and-journeys.md` is Agent B's review of Agent A's parity and journey findings |
-| `docs/strategy/` | Dated strategy responses. **`2026-10-27-taxpayer-first/`** answers the owner's taxpayer-first brief: thesis, gap matrix, journeys, backlog, sources, test protocol — a proposal awaiting approval. Its `agent-b/` folder holds Agent B's incident-recovery plan (journey, wireframes, component specs, state machine, implementation plan, acceptance tests) |
+| `docs/strategy/` | Dated strategy responses. **`2026-10-27-taxpayer-first/`** answers the owner's taxpayer-first brief: thesis, gap matrix, journeys, backlog, sources, test protocol — approved by the owner on 27 Oct 2026. Its `agent-b/` folder holds Agent B's incident-recovery plan (journey, wireframes, component specs, state machine, implementation plan, acceptance tests) |
 | `docs/design/` | Generated design system — **superseded**; it predates the blueprint, and blueprint §9 is the authority |
 | `app/`, `components/`, `lib/` | The Next.js application |
 | `supabase/` | Forward-only migrations in `supabase/migrations/` (applied by CI on push to `main`) and backend notes — see Backend and `docs/deployment.md` |
@@ -336,6 +336,14 @@ under their remote versions, verified on every PR and applied on push to `main`
 
 ## Where the work stands
 
+**Status, 29 October 2026: not client-ready.** The QA and adoption plan in
+`docs/strategy/2026-10-29-qa-and-adoption/plan.md` scores safety and honesty 7/10 and
+end-to-end loops 5/10. **No real taxpayer data may be loaded** until its phases 1, 2 and 7
+are complete and the owner has approved. The shared document loop has never carried a real
+file; firm self-sign-up, per-firm isolation (`member_has()` is still firm-wide) and the
+two-firm isolation test are launch blockers. That plan is the controlling roadmap, and
+`docs/strategy/2026-10-27-taxpayer-first/backlog.md` carries the per-item statuses.
+
 **Fee payments: clients report, the firm confirms (27 Oct 2026, Agent A, owner D6 and
 D2).** A signed-in client can now report a payment of KIMA's own fees from
 `/app/payments` (`components/live/payments-panel.tsx`). The row lands as
@@ -351,7 +359,7 @@ blocked (backlog P2-5, risk R-47, owner D7). Review of #6:
 `docs/agents/handoffs/2026-10-27-a-review-of-pr6.md`. auth-codes version history:
 `docs/deployment.md`.
 
-**P0 security and honesty fixes (27 Oct 2026, draft PR, not merged).** One forward-only
+**P0 security and honesty fixes (27 Oct 2026, merged in #13; migration `20261027120000` applied).** One forward-only
 migration (`20261027120000`) scopes storage to the taxpayer segment of the path, limits
 what a client may write (`client_may_record()` = `CLIENT_EVENT_KINDS`; no message as
 the firm, no non-pending document, only a request's status), refuses delivery without a
@@ -362,7 +370,7 @@ member. On screen: statuses read the filing dimension (`clientStatus`, `clientSt
 taxpayer (`sessionTaxpayerId`) and show refusals, the firm's new-client wizard uses the
 member's own organisation and leaves the engagement awaiting authorisation, and sign-in
 fails rather than answering ok without a bound session. The `auth-codes` Edge Function
-source is now in `supabase/functions/`; **redeploying it needs a separate owner go**
+source is now in `supabase/functions/`; it is **deployed as v5** (version history in `docs/deployment.md`)
 (`docs/deployment.md`). Contract for Agent B:
 `docs/agents/handoffs/2026-10-27-a-to-b-p0-contract.md`.
 
@@ -380,7 +388,7 @@ that clients can forge `case_events`, and several screens that state completion
 that is not true. Those are the P0 items in `backlog.md`; nothing is built until
 the owner approves that proposal.
 
-**Audit (27 Oct 2026).** `docs/audits/2026-10-27-taxdome-parity/` finds that nothing is yet end-to-end WORKING (engines are; no DB or E2E tests), that firms cannot create cases, tasks, contacts or invoices and registered taxpayers cannot get a sign-in, and that **production migrations have failed since 23 Oct** (repair is in open PR #6). Awaiting owner approval; nothing applied.
+**Audit (27 Oct 2026).** `docs/audits/2026-10-27-taxdome-parity/` finds that nothing is yet end-to-end WORKING (engines are; no DB or E2E tests), that firms cannot create cases, tasks, contacts or invoices and registered taxpayers cannot get a sign-in, and that **production migrations have failed since 23 Oct** The drift was repaired by #6 (merged 27 Oct, ratified after the fact as owner decision D2); the migration pipeline has run green since. The audit's other findings stand.
 
 **Owner answers (27 Oct 2026, second round).** The reviewer is an expert-comptable;
 incident recovery is part of the engagement; the system itself should fetch the

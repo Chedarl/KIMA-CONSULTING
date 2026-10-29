@@ -14,7 +14,7 @@ backend disagree, the backend wins; where a board and blueprint §9 disagree,
 §9 wins (amber = warning, never CTA; no unsourced statistics; never
 "Filed on DGI").
 
-## Backend inventory (verified 2026-10-22)
+## Backend inventory (verified 2026-10-22; storage, incidents and fees re-checked 2026-10-29)
 
 Engines (`lib/`): `registration` (lifecycle + KPI timestamps + completeness,
 advisory never a gate) · `crm` (contacts ⟷ taxpayers, derived segments, typed
@@ -46,17 +46,19 @@ RPC: `portal_sign_in` (DEPRECATED). API: `POST /api/inquiry` (Resend).
 | Cases: stages, 4 dimensions, blocker, risk | `FirmDashboard`, `WorkQueue`, `CaseDetail` `/workspace/cases/[id]` (`advance`, `recordFiling`, four dimensions) | `ClientDashboard` and `/app/declarations/[id]` use the five `clientStatus()` labels only | REFLECTED. The client never sees firm stage names. |
 | Events: timeline, visibility, `drift()` | dashboard feed | dashboard feed (client-visible only) | PARTIAL — no audit/drift surface |
 | `activity_events` (legacy) | — | — | Writes revoked in `20261023044730`. The table remains. New events go to `case_events`. |
-| Document review: 3 verdicts | `InboxWorkspace` `/workspace/inbox` records `documents.acceptance` before accept | `DocumentsPanel` uploads a file and shows received separately from accepted | REFLECTED. A client upload lands as `submitted`, never `accepted`. |
+| Document review: 3 verdicts | `InboxWorkspace` `/workspace/inbox` records `documents.acceptance` before accept | `DocumentsPanel` uploads a file and shows received separately from accepted | **PARTIAL (re-checked 29 Oct)** — the engine and both surfaces exist and keep received apart from accepted, but the loop has **never carried a real file**: 0 rows in `documents`, 0 in `storage.objects`. Untested end to end. Phase 5 of the 29 Oct plan. |
 | Document naming: buckets, references | `FilingFramework` `/workspace/filing` | — | PARTIAL — grammar not applied to document centre / archive |
 | Rules: obligations, deadlines, prorogations | `/workspace/calendar` labels statutory, prorogued, and unconfirmed | Client compliance, declarations, archive | REFLECTED |
 | Diagnostics (pre-approval gate) | `ReviewsPanel` `/workspace/reviews` | — | REFLECTED — queue is `compliance_cases`; approve calls `commandAdvanceCase` (SoD); filing evidence is one `commandRecordFiling` step |
 | Permissions: capabilities, SoD, denial reasons | Firm shell shows the OTP session and `capabilitiesOf()`. Case, inbox, reviews and messages refuse without that member. | portal OTP login | REFLECTED for the firm workspace. Writes still need the Auth session minted by `verifyFirmCode`. |
-| Payments / billing dimension | `BillingWorkspace` `/workspace/billing` reads `invoices`, `service_payments` and case `billing_status`. Confirm or reject calls `reviewServicePayment` and needs `billing.manage`. The case dimension is displayed with `billingLabel` and is not written — there is no `recordBilling`. Issuing an invoice has no insert policy, so the screen does not offer it. | `PaymentsPanel` `/app/payments` reports a payment as `pending_confirmation`. Balances use `ledgerBalance`. | PARTIAL — firm confirms a reported fee. The case fee dimension and invoice issuance stay closed. |
+| Payments / billing dimension | `BillingWorkspace` `/workspace/billing` reads `invoices`, `service_payments` and case `billing_status`. Confirm or reject calls `reviewServicePayment` and needs `billing.manage`. The case dimension is displayed with `billingLabel` and is not written — there is no `recordBilling`. Issuing an invoice has no insert policy, so the screen does not offer it. | `PaymentsPanel` `/app/payments` reports a payment as `pending_confirmation`. Balances use `ledgerBalance`. | PARTIAL — firm confirms a reported fee (migrations `20261027210000`, `20261027210100`; 24 pgTAP checks in `supabase/tests/fee_payments_test.sql`). The case fee dimension and invoice issuance stay closed. **Not organisation-scoped**: `member_has()` is firm-wide, so these policies would pass for a member of another firm (backlog P2-5, risk R-47). |
 | Engagement authority | `EngagementsWorkspace` `/workspace/engagements` lists every engagement. Authorise, revoke and draft call `authorizeEngagement`, `revokeEngagement` and `draftEngagement`, which write the timestamps `authorityCheck` reads. Client acceptance (`accepted_at`) is shown and not written by the firm. | Client 360 engagements tab, per taxpayer | REFLECTED |
 | Evidence vault | `VaultWorkspace` `/workspace/vault` lists documents with `review_status = accepted` and filings `filingEvidence` accepts (verified, with a reference). Pending and returned documents stay in the inbox. A failing verdict does not drop the row. | Client archive uses the same filing rule | REFLECTED |
 | Messages | `MessagesWorkspace` | `MessageThread` | REFLECTED (realtime) |
 | Organizer (documents only) | `OnboardingWizard` | in registration flow | REFLECTED |
 | DSF Bridge (`validation_findings`, declarations) | — | — | MISSING — Priority 1 after MVP 1 spine |
+| Storage: private document objects | — (read through the inbox) | `DocumentsPanel` upload | **MISSING in practice (29 Oct)** — migration `20261027120000` scopes storage to the path's taxpayer segment and drops the `anon` policies, but no object has ever been written. No signed URLs, no content-based file-type check, no size limit, no versions (plan issue 12). Phase 5. |
+| Payment incidents | — | `/prototype/incident` only (mock data) | **MISSING** — `lib/incidents.ts` and `lib/next-best-action.ts` are engine-only. No `incidents`, `incident_evidence` or `incident_contacts` tables. Backlog P1-2 is owner-approved (D3) but not built; it lands with the reviewer credential P1-8. Phase 6. |
 | Public site → registration | — | landing `/` | REFLECTED (Phase 1b); feeds `registrations` only |
 
 ## Build order (backend-first)

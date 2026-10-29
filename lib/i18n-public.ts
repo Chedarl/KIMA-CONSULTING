@@ -37,7 +37,7 @@ const fr = {
     howTitle: "Comment ça marche",
     howIntro: "Quatre étapes. Vous savez toujours où vous en êtes.",
     how: [
-      { title: "Vos informations", body: "Vous choisissez un espace individuel, une entreprise ou un cabinet." },
+      { title: "Vos informations", body: "Vous choisissez un espace individuel ou une entreprise." },
       { title: "Vérification", body: "Vous nous dites qui vous êtes. Un réviseur confirme le dossier." },
       { title: "Vos services", body: "Déclarations, DSF, comptabilité, calendrier, assistance." },
       { title: "Votre espace", body: "Chaque demande est enregistrée à part. Les autres clients ne la lisent pas." },
@@ -289,7 +289,7 @@ const en: PublicCopy = {
     howTitle: "How it works",
     howIntro: "Four steps. You always know where you are.",
     how: [
-      { title: "Your information", body: "You choose an individual space, a business, or an accounting firm." },
+      { title: "Your information", body: "You choose an individual space or a business." },
       { title: "Identity check", body: "You tell us who you are. A reviewer confirms the file." },
       { title: "Your services", body: "Declarations, DSF, accounting, the calendar, expert help." },
       { title: "Your workspace", body: "Each application is stored on its own. Other clients cannot read it." },
