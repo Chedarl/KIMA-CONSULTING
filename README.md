@@ -333,6 +333,12 @@ the original tenant-scoped access checks, the older `firm_member_has()`,
 a suspended firm. A firm's own access returns only after authorized
 unsuspension; its clients remain able to view their own files.
 
+**Firm sign-up name hygiene (Phase 2 / OD-2).** A new accounting firm name
+will use a deterministic collision key (case, accents, punctuation, spacing
+and legal-form labels ignored) to refuse look-alike names. This is not an
+official registration or ONECCA format check; the registration number still
+has to be supplied separately by the later atomic signup RPC.
+
 ### Two synthetic tenants
 
 Isolation cannot be asserted against one tenant, so there is a seed that creates

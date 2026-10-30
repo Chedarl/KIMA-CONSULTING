@@ -68,7 +68,7 @@ select is(
   'current_firm_role, current_member_id, current_member_label, '
   'current_member_org, demo_taxpayer_id, engagement_authorized_at_is_permanent, '
   'engagements_grant_guard, '
-  'firm_member_has, flag_enabled, member_has, '
+  'firm_member_has, firm_name_key, flag_enabled, member_has, '
   'member_has_in_org, portal_request_code, serialize_taxpayer_grant, '
   'signal_firm_intake_document_change, '
   'taxpayer_held_by_another_firm, taxpayer_id_for_niu',
