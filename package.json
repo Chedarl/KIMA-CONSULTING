@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
     "test": "node scripts/engine-check.mjs",
-    "test:journey": "node scripts/journey-check.mjs && node scripts/firm-signup-journey-check.mjs",
+    "test:journey": "node scripts/journey-check.mjs && node scripts/firm-signup-journey-check.mjs && node scripts/contact-inquiry-check.mjs",
     "seed:storage": "node scripts/seed-storage.mjs"
   },
   "dependencies": {
