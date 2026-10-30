@@ -47,7 +47,8 @@ type Msg = {
   read_at: string | null;
 };
 
-type RequestLite = { id: string; label_fr: string; label_en: string };
+type RequestLite = { id: string; organization_id: string; label_fr: string; label_en: string };
+type FirmChoice = { id: string; name: string };
 
 const MAX = 4000;
 
@@ -73,9 +74,9 @@ export function ClientMessageThread({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { demoIds } = await import("@/lib/supabase");
-      const ids = await demoIds();
-      if (!cancelled && ids) setTid(ids.taxpayerId);
+      const { sessionTaxpayerId } = await import("@/lib/supabase");
+      const id = await sessionTaxpayerId();
+      if (!cancelled) setTid(id);
     })();
     return () => {
       cancelled = true;
@@ -131,6 +132,7 @@ export function MessageThread({
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [requests, setRequests] = useState<RequestLite[]>([]);
   const [orgId, setOrgId] = useState<string | null>(null);
+  const [firms, setFirms] = useState<FirmChoice[]>([]);
   const [draft, setDraft] = useState("");
   const [about, setAbout] = useState<string>("");
   const [live, setLive] = useState(false);
@@ -143,29 +145,42 @@ export function MessageThread({
     if (!taxpayerId) return;
     try {
       const db = supabase();
-      // Only a live engagement can route a message to a firm. Never pick the
-      // oldest organization: in a multi-tenant portal that could be another firm.
-      // Multiple live firms remain ambiguous until the portal adds explicit
-      // firm selection (owner decision D-7); fail closed rather than guessing.
-      const [{ data: m }, { data: r }, { data: grants, error: grantError }] = await Promise.all([
+      // Both parties see only live, RLS-visible engagements for this company.
+      // If there is more than one firm, the user must select one by name.
+      const [{ data: m, error: messagesError }, { data: r, error: requestsError },
+        { data: grants, error: grantError }, { data: directory }] = await Promise.all([
         db.from("messages").select("*").eq("taxpayer_id", taxpayerId).order("created_at"),
-        db.from("document_requests").select("id, label_fr, label_en").eq("taxpayer_id", taxpayerId),
+        db.from("document_requests")
+          .select("id, organization_id, label_fr, label_en").eq("taxpayer_id", taxpayerId),
         db.from("engagements")
           .select("organization_id, status, authorized_at, accepted_at, revoked_at")
           .eq("taxpayer_id", taxpayerId)
           .in("status", ["accepted", "authorized"])
-          .is("revoked_at", null)
-          .limit(2),
+          .is("revoked_at", null),
+        db.rpc("firm_directory"),
       ]);
-      if (grantError) throw grantError;
-      const live = (grants ?? []).filter((grant) => grant.authorized_at || grant.accepted_at);
+      if (grantError || messagesError || requestsError) {
+        throw grantError ?? messagesError ?? requestsError;
+      }
+      const liveIds = [...new Set((grants ?? [])
+        .filter((grant) => grant.authorized_at || grant.accepted_at)
+        .map((grant) => grant.organization_id as string))];
+      const names = new Map((directory ?? []).map(
+        (firm: { id: string; name: string }) => [firm.id, firm.name] as const));
+      setFirms(liveIds.map((id) => ({
+        id,
+        name: names.get(id) ?? `${labels.firmName} (${id.slice(0, 8)})`,
+      })));
+      setOrgId((current) =>
+        current && liveIds.includes(current)
+          ? current : liveIds.length === 1 ? liveIds[0] : null);
       setMsgs((m ?? []) as Msg[]);
       setRequests((r ?? []) as RequestLite[]);
-      setOrgId(live.length === 1 ? live[0].organization_id : null);
+      setError(false);
     } catch {
       setError(true);
     }
-  }, [taxpayerId]);
+  }, [taxpayerId, labels.firmName]);
 
   useEffect(() => {
     void load();
@@ -175,7 +190,7 @@ export function MessageThread({
   // a repeated name, and calling .on after subscribe throws, so two threads on
   // one page would collide.
   useEffect(() => {
-    if (!taxpayerId) return;
+    if (!taxpayerId || !orgId) return;
     const db = supabase();
     const channel = db
       .channel(`thread-${side}-${taxpayerId}-${Math.random().toString(36).slice(2)}`)
@@ -189,6 +204,7 @@ export function MessageThread({
         },
         (payload) => {
           const row = payload.new as Msg;
+          if (row.organization_id !== orgId) return;
           setMsgs((prev) =>
             prev && prev.some((m) => m.id === row.id) ? prev : [...(prev ?? []), row],
           );
@@ -198,7 +214,7 @@ export function MessageThread({
     return () => {
       db.removeChannel(channel);
     };
-  }, [taxpayerId, side]);
+  }, [taxpayerId, side, orgId]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "nearest" });
@@ -206,13 +222,16 @@ export function MessageThread({
 
   async function send() {
     const body = draft.trim();
-    if (!body || !taxpayerId || !orgId || sendBlocked) return;
+    if (!body || !taxpayerId || !orgId || sendBlocked || busy) return;
     if (side === "firm" && !firmActor) return;
     if (body.length > MAX) {
       toast(labels.tooLong, "error");
       return;
     }
 
+    // Stale or revoked grants must never be used even if the picker has not refreshed.
+    const chosenOrg = orgId;
+    if (about && !requests.some((r) => r.id === about && r.organization_id === chosenOrg)) return;
     const id = crypto.randomUUID();
     const optimistic: Msg = {
       id,
@@ -232,6 +251,14 @@ export function MessageThread({
 
     try {
       const db = supabase();
+      const { data: current, error: grantError } = await db.from("engagements")
+        .select("status, authorized_at, accepted_at")
+        .eq("taxpayer_id", taxpayerId).eq("organization_id", chosenOrg)
+        .in("status", ["accepted", "authorized"])
+        .is("revoked_at", null).limit(1).maybeSingle();
+      if (grantError || !current || !(current.authorized_at || current.accepted_at)) {
+        throw new Error("Engagement is not authorized");
+      }
       const { error: e } = await db.from("messages").insert(optimistic);
       if (e) throw e;
 
@@ -284,10 +311,36 @@ export function MessageThread({
     );
   }
 
+  const visibleMsgs = msgs.filter((m) => m.organization_id === orgId);
+  const visibleRequests = requests.filter((r) => r.organization_id === orgId);
+  const firmPicker = firms.length > 1 ? (
+    <label className="flex flex-wrap items-center gap-2 text-sm text-fg">
+      {locale === "fr" ? "Cabinet destinataire" : "Receiving accounting firm"}
+      <select
+        aria-label={locale === "fr" ? "Choisir le cabinet destinataire" : "Choose receiving firm"}
+        value={orgId ?? ""}
+        onChange={(event) => {
+          const id = event.target.value;
+          setOrgId(firms.some((firm) => firm.id === id) ? id : null);
+          setThreadId("general");
+          setAbout("");
+        }}
+        className="min-h-[44px] rounded-lg border border-border bg-white px-3 text-sm"
+      >
+        <option value="">{locale === "fr" ? "Sélectionner un cabinet" : "Select a firm"}</option>
+        {firms.map((firm) => <option key={firm.id} value={firm.id}>{firm.name}</option>)}
+      </select>
+    </label>
+  ) : null;
+  const needsFirm = !orgId;
+  const chooseHint = locale === "fr"
+    ? "Sélectionnez un cabinet autorisé pour ce dossier avant d’envoyer un message."
+    : "Select an authorized firm for this company before sending a message.";
+
   if (appearance === "portal") {
     const groups = new Map<string, { id: string; title: string; preview: string; unread: boolean }>();
     groups.set("general", { id: "general", title: labels.noRequest, preview: "", unread: false });
-    for (const r of requests) {
+    for (const r of visibleRequests) {
       groups.set(r.id, {
         id: r.id,
         title: locale === "fr" ? r.label_fr : r.label_en,
@@ -295,7 +348,7 @@ export function MessageThread({
         unread: false,
       });
     }
-    for (const m of msgs) {
+    for (const m of visibleMsgs) {
       const id = m.request_id ?? "general";
       const slot = groups.get(id) ?? { id, title: labels.firmName, preview: "", unread: false };
       slot.preview = m.body;
@@ -304,12 +357,14 @@ export function MessageThread({
     }
     const list = [...groups.values()];
     const activeId = groups.has(threadId) ? threadId : "general";
-    const shown = msgs.filter((m) => (m.request_id ?? "general") === activeId);
+    const shown = visibleMsgs.filter((m) => (m.request_id ?? "general") === activeId);
     const activeTitle = groups.get(activeId)?.title ?? labels.firmName;
 
     return (
       <div className="flex flex-col gap-4">
         {heading && <h1 className="font-display text-[1.65rem] font-semibold tracking-tight text-fg">{heading}</h1>}
+        {firmPicker}
+        {needsFirm && <p role="status" className="text-sm text-fg-muted">{chooseHint}</p>}
         <div className="grid min-h-[32rem] overflow-hidden rounded-card border border-border bg-white shadow-card lg:grid-cols-[240px_minmax(0,1fr)]">
           <aside className="border-b border-border lg:border-b-0 lg:border-r">
             <ul className="flex gap-2 overflow-x-auto p-2 lg:flex-col">
@@ -373,12 +428,12 @@ export function MessageThread({
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder={labels.placeholder}
-                disabled={Boolean(sendBlocked)}
+                disabled={Boolean(sendBlocked) || needsFirm}
                 className="min-h-[44px] flex-1 rounded-lg border border-border px-3 text-sm"
               />
               <button
                 type="submit"
-                disabled={busy || Boolean(sendBlocked) || draft.trim().length === 0}
+                disabled={busy || Boolean(sendBlocked) || needsFirm || draft.trim().length === 0}
                 className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-white hover:bg-[#0c5a42] disabled:opacity-50"
               >
                 {busy ? labels.sending : labels.send}
@@ -393,6 +448,8 @@ export function MessageThread({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {firmPicker}
+      {needsFirm && <p role="status" className="text-sm text-fg-muted">{chooseHint}</p>}
       <p className="flex flex-wrap items-center gap-2 text-xs text-fg-subtle">
         <span
           className={`h-2 w-2 rounded-full ${live ? "pulse-dot bg-teal" : "bg-fg-subtle"}`}
@@ -403,10 +460,10 @@ export function MessageThread({
       </p>
 
       <ol className="flex max-h-[26rem] flex-col gap-2.5 overflow-y-auto rounded-card border border-border bg-surface p-4">
-        {msgs.length === 0 && <li className="text-sm text-fg-muted">{labels.empty}</li>}
-        {msgs.map((m) => {
+        {visibleMsgs.length === 0 && <li className="text-sm text-fg-muted">{labels.empty}</li>}
+        {visibleMsgs.map((m) => {
           const mine = m.sender === side;
-          const req = requests.find((r) => r.id === m.request_id);
+          const req = visibleRequests.find((r) => r.id === m.request_id);
           return (
             <li key={m.id} className={`rise-in flex ${mine ? "justify-end" : "justify-start"}`}>
               <div
@@ -440,7 +497,7 @@ export function MessageThread({
       </ol>
 
       <div className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
-        {requests.length > 0 && (
+        {visibleRequests.length > 0 && (
           <label className="flex flex-wrap items-center gap-2 text-xs text-fg-muted">
             {labels.aboutRequest}
             <select
@@ -449,7 +506,7 @@ export function MessageThread({
               className="min-h-[40px] rounded-lg border border-border bg-surface px-2 text-sm text-fg"
             >
               <option value="">{labels.noRequest}</option>
-              {requests.map((r) => (
+              {visibleRequests.map((r) => (
                 <option key={r.id} value={r.id}>
                   {locale === "fr" ? r.label_fr : r.label_en}
                 </option>
@@ -471,12 +528,12 @@ export function MessageThread({
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
             }}
             placeholder={labels.placeholder}
-            disabled={Boolean(sendBlocked)}
+            disabled={Boolean(sendBlocked) || needsFirm}
             className="min-h-[52px] flex-1 resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg disabled:bg-surface-sunken"
           />
           <button
             type="button"
-            disabled={busy || Boolean(sendBlocked) || draft.trim().length === 0}
+            disabled={busy || Boolean(sendBlocked) || needsFirm || draft.trim().length === 0}
             onClick={() => void send()}
             className={`inline-flex min-h-[44px] items-center rounded-lg px-4 text-sm font-semibold text-surface disabled:opacity-50 ${
               side === "firm" ? "bg-teal-text hover:opacity-90" : "bg-navy"
