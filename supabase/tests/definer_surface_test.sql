@@ -58,14 +58,16 @@ select is(
 -- current_member_org with 20261030090000 (R-53), and
 -- taxpayer_id_for_niu and taxpayer_held_by_another_firm with 20261030120000
 -- (R-56); the latter replaced taxpayer_engaged_elsewhere, which asked only
--- about live engagements.
+-- about live engagements. engagement_authorized_at_is_permanent arrived with
+-- the R-56 historical authorization safeguard and runs as SECURITY INVOKER.
 select is(
   (select string_agg(distinct p.proname, ', ' order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'private'),
   'auth_identity_is_single, can_see_taxpayer, client_taxpayer_ids, '
   'current_firm_role, current_member_id, current_member_label, '
-  'current_member_org, demo_taxpayer_id, engagements_grant_guard, '
+  'current_member_org, demo_taxpayer_id, engagement_authorized_at_is_permanent, '
+  'engagements_grant_guard, '
   'firm_member_has, flag_enabled, member_has, '
   'member_has_in_org, portal_request_code, signal_firm_intake_document_change, '
   'taxpayer_held_by_another_firm, taxpayer_id_for_niu',

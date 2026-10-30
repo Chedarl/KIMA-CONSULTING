@@ -33,7 +33,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(25);
+select plan(37);
 
 -- ---------------------------------------------------------------------------
 -- Fixture. Two firms, each holding one taxpayer. A prospect no firm holds.
@@ -55,8 +55,12 @@ insert into taxpayers (id, legal_name) values
   ('00000000-0000-4000-c000-00000000000a', 'Taxpayer of Grant Firm A'),
   ('00000000-0000-4000-c000-00000000000b', 'Taxpayer of Grant Firm B'),
   ('00000000-0000-4000-c000-00000000000d', 'Prospect no firm holds'),
+  -- A prospect that a stranger merely typed the NIU of. T-154 .. T-157 use it:
+  -- the only other engagement on it is a draft, which granted nothing.
+  ('00000000-0000-4000-c000-00000000000c', 'Prospect with a stranger''s draft'),
   -- A second prospect, kept untouched for T-106 and T-107.
-  ('00000000-0000-4000-c000-00000000000e', 'Second prospect no firm holds');
+  ('00000000-0000-4000-c000-00000000000e', 'Second prospect no firm holds'),
+  ('00000000-0000-4000-c000-0000000000cc', 'Prospect for timestamp immutability');
 
 insert into engagements (id, organization_id, taxpayer_id, status, authorized_at) values
   ('00000000-0000-4000-c000-0000000000e1', '00000000-0000-4000-c000-0000000000a0',
@@ -87,6 +91,12 @@ insert into contact_account_links (contact_id, taxpayer_id, portal_access) value
 insert into engagements (id, organization_id, taxpayer_id, status, authorized_at, revoked_at) values
   ('00000000-0000-4000-c000-0000000000e6', '00000000-0000-4000-c000-0000000000b0',
    '00000000-0000-4000-c000-00000000000f', 'revoked', now(), now());
+
+-- Firm B typed this one's NIU in the wizard and stopped. A draft, both dates
+-- null: nothing was ever granted to anybody.
+insert into engagements (id, organization_id, taxpayer_id, status, authorized_at, accepted_at) values
+  ('00000000-0000-4000-c000-0000000000e8', '00000000-0000-4000-c000-0000000000b0',
+   '00000000-0000-4000-c000-00000000000c', 'draft', null, null);
 
 insert into engagements (id, organization_id, taxpayer_id) values
   ('00000000-0000-4000-c000-0000000000e3', '00000000-0000-4000-c000-0000000000a0',
@@ -339,6 +349,126 @@ select is(
   (select count(*) from taxpayers where id = '00000000-0000-4000-c000-00000000000b'),
   1::bigint,
   'T-75 Firm A reads Firm B''s taxpayer only after that taxpayer accepted'
+);
+
+-- ---------------------------------------------------------------------------
+-- T-154 .. T-158: a stranger's draft is not a grant, so it blocks nobody.
+--
+-- 20261030120000 replaced "currently holds" with "has a row", which closed the
+-- escalation T-126 covers and opened the opposite fault: every firm that types
+-- a registered NIU leaves a draft behind, and those drafts counted as holding
+-- the client. Reproduced before fixing, against a replayed schema -- the firm
+-- refused here is the client's OWN former accountant:
+--
+--   A opened, taxpayer = 813e9bfc-...
+--   A revoked, status = revoked
+--   C outcome = already_registered        <- a stranger types the NIU
+--   drafts on this taxpayer = 1
+--   A REFUSED: 42501 / another firm has held this taxpayer
+--
+-- 20261030160000 asks the durable columns instead: ever granted, not currently
+-- granting. A draft has authorized_at and accepted_at both null, so it never
+-- blocks; a revoked engagement keeps its authorized_at, so it always does, and
+-- T-126 above is the control for that half.
+-- ---------------------------------------------------------------------------
+
+-- T-154 the control: drafting was always allowed, so a failure here would mean
+-- the fixture is wrong rather than the rule.
+select lives_ok(
+  $$ insert into engagements (id, organization_id, taxpayer_id)
+     values ('00000000-0000-4000-c000-0000000000e9',
+             '00000000-0000-4000-c000-0000000000a0',
+             '00000000-0000-4000-c000-00000000000c') $$,
+  'T-154 control: Firm A may draft against a prospect a stranger only drafted on'
+);
+
+-- T-155 the fix. This is the assertion that fails against 20261030120000.
+select lives_ok(
+  $$ update engagements set status = 'authorized', authorized_at = now()
+      where id = '00000000-0000-4000-c000-0000000000e9' $$,
+  'T-155 and may authorise it alone: a draft is not a grant, so nobody holds them'
+);
+
+-- T-156 and the access is real, not just an unrefused write.
+select is(
+  (select count(*) from taxpayers
+    where id = '00000000-0000-4000-c000-00000000000c'),
+  1::bigint,
+  'T-156 and then actually reads the client file'
+);
+
+reset role;
+
+-- T-157 and T-158 are the control that the fix did not go too far, read from
+-- the stranger's own side. If a draft had become a grant, the first of these
+-- would read 1 and the second would not raise.
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-c000-0000000000b1","role":"authenticated"}', true);
+
+select is(
+  (select count(*) from taxpayers
+    where id = '00000000-0000-4000-c000-00000000000c'),
+  0::bigint,
+  'T-157 the stranger holding only a draft reads nothing of that client'
+);
+
+select throws_ok(
+  $$ update engagements set status = 'authorized', authorized_at = now()
+      where id = '00000000-0000-4000-c000-0000000000e8' $$,
+  '42501', null,
+  'T-158 and cannot authorise it now that Firm A has been granted'
+);
+
+-- T-159 .. T-165: Codex P1 -- status alone must not grant access;
+-- a recorded authorization timestamp must never be erased or rewritten.
+select lives_ok(
+  $$ insert into engagements (id, organization_id, taxpayer_id)
+     values ('00000000-0000-4000-c000-0000000000eb',
+             '00000000-0000-4000-c000-0000000000b0',
+             '00000000-0000-4000-c000-0000000000cc') $$,
+  'T-159 control: Firm B may create a draft for an unheld prospect'
+);
+
+select throws_ok(
+  $$ update engagements set status = 'authorized'
+      where id = '00000000-0000-4000-c000-0000000000eb' $$,
+  '23514', null,
+  'T-160 authorized status alone without a date never grants access'
+);
+
+select lives_ok(
+  $$ update engagements set status = 'authorized', authorized_at = now()
+      where id = '00000000-0000-4000-c000-0000000000eb' $$,
+  'T-161 control: a dated authorization for a free prospect works'
+);
+
+select throws_ok(
+  $$ update engagements set authorized_at = null
+      where id = '00000000-0000-4000-c000-0000000000eb' $$,
+  '42501', null,
+  'T-162 a firm cannot clear an authorization date to hide a prior grant'
+);
+
+select throws_ok(
+  $$ update engagements set authorized_at = now() + interval '1 day'
+      where id = '00000000-0000-4000-c000-0000000000eb' $$,
+  '42501', null,
+  'T-163 a firm cannot rewrite the recorded authorization date'
+);
+
+select lives_ok(
+  $$ update engagements set status = 'expired'
+      where id = '00000000-0000-4000-c000-0000000000eb' $$,
+  'T-164 expiry may change status without deleting the prior grant'
+);
+
+select is(
+  (select count(*) from engagements
+     where id = '00000000-0000-4000-c000-0000000000eb'
+       and authorized_at is not null),
+  1::bigint,
+  'T-165 the dated grant survives a later non-granting status'
 );
 
 reset role;
