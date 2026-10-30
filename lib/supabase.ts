@@ -156,6 +156,7 @@ export async function audit(entry: {
   taxpayerId: string;
   organizationId?: string;
   actor: "taxpayer" | "firm";
+  actorMemberId?: string;
   action: string;
   resourceType: string;
   resourceId?: string;
@@ -168,6 +169,7 @@ export async function audit(entry: {
       taxpayer_id: entry.taxpayerId,
       organization_id: entry.organizationId ?? null,
       actor: entry.actor,
+      actor_member_id: entry.actorMemberId ?? null,
       action: entry.action,
       resource_type: entry.resourceType,
       resource_id: entry.resourceId ?? null,
