@@ -11,6 +11,7 @@
     "lint": "next lint",
     "test": "node scripts/engine-check.mjs",
     "test:journey": "node scripts/journey-check.mjs && node scripts/firm-signup-journey-check.mjs && node scripts/contact-inquiry-check.mjs",
+    "test:staff:contract": "node scripts/staff-contract-smoke.mjs",
     "seed:storage": "node scripts/seed-storage.mjs",
     "test:marketing": "node scripts/marketing-consistency-check.mjs"
   },
