@@ -503,6 +503,37 @@ also asserts the disclaimer that **no tax-authority authorization, partnership
 or e-filing integration is established or claimed** is still present in both
 locales — a hard constraint, asserted rather than trusted.
 
+### Firm staff management (Phase 2)
+
+A firm partner invites, re-roles and revokes their own staff through one
+database function, `public.manage_firm_staff()`. There is no generic
+`firm_members` write policy and none is added: the table stays fail-closed and
+that function is the only route.
+
+What it will not do, by construction rather than by convention:
+
+| | |
+|---|---|
+| Grant `firm_partner` or `kima_admin` | refused — a partner cannot mint another partner or a KIMA administrator |
+| Reach another firm's staff | the caller's organisation comes from their own bound membership, never from an argument |
+| Act for a suspended firm | the partner check resolves through the access helpers, which exclude a suspended organisation |
+| Send email | nothing is sent from the database; the invitation email is a separate change |
+
+Every invite, role change and revocation appends an audit event.
+
+**A staff email is globally unique**, because `firm_issue_code()` selects a
+member by email — two rows sharing one address would make sign-in ambiguous. The
+migration checks for duplicates before it creates that index and refuses with
+the count and every colliding address. Correct or clear a stale email
+while retaining the membership record; deactivation alone does not satisfy the
+index predicate. Never silently rewrite another member's address. Production was re-checked before release:
+3 member rows, 3 with an email, 3 distinct, 0 duplicate groups.
+
+**Still outstanding:** the staff screens themselves. The function and its rules
+exist and are tested; there is no interface for a partner to use them yet, so
+staff management is reachable only through the RPC. That UI is Agent B's, and
+phase 2 is not done without it.
+
 ## Where the work stands
 
 **Status, 29 October 2026: not client-ready.** The QA and adoption plan in
