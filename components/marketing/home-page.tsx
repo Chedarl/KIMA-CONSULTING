@@ -3,7 +3,7 @@ import { ContactForm } from "@/components/marketing/contact-form";
 import { MarketingHeader } from "@/components/marketing/header";
 import { ServiceIcon, type ServiceIconName } from "@/components/marketing/icons";
 import { getPublicCopy, type PublicLocale } from "@/lib/i18n-public";
-import { OPEN_WORKSPACE_KINDS } from "@/lib/public-onboarding";
+import { isOpenWorkspaceKind } from "@/lib/public-onboarding";
 
 const SERVICE_ICONS: ServiceIconName[] = ["tax", "dsf", "accounting", "calendar", "expert"];
 
@@ -98,8 +98,19 @@ export function HomePage({ locale }: { locale: PublicLocale }) {
             <h2 className="font-display text-3xl font-bold text-fg">{t.pricingTitle}</h2>
             <p className="mt-2 max-w-2xl text-sm text-fg-muted">{t.pricingIntro}</p>
             <ul className="mt-8 grid gap-4 md:grid-cols-2">
-              {OPEN_WORKSPACE_KINDS.map((kind, i) => {
-                const plan = t.pricing[i];
+              {/*
+                * Paired by kind, not by position. This used to walk
+                * OPEN_WORKSPACE_KINDS and take t.pricing[i], which only worked
+                * while the two arrays happened to start with the same two
+                * entries in the same order — the third plan, the accounting
+                * firm, was simply never reached. Flip the flag or reorder
+                * either array and that renders one plan's words under another
+                * plan's link.
+                */}
+              {t.pricing
+                .filter((plan) => isOpenWorkspaceKind(plan.kind))
+                .map((plan) => {
+                const kind = plan.kind;
                 return (
                   <li key={plan.title} className="flex flex-col rounded-card border border-border bg-white p-6 shadow-card">
                     <h3 className="font-display text-xl font-semibold text-fg">{plan.title}</h3>
