@@ -69,17 +69,19 @@ comment on function private.taxpayer_held_by_another_firm(uuid, uuid) is
 -- REVIEW FOLLOW-UP (P1): "ever granted" dates must be trustworthy.
 -- The previous guard allowed an authenticated firm to erase authorized_at or
 -- to authorize by status alone. Both bypassed the historical ownership check.
--- Do not fabricate timestamps for older rows: stop the migration if any live
--- authorization lacks one, so records can be investigated and corrected using
--- evidence rather than assigning a false date.
+-- A historical authorization may have been erased, then status changed
+-- to expired, revoked, invited or even draft. With no timestamps, the row
+-- cannot prove it was always a draft. Fail closed on EVERY pre-existing row
+-- with neither date, so ambiguous records receive evidence-based review.
+-- Never fabricate an authorization date to make the migration pass.
 do $$
 begin
   if exists (
     select 1 from public.engagements
-     where status = 'authorized' and authorized_at is null
+     where authorized_at is null and accepted_at is null
   ) then
     raise exception
-      'undated authorized engagements must be reviewed before enforcing grant history';
+      'undated engagement history must be reviewed before enforcing grant history';
   end if;
 end $$;
 
