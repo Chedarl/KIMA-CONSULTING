@@ -10,6 +10,7 @@
 --   T-249 .. T-250  what it deliberately did NOT produce: portal ACCESS
 --   T-251 .. T-254  the two outcomes that are not an approval
 --   T-255 .. T-256  an application with no NIU, which gets no portal row
+--   T-257 .. T-259  an UNASSIGNED application, which is claimed rather than refused
 --
 -- Run with `supabase test db` (pgTAP). Synthetic data only; rolled back.
 
@@ -17,7 +18,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(17);
+select plan(20);
 
 -- Two firms, each with a partner. Firm P has three applications: a plain one, a
 -- second whose declared NIU is already registered elsewhere, and one with no
@@ -60,6 +61,17 @@ values
   ('00000000-0000-4000-9100-00000000a042', '00000000-0000-4000-9100-00000000a010',
    'No Niu Applicant', 'noniu@applicant.test', null,
    'individual', null, null, null, null, 'en', '{}'::jsonb);
+
+-- What the public forms actually create: no chosen firm. registrationInsert()
+-- in lib/public-onboarding.ts omits organization_id, and production's one real
+-- registration is unassigned, so this is the ordinary case and not an edge.
+insert into registrations
+  (id, organization_id, applicant_name, applicant_email, taxpayer_type,
+   legal_name, preferred_language)
+values
+  ('00000000-0000-4000-9100-00000000a043', null,
+   'Unassigned Applicant', 'unassigned@applicant.test', 'business',
+   'Unassigned Trading SARL', 'fr');
 
 -- ---------------------------------------------------------------------------
 -- Who may approve.
@@ -277,6 +289,48 @@ select is(
      from registrations g where g.id = '00000000-0000-4000-9100-00000000a042'),
   '0 portal rows / none: no declared NIU',
   'T-256 and gets no portal account, which the audit entry states'
+);
+
+-- ---------------------------------------------------------------------------
+-- An application that chose no firm.
+-- ---------------------------------------------------------------------------
+-- The first draft of this function refused these outright, on the grounds that
+-- 20261030163000 makes an applicant choose a firm. That migration is in an
+-- unmerged branch, not in this one's base — so every application the public
+-- forms create would have been refused with "this application belongs to
+-- another firm", and production's single real registration is unassigned.
+-- Claiming is what the intake queue already does, and `"firm updates
+-- registrations"` is already written for it: it permits a member with
+-- engagement.create to update a null-organisation row and then REQUIRES the new
+-- row to name their own firm.
+
+-- T-257
+select is(
+  (select outcome from approve_registration('00000000-0000-4000-9100-00000000a043')),
+  'approved',
+  'T-257 an application that chose no firm is claimed and approved, not refused'
+);
+
+-- T-258 claimed into the approver's own firm, and the audit entry says it was a
+-- claim rather than leaving it to be inferred from a null that is now gone.
+select is(
+  (select g.organization_id::text || ' / claimed=' ||
+          (select a.after ->> 'claimed' from audit_events a
+            where a.resource_id = g.id and a.action = 'registration.approved')
+     from registrations g where g.id = '00000000-0000-4000-9100-00000000a043'),
+  '00000000-0000-4000-9100-00000000a010 / claimed=true',
+  'T-258 into the approver''s own firm, and the audit entry records the claim'
+);
+
+-- T-259 and activated_at stays null across every approval. The portal account
+-- is pending and sometimes absent, so nothing has been activated;
+-- registration_kpis computes avg_hours_to_activation from this column, and
+-- stamping it recorded unreachable accounts as activated instantly.
+select is(
+  (select count(*) from registrations
+    where status = 'approved' and activated_at is not null),
+  0::bigint,
+  'T-259 and no approval claims an activation that has not happened'
 );
 reset role;
 

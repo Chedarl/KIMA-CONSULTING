@@ -66,21 +66,46 @@ begin
       using errcode = '42501';
   end if;
 
-  -- The row, read under the caller's own policy: a firm that cannot see this
-  -- application gets no row and the same message as one that does not exist, so
-  -- this cannot be used to discover another firm's queue.
-  select * into r from registrations where id = p_registration_id;
+  -- FOR UPDATE, which the first draft of this function did not take. Without
+  -- it two concurrent approvals both read the application as undecided, and for
+  -- an application with no NIU both then create a taxpayer, an engagement, a
+  -- contact and an audit entry -- the second UPDATE overwriting the first
+  -- file's reference while both callers are told 'approved'. The lock is what
+  -- makes the already_approved branch below mean anything.
+  --
+  -- Read under the caller's own policy: a firm that cannot see this application
+  -- gets no row and the same message as one that does not exist, so this cannot
+  -- be used to discover another firm's queue.
+  select * into r from registrations where id = p_registration_id for update;
   if r.id is null then
     raise exception 'no such application' using errcode = '42501';
   end if;
 
-  if r.organization_id is distinct from v_org then
-    raise exception 'this application belongs to another firm'
+  if not member_has_in_org('engagement.create', v_org) then
+    raise exception 'approving an application needs engagement.create'
       using errcode = '42501';
   end if;
 
-  if not member_has_in_org('engagement.create', v_org) then
-    raise exception 'approving an application needs engagement.create'
+  -- AN UNASSIGNED APPLICATION IS CLAIMED, NOT REFUSED.
+  --
+  -- The first draft rejected `organization_id is null` outright, on the grounds
+  -- that 20261030163000 makes an applicant choose a firm. That migration is in
+  -- an unmerged branch, not in this one's base -- so every application the
+  -- public forms actually create (`lib/public-onboarding.ts`
+  -- registrationInsert(), components/live/registration-form.tsx) arrives
+  -- unassigned and would have been refused with "this application belongs to
+  -- another firm", which is both wrong and untrue. Production holds exactly one
+  -- registration and it is unassigned, so the function could not have approved
+  -- a single real row.
+  --
+  -- Claiming is the behaviour the intake queue already has and the policy is
+  -- already written for it: `"firm updates registrations"` permits a member
+  -- with engagement.create to update a null-organisation row, and its WITH
+  -- CHECK then REQUIRES the new row to name their own organisation. So the
+  -- claim is authorised by the same rule that governs the queue, and the audit
+  -- entry below records that it happened.
+  if r.organization_id is not null and r.organization_id is distinct from v_org then
+    raise exception 'this application belongs to another firm'
       using errcode = '42501';
   end if;
 
@@ -130,6 +155,7 @@ begin
 
     update registrations
        set status = 'verifying',
+           organization_id = v_org,
            first_response_at = coalesce(first_response_at, now()),
            decision_note = coalesce(
              p_note,
@@ -191,11 +217,20 @@ begin
 
   update registrations
      set status = 'approved',
+         -- The claim, for an application that named no firm. Already this
+         -- firm's when it did: the check above refused any other.
+         organization_id = v_org,
          taxpayer_id = v_taxpayer,
          decided_at = now(),
          decided_by = coalesce(current_member_label(), 'firm'),
          decision_note = p_note,
-         activated_at = now(),
+         -- activated_at stays NULL, deliberately. It used to be stamped here,
+         -- which contradicted this function's own design: the portal account is
+         -- created `pending` and sometimes not created at all, so nothing was
+         -- activated. `registration_kpis` computes avg_hours_to_activation from
+         -- this column, so stamping it recorded an unreachable account as
+         -- activated instantly and corrupted the metric. Whatever finally
+         -- activates portal access sets it.
          first_response_at = coalesce(first_response_at, now())
    where id = p_registration_id;
 
@@ -205,10 +240,12 @@ begin
   values
     (v_taxpayer, v_org, 'firm', current_member_id(), 'registration.approved',
      'registration', p_registration_id,
-     jsonb_build_object('status', r.status::text),
+     jsonb_build_object('status', r.status::text,
+                        'organization_id', r.organization_id),
      jsonb_build_object(
        'status', 'approved',
        'taxpayer_id', v_taxpayer,
+       'claimed', r.organization_id is null,
        'portal_account', case when v_niu is null then 'none: no declared NIU'
                               else 'pending' end));
 
