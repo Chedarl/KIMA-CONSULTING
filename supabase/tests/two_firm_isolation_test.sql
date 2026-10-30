@@ -6,6 +6,14 @@
 -- case tasks are scoped like everything else, and the public application queue
 -- still works now that reads are scoped by organisation.
 --
+-- T-63 and T-64 are the two halves of R-48, and they disagree with each other on
+-- purpose. The KIMA admin gets no access across firms, which is what the
+-- organisation scoping bought. It still reads its own firm's client data,
+-- because it holds case.view and access flows through firm membership, and
+-- product rule 7 says it should hold none. T-64 records that as a fact rather
+-- than a footnote, so whoever closes R-48 has to change a failing test and
+-- notice they are changing the rule.
+--
 -- These failed before 20261029213000 and gate the build now. The commit that
 -- added them wrapped six in pgTAP TODO blocks, because can_see_taxpayer(tp)
 -- began with member_has('case.view') — a check that was never passed the
@@ -27,7 +35,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(29);
+select plan(31);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: two unrelated firms, each with one taxpayer, one engagement and one
@@ -187,8 +195,8 @@ select is(
 );
 
 -- T-26 the helper itself, so the cause is named and not only its effects.
--- Schema-qualified: 20261030020000 moved it to `private`, which is not on the
--- search_path here precisely because PostgREST does not publish it.
+-- Schema-qualified: 20261030020000 moved it to `private`, which is deliberately
+-- not on the search_path, because PostgREST does not publish that schema.
 select ok(
   not private.can_see_taxpayer('00000000-0000-4000-a000-00000000b002'),
   'T-26 can_see_taxpayer() refuses a taxpayer of another firm'
@@ -366,6 +374,30 @@ select is(
   (select count(*) from registrations where organization_id is null),
   0::bigint,
   'T-48 the KIMA admin reads no unclaimed application'
+);
+
+-- T-63 the half of R-48 that the organisation scoping settles: platform
+-- administration is not a way into another firm's book. This caller is a member
+-- of Firm B, and firm_partner-grade reach would not help it here, because reach
+-- is per organisation now.
+select is(
+  (select count(*) from taxpayers where id = '00000000-0000-4000-a000-00000000a002'),
+  0::bigint,
+  'T-63 the KIMA admin reads no taxpayer of another firm'
+);
+
+-- T-64 the half that is NOT settled, asserted so that it cannot be forgotten.
+-- kima_admin holds case.view, and member_has(cap, tp) asks only whether the
+-- caller belongs to an organisation with a live engagement for that taxpayer.
+-- So an admin who is a member of a firm reads that firm's clients like any
+-- member, and product rule 7 ("a KIMA admin gets no automatic access to client
+-- data") is not satisfied inside its own firm. R-48 is open and needs an owner
+-- decision on what a KIMA admin is for. When it is answered, this test fails,
+-- which is the point.
+select is(
+  (select count(*) from taxpayers where id = '00000000-0000-4000-a000-00000000b002'),
+  1::bigint,
+  'T-64 the KIMA admin still reads its own firm''s taxpayer (R-48, open)'
 );
 
 reset role;
