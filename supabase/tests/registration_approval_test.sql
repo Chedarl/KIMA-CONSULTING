@@ -5,7 +5,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(17);
+select plan(21);
 
 -- Two independent firms; all fixtures roll back.
 insert into auth.users (id, email) values
@@ -227,6 +227,39 @@ select is(
   'T-256 and gets no portal account, which the audit entry states'
 );
 reset role;
+
+-- T-257 and T-258: a repeated approval writes no duplicate audit or portal
+-- record. The prior already_approved assertion alone did not catch either.
+select is(
+  (select count(*) from audit_events
+    where resource_id = '00000000-0000-4000-9100-00000000a040'
+      and action = 'registration.approved'),
+  1::bigint, 'T-257 double-click records exactly one approval audit');
+select is(
+  (select count(*) from portal_accounts p
+    join registrations r on r.taxpayer_id=p.taxpayer_id
+   where r.id='00000000-0000-4000-9100-00000000a040'),
+  1::bigint, 'T-258 double-click creates one pending portal account');
+
+-- Separate registration for the same NIU, differently cased. The advisory
+-- lock makes the concurrent form of this test deterministic at commit time.
+insert into registrations
+  (id, organization_id, applicant_name, applicant_email, taxpayer_type,
+   legal_name, declared_niu, preferred_language, onboarding)
+values ('00000000-0000-4000-9100-00000000a043',
+        '00000000-0000-4000-9100-00000000a010',
+        'Repeat Applicant', 'repeat@applicant.test', 'business',
+        'Boulangerie Awa SARL', 'p0bbbbbbbbbbb2', 'fr', '{}'::jsonb);
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-9100-00000000a001","role":"authenticated"}', true);
+select is(
+ (select outcome from approve_registration('00000000-0000-4000-9100-00000000a043')),
+ 'already_registered', 'T-259 another application for same NIU cannot duplicate the taxpayer');
+reset role;
+select is(
+ (select count(*) from taxpayers where upper(btrim(niu))='P0BBBBBBBBBBB2'),
+ 1::bigint, 'T-260 same NIU remains one taxpayer after two approval attempts');
 
 select * from finish();
 rollback;
