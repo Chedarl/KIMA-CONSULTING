@@ -567,6 +567,15 @@ audit entry says so. `portal_accounts.identifier` *is* the NIU, `NOT NULL` and
 `UNIQUE` — a blank would collide with the next one and an invented one would sit
 in the table looking like an account.
 
+### Staff workspace (Phase 2, behind release gate)
+
+The bilingual `/fr/workspace/staff` and `/en/workspace/staff` routes display
+only the firm's RLS-visible members. Active partners can invite staff or
+reviewers, change those two roles, and revoke access via the audited
+`manage_firm_staff()` RPC; no direct member writes or privilege elevation.
+Invitations do not send email. Staff screens remain unmerged until owner
+approval, staging isolation checks, and final Phase 2 review.
+
 ## Where the work stands
 
 **Status, 29 October 2026: not client-ready.** The QA and adoption plan in
