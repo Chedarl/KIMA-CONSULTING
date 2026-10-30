@@ -320,6 +320,12 @@ waiting period before `disputed`; no next action or prototype string shows a
 number of days). Each check counts its own assertions and fails if none ran.
 CI runs it on every push (`.github/workflows/ci.yml`, Agent A's).
 
+**Firm sign-up name hygiene (Phase 2 / OD-2).** A new accounting firm name
+will use a deterministic collision key (case, accents, punctuation, spacing
+and legal-form labels ignored) to refuse look-alike names. This is not an
+official registration or ONECCA format check; the registration number still
+has to be supplied separately by the later atomic signup RPC.
+
 ### Two synthetic tenants
 
 Isolation cannot be asserted against one tenant, so there is a seed that creates
