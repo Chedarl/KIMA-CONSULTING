@@ -48,7 +48,8 @@ export async function runGate(env = process.env, fetchImpl = globalThis.fetch) {
   const pr = await response.json();
   if (String(pr.number) !== number) throw new Error('Unexpected PR identity');
   const count = validatePullRequest(pr);
-  process.stdout.write(`PR #${number}: ${count}/${MAX_CHANGED_LINES} changed lines — PASS\n`);
+  const outcome = isIntegrationRelease(pr) ? 'EXEMPT: audited Phase 2 integration collection' : 'PASS';
+  process.stdout.write(`PR #${number}: ${count}/${MAX_CHANGED_LINES} changed lines — ${outcome}\n`);
   return count;
 }
 
