@@ -36,19 +36,19 @@ $$ update compliance_cases set stage='client_approval' where id='00000000-0000-4
 '23514', null, 'P4 stage skips are rejected');
 
 select lives_ok(
-$ update compliance_cases set stage='accounting' where id='00000000-0000-4000-a000-00000000f161' $,
+$sql$ update compliance_cases set stage='accounting' where id='00000000-0000-4000-a000-00000000f161' $sql$,
 'P4 partner may enter accounting stage');
 select lives_ok(
-$ update compliance_cases set stage='preparation' where id='00000000-0000-4000-a000-00000000f161' $,
+$sql$ update compliance_cases set stage='preparation' where id='00000000-0000-4000-a000-00000000f161' $sql$,
 'P4 partner may enter preparation stage');
 select lives_ok(
-$ update compliance_cases set stage='review' where id='00000000-0000-4000-a000-00000000f161' $,
+$sql$ update compliance_cases set stage='review' where id='00000000-0000-4000-a000-00000000f161' $sql$,
 'P4 partner may enter review stage');
 select lives_ok(
-$ update compliance_cases set stage='filing' where id='00000000-0000-4000-a000-00000000f161' $,
+$sql$ update compliance_cases set stage='filing' where id='00000000-0000-4000-a000-00000000f161' $sql$,
 'P4 partner may enter filing stage');
 select lives_ok(
-$ update compliance_cases set stage='evidence' where id='00000000-0000-4000-a000-00000000f161' $,
+$sql$ update compliance_cases set stage='evidence' where id='00000000-0000-4000-a000-00000000f161' $sql$,
 'P4 partner may enter evidence stage');
 
 select throws_ok(
