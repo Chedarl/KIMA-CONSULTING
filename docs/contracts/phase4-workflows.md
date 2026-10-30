@@ -20,13 +20,17 @@ deadline not supported by `lib/rules.ts` and `resolveDueDate()`.
 - RPCs resolve firm membership from Auth + current RLS; never trust
   `organization_id` provided by the browser. All inserts are audited.
 - No case is opened unless its engagement is authorized and active for
-  the exact taxpayer, obligation scope, and receiving firm.
+  the exact company/taxpayer record and receiving firm. A person owning
+  multiple companies may authorize a different firm for each company;
+  access does not automatically extend to their other companies.
 - Creating the same obligation/period/taxpayer case twice returns a named
   duplicate outcome; use a database uniqueness constraint.
 - Assignment respects firm membership and does not confer new case access.
   Unassigned accountants receive permission-denied, not an empty client list.
-- A `submitted` document is *received*, **not accepted**. Only an authorized,
-  independent reviewer may set accepted/returned/rejected with a reason.
+- A submitted document enters the **received** intake state, which is *not*
+  a verdict and never implies acceptance. Only an authorized independent
+  reviewer may select one of exactly **three verdicts**: accepted, returned,
+  or rejected, with a reason. Keep intake state and verdict separate.
 - Stage transitions are enforced in PostgreSQL, not merely in TypeScript.
   `client_approval` demands authenticated taxpayer consent, not a UI flag.
   `cancelled`, `abandoned`, `delivered` are terminal.
