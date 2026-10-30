@@ -42,6 +42,9 @@ begin
      and nullif(btrim(u.email), '') is not null;
   if v_email is null
      or exists (select 1 from public.firm_members m where m.auth_user_id = v_user)
+     -- Legacy/invited staff may not yet have auth_user_id bound. The existing
+     -- OTP login would later bind this same email and conflict with this firm.
+     or exists (select 1 from public.firm_members m where lower(btrim(m.email)) = v_email)
      or exists (select 1 from public.contacts c where c.auth_user_id = v_user) then
     raise exception 'this identity cannot create a firm'
       using errcode = '42501';
