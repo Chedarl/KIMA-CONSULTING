@@ -11,6 +11,9 @@ export async function insertRegistration(
   workspaceRef: string,
 ): Promise<"ok" | "failed"> {
   try {
+    // Without an explicit receiving firm, the new RLS policy would make the
+    // application invisible to every firm. Never silently assign one.
+    if (!draft.firmId) return "failed";
     const row = registrationInsert(draft, workspaceRef);
     const db = supabase();
     const first = await db.from("registrations").insert(row.full);
