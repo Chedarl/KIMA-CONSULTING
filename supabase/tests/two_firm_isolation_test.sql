@@ -187,8 +187,10 @@ select is(
 );
 
 -- T-26 the helper itself, so the cause is named and not only its effects.
+-- Schema-qualified: 20261030020000 moved it to `private`, which is not on the
+-- search_path here precisely because PostgREST does not publish it.
 select ok(
-  not can_see_taxpayer('00000000-0000-4000-a000-00000000b002'),
+  not private.can_see_taxpayer('00000000-0000-4000-a000-00000000b002'),
   'T-26 can_see_taxpayer() refuses a taxpayer of another firm'
 );
 

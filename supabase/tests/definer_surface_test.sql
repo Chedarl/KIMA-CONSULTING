@@ -111,6 +111,11 @@ update app_flags set enabled = false where key = 'allow_demo_anon';
 -- ---------------------------------------------------------------------------
 -- The one helper that also loses its grants, because nothing calls it.
 -- ---------------------------------------------------------------------------
+-- `set local role` changes the role, not the identity: request.jwt.claims is
+-- transaction-local and survives it. Every anon section below clears the claims
+-- as well, or auth.uid() keeps answering for whoever was signed in last and
+-- client_taxpayer_ids() keeps matching their taxpayer. T-57 caught exactly that.
+select set_config('request.jwt.claims', '', true);
 set local role anon;
 
 -- T-54 reached by its qualified name, so this is the privilege refusing and not
@@ -171,6 +176,7 @@ reset role;
 
 -- T-57 with the switch off, an anonymous visitor sees no taxpayer at all. This
 -- is also the phase 1 exit criterion for the demo flags.
+select set_config('request.jwt.claims', '', true);
 set local role anon;
 select is(
   (select count(*) from taxpayers),
@@ -183,6 +189,7 @@ reset role;
 -- flag working rather than the anonymous path having been broken outright.
 update app_flags set enabled = true where key = 'allow_demo_anon';
 
+select set_config('request.jwt.claims', '', true);
 set local role anon;
 select is(
   (select count(*) from taxpayers),
