@@ -232,6 +232,8 @@ export type ComplianceCase = {
   due_needs_confirmation: boolean;
   due_basis: "statutory" | "prorogation";
   stage: CaseStage;
+  /** Incremented in the database on every entry into client-approval. */
+  approval_round: number;
   owner: string | null;
   blocker: string | null;
   opened_at: string;
