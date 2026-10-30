@@ -64,3 +64,54 @@ comment on function private.taxpayer_held_by_another_firm(uuid, uuid) is
   'self-authorise onto a client whose previous firm revoked; and deliberately '
   'not "has a row", which let any firm lock out a client''s real accountant by '
   'typing their NIU once and leaving a draft. R-56.';
+
+
+-- REVIEW FOLLOW-UP (P1): "ever granted" dates must be trustworthy.
+-- The previous guard allowed an authenticated firm to erase authorized_at or
+-- to authorize by status alone. Both bypassed the historical ownership check.
+-- Do not fabricate timestamps for older rows: stop the migration if any live
+-- authorization lacks one, so records can be investigated and corrected using
+-- evidence rather than assigning a false date.
+do $$
+begin
+  if exists (
+    select 1 from public.engagements
+     where status = 'authorized' and authorized_at is null
+  ) then
+    raise exception
+      'undated authorized engagements must be reviewed before enforcing grant history';
+  end if;
+end $$;
+
+alter table public.engagements
+  add constraint engagements_authorized_needs_a_date
+  check (status <> 'authorized' or authorized_at is not null);
+
+-- Once authorized_at is set, neither a firm nor a future status transition may
+-- erase or rewrite it. The existing accepted_at guard already does the same
+-- for taxpayer acceptance. This trigger runs for every writer, including
+-- privileged writes, so later status changes cannot erase grant history.
+create or replace function private.engagement_authorized_at_is_permanent()
+returns trigger
+language plpgsql
+set search_path to 'private', 'public'
+as $$
+begin
+  if old.authorized_at is not null
+     and new.authorized_at is distinct from old.authorized_at then
+    raise exception 'an authorization already recorded cannot be changed'
+      using errcode = '42501';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists engagements_authorized_at_is_permanent
+  on public.engagements;
+create trigger engagements_authorized_at_is_permanent
+  before update on public.engagements
+  for each row execute function private.engagement_authorized_at_is_permanent();
+
+comment on function private.engagement_authorized_at_is_permanent() is
+  'F-01 / R-56: authorized_at is an irreversible historical fact. A firm '
+  'cannot clear it to make an earlier grant disappear from '
+  'taxpayer_held_by_another_firm(), or rewrite it during later status changes.';
