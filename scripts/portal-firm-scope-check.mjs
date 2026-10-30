@@ -38,6 +38,14 @@ assert.match(thread.src, /visibleRequests = requests\.filter\(\(r\) => r\.organi
 assert.match(thread.src, /\.eq\("organization_id", chosenOrg\)/);
 assert.match(thread.src, /if \(grantError \|\| !current/);
 assert.match(thread.src, /sessionTaxpayerId/);
+assert.match(thread.src, /side === "firm" && !firmMemberId/);
+assert.match(thread.src, /\.from\("firm_members"\)/);
+assert.match(thread.src, /member\?\.organization_id !== chosenOrg/);
+assert.match(thread.src, /messageQuery\.eq\("organization_id", firmOrgId\)/);
+assert.match(thread.src, /requestQuery\.eq\("organization_id", firmOrgId\)/);
+assert.match(thread.src, /engagementQuery\.eq\("organization_id", firmOrgId\)/);
+const workspace = inspect("components/live/messages-workspace.tsx");
+assert.match(workspace.src, /memberId: session\.memberId/);
 assert.ok(!thread.src.includes(".limit(2)"), "do not truncate active firm choices");
 const shell = inspect("components/client-portal/shell.tsx");
 assert.match(shell.src, /multipleFirms && !path\.startsWith/);
