@@ -33,7 +33,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(22);
+select plan(25);
 
 -- ---------------------------------------------------------------------------
 -- Fixture. Two firms, each holding one taxpayer. A prospect no firm holds.
@@ -50,6 +50,8 @@ insert into organizations (id, name) values
   ('00000000-0000-4000-c000-0000000000b0', 'Grant Firm B');
 
 insert into taxpayers (id, legal_name) values
+  -- A client Firm B held and then let go. T-126 and T-127 use it.
+  ('00000000-0000-4000-c000-00000000000f', 'Former client of Grant Firm B'),
   ('00000000-0000-4000-c000-00000000000a', 'Taxpayer of Grant Firm A'),
   ('00000000-0000-4000-c000-00000000000b', 'Taxpayer of Grant Firm B'),
   ('00000000-0000-4000-c000-00000000000d', 'Prospect no firm holds'),
@@ -81,6 +83,11 @@ insert into contact_account_links (contact_id, taxpayer_id, portal_access) value
 
 -- T-86 first, while the fixture is still being written as the owner: the
 -- column default is what made every other route possible.
+-- Firm B held this one and revoked. Not live, but it happened.
+insert into engagements (id, organization_id, taxpayer_id, status, authorized_at, revoked_at) values
+  ('00000000-0000-4000-c000-0000000000e6', '00000000-0000-4000-c000-0000000000b0',
+   '00000000-0000-4000-c000-00000000000f', 'revoked', now(), now());
+
 insert into engagements (id, organization_id, taxpayer_id) values
   ('00000000-0000-4000-c000-0000000000e3', '00000000-0000-4000-c000-0000000000a0',
    '00000000-0000-4000-c000-00000000000d'),
@@ -172,6 +179,38 @@ select throws_ok(
       where id = '00000000-0000-4000-c000-0000000000e1' $$,
   '42501', null,
   'T-80 an engagement cannot be moved to another firm'
+);
+
+-- T-126 and T-127: "no other firm holds them" means no other firm ever has.
+--
+-- The self-authorise shortcut exists so a firm opening a brand-new client file
+-- is not blocked by an acceptance screen that does not exist yet. A client with
+-- history is not that case. Until 20261030120000 the check asked only about
+-- *live* engagements, so a client whose previous firm had revoked could be
+-- picked up by any firm without consent -- and once taxpayer_id_for_niu()
+-- existed, reachable by typing a NIU instead of guessing a UUID. Measured
+-- before the fix: B self-authorised and read both the client and Firm A's
+-- historical engagement.
+select lives_ok(
+  $$ insert into engagements (id, organization_id, taxpayer_id)
+     values ('00000000-0000-4000-c000-0000000000e7',
+             '00000000-0000-4000-c000-0000000000a0',
+             '00000000-0000-4000-c000-00000000000f') $$,
+  'T-126a control: Firm A may still draft against a client Firm B let go'
+);
+
+select throws_ok(
+  $$ update engagements set status = 'authorized', authorized_at = now()
+      where id = '00000000-0000-4000-c000-0000000000e7' $$,
+  '42501', null,
+  'T-126 but cannot authorise it alone: Firm B has held this client before'
+);
+
+select is(
+  (select count(*) from taxpayers
+    where id = '00000000-0000-4000-c000-00000000000f'),
+  0::bigint,
+  'T-127 and so reads nothing of that client'
 );
 
 -- T-77 control: the prospect. No other firm holds them, so the firm that
