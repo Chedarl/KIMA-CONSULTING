@@ -254,11 +254,36 @@ break local sign-in, so it stays.
 **The synthetic demo accounts cannot sign in on production, and that is correct
 rather than broken.** Their addresses are on `demo.kima.cm` and `example.*`,
 domains that cannot receive mail, so the emailed code never arrives — and with
-`demo_otp_reveal` off, nothing prints it on screen either. Signing in as a demo
-identity now means a local or preview deployment, or putting a real address on
-the member or contact row first. Please do not "fix" this by turning a flag back
-on: on production, every one of those three gates is the one standing between a
-name plus an NIU and somebody's tax file.
+`demo_otp_reveal` off, nothing prints it on screen either. That is the three
+gates working.
+
+**Owner decision, 30 Oct 2026, on how to demo on production instead.** Give the
+demo accounts real inboxes the team controls — `demo+client@…`,
+`demo+firm@…` on a KIMA CONSULTING mailbox — and leave `demo_otp_reveal` off.
+The code then arrives by email exactly as it does for a real client, and nothing
+is switched back on. The accepted alternative is a separate demo deployment (a
+Vercel preview against its own Supabase project holding only invented data),
+where showing codes on screen is harmless because there is nothing real behind
+it. **Explicitly rejected: turning `demo_otp_reveal` back on in production, and
+any shared demo password.** Either reopens what was closed on 30 Oct.
+
+Two consequences of that decision worth knowing before you act on it:
+
+- A real address is, correctly, **not** an undeliverable one, so
+  `mayRevealCode()` returns false for it *everywhere*, local included. A
+  developer working offline still wants `demo.kima.cm` or `example.*` on their
+  local rows; the team mailbox belongs on the shared demo, not in
+  `.env.local`-land. The two uses are different and should not converge on one
+  address list.
+- `demo.kima.cm` is hardcoded as undeliverable in `isUndeliverableAddress()`. If
+  that domain is ever given a real mailbox, the code list has to change in the
+  same commit, or a real inbox silently becomes one whose codes are printed on
+  screen.
+
+`supabase/seed/synthetic.sql` keeps `@example.invalid`, which cannot receive mail
+by IANA reservation, so running the seed can never mail a real person by
+accident. Substituting the team mailbox is a deliberate edit for a shared demo,
+not the default.
 
 ### Testing the pure engines
 
