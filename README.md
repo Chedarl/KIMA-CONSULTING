@@ -324,9 +324,11 @@ CI runs it on every push (`.github/workflows/ci.yml`, Agent A's).
 
 Isolation cannot be asserted against one tenant, so there is a seed that creates
 two. It is **not** a migration and must never be moved into
-`supabase/migrations/`, because CI applies that directory to production on every
-push to `main`. It refuses to run without an explicit session setting, and every
-name, NIU and amount in it is invented.
+`supabase/migrations/`, because the production migration job can apply that
+directory **only after successful CI for the exact current `main` commit**.
+Obsolete runs skip and manual deployment dispatch is disabled; retry a failed
+migration by rerunning CI. This seed refuses to run without an explicit session
+setting, and every name, NIU and amount in it is invented.
 
 ```bash
 psql "$LOCAL_DATABASE_URL" \
