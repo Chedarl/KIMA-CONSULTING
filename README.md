@@ -347,10 +347,16 @@ final, and the database writes the confirmer's name and the time (migrations
 `20261027210000`, `20261027210100`; tests `supabase/tests/fee_payments_test.sql`, engine
 check T-21). Staff can record a payment only as the firm, and only as pending.
 **Organisation scoping is written but not merged** (PR #22, migration
-`20261029213000`): `member_has(cap, taxpayer_id)` requires a live engagement between the
-caller's organisation and that taxpayer, and the fee-payment policies pass the row's
-taxpayer like every other. A second firm stays blocked until that merges (backlog P2-5,
-risk R-47, owner D7). Review of #6:
+`20261029213000`): `member_has(cap, taxpayer_id)` requires an accepted, unrevoked
+engagement between the caller's organisation and that taxpayer, and the fee-payment
+policies pass the row's taxpayer like every other. A draft engagement grants nothing, and
+setting `revoked_at` removes access on the next call. Rows a firm owns rather than a
+taxpayer (its engagements, its contacts, applications it has taken) go through
+`member_has_in_org(cap, organization_id)` instead, and a public application that belongs
+to no firm yet stays visible to firm members who work client files until one of them
+claims it. `supabase/tests/two_firm_isolation_test.sql` holds the 29 pgTAP checks that
+gate it. A second firm stays blocked until that merges (backlog P2-5, risk R-47, owner
+D7). Review of #6:
 `docs/agents/handoffs/2026-10-27-a-review-of-pr6.md`. auth-codes version history:
 `docs/deployment.md`.
 
