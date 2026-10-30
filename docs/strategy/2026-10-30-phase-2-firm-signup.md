@@ -106,13 +106,22 @@ a qualified expert-comptable". The wording is Agent B's and needs both locales.
 
 ## Build order
 
-1. `organizations` gains `registration_number` (unique, non-blank), `verification_status`
-   and `suspended_at`. R-55 is already closed, so this step no longer narrows the read:
-   it adds `verification_status` to `public.firm_directory()`'s two columns, which is the
-   only change the lookup needs.
-2. Suspension wired into the access helpers, with the negative test.
+1. ~~`organizations` gains `registration_number` (unique, non-blank), `verification_status`
+   and `suspended_at`~~ — **done, 30 Oct, in `20261030150000`**, together with step 2, because
+   the columns alone change nothing. `public.firm_directory()` now carries the label too.
+2. ~~Suspension wired into the access helpers, with the negative test~~ — **done**, in the
+   same migration: `current_member_org()`, `current_firm_role()`, `member_has(cap, tp)` and
+   `member_has_in_org()`. T-145 .. T-152; four of them fail with the columns present and the
+   helpers unwired, which is the trap this step existed to avoid.
 3. The sign-up code path, once (1) above is decided.
-4. `sign_up_firm()` — one function, `SECURITY INVOKER`, atomic, requires the number,
-   writes the audit entry.
+4. `sign_up_firm()` — one function, atomic, requires the number, writes the audit entry.
+   **The owner's two rules, 30 Oct, so this is unblocked:** the registration number gets a
+   **hygiene check only** (required, normalised, unique, non-blank, sane length and character
+   set), labelled as hygiene rather than an ONECCA rule, with the real format to follow once
+   sourced; and a **look-alike name is a normalised exact match with legal forms stripped** —
+   case, accents, punctuation and spacing folded, then SARL, SA, Cabinet, & Associés and
+   similar removed, so "Cabinet Atangana SARL" collides with "Atangana SA". The accepted cost
+   is that two real firms sharing a family name will be refused, so the refusal must point the
+   person to KIMA rather than just say no.
 5. The application form becomes the sign-up form, behind the flag.
 6. The flag flips last, and only after the end-to-end check passes.
