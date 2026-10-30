@@ -1001,3 +1001,9 @@ structurally-valid value.
 - `demo_taxpayer_id()` remains executable; the anon branch that uses it is off
   unless the `allow_demo_anon` row in `app_flags` is true, and that row is false
   on production since 30 Oct 2026
+
+## Phase 2 firm signup review preview (not publicly enabled)
+
+The ordinary public onboarding for taxpayers remains unchanged. For a **local or Vercel preview** build only, set `KIMA_FIRM_SIGNUP_PREVIEW=1` and visit `/fr/register?type=accounting_firm` or `/en/register?type=accounting_firm`. Without that flag the firm route is 404; Vercel production always returns 404 even if the flag is set. The route renders a **clearly identified mock**: no OTP or firm is created.
+
+Only for an independently isolated staging Supabase project (not `vhrnrbnjhmxrygvyfirf`), set `KIMA_FIRM_SIGNUP_STAGING=1` in addition to the preview flag to exercise the real Supabase Auth OTP adapter (#43) and atomic database RPC (#46). Configure the staging email template with `{{ .Token }}`; verify Auth OTP expiry, resend limits and rate limits. Keep `app_flags.allow_firm_signup=false` everywhere until a reviewed staging test explicitly enables it on **staging only**. The UI never sets that flag. Preview deployments currently point at production; **do not enable staging mode on a production-connected preview.** After owner approval and schema-first release, entrypoint activation is a separate release-gated change.
