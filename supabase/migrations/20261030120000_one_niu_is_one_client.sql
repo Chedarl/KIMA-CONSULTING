@@ -44,6 +44,26 @@
 -- accepts, which needs a request record that carries no taxpayer_id. That is
 -- the phase 3 invitation flow, not this migration.
 --
+-- AND THE HOLE HANDING OVER THAT ID OPENED, which review caught and which this
+-- migration therefore has to close as well. Giving the second firm the id is
+-- only safe while something still refuses it the engagement. It did not:
+-- taxpayer_engaged_elsewhere() ignored revoked engagements, so for a client
+-- whose previous firm had revoked, the second firm could take the id off its
+-- own draft and simply authorise it -- no acceptance, full history. Measured:
+--
+--   B outcome = already_registered
+--   B learns id from own draft = 80389a64-...
+--   B reads client before authorising = 0
+--   B SELF-AUTHORISED, clients readable = 1
+--   B reads A historical engagement = 1
+--
+-- So the NIU lookup turned "guess a UUID" into "type a NIU" for every client
+-- with a revoked engagement. Section 4 fixes the rule rather than withdrawing
+-- the lookup: a firm may authorise alone only for a taxpayer **no other firm
+-- has ever been engaged with**, which is what "a taxpayer no other firm holds"
+-- should always have meant. Opening a brand-new file still works, because a
+-- taxpayer created in the same call has no other engagements at all.
+--
 -- Production checked before writing this: 1 taxpayer, 1 NIU, 0 blank, 0
 -- duplicate groups, so the index below applies cleanly.
 
@@ -210,3 +230,121 @@ comment on function public.open_client_file(text, text, text, text, text, text, 
 
 revoke execute on function public.open_client_file(text, text, text, text, text, text, text, text, jsonb) from public, anon;
 grant execute on function public.open_client_file(text, text, text, text, text, text, text, text, jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 4. "No other firm holds them" means no other firm ever has.
+--
+-- taxpayer_engaged_elsewhere() asked only about *live* engagements, which made
+-- the self-authorise shortcut available on any client whose previous firm had
+-- revoked. The shortcut exists so that a firm opening a file for a brand-new
+-- client is not blocked by an acceptance screen that does not exist yet. A
+-- client with history is not that case: they exist, they have a past, and
+-- their consent is the only thing that should bring a new firm in.
+--
+-- Own rows are still excluded (organization_id <> org), so a firm re-engaging
+-- a client it previously held is unaffected.
+-- ---------------------------------------------------------------------------
+create or replace function private.taxpayer_held_by_another_firm(tp uuid, org uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select exists (
+    select 1
+      from engagements e
+     where e.taxpayer_id = tp
+       and e.organization_id is distinct from org
+  )
+$$;
+
+comment on function private.taxpayer_held_by_another_firm(uuid, uuid) is
+  'Has any organisation other than org ever been engaged with this taxpayer, '
+  'at any status, revoked or not? Replaces taxpayer_engaged_elsewhere(), which '
+  'asked only about live engagements and so let a firm self-authorise onto a '
+  'client whose previous firm had revoked -- reachable by NIU once '
+  'taxpayer_id_for_niu() existed. R-56.';
+
+revoke execute on function private.taxpayer_held_by_another_firm(uuid, uuid) from public, anon;
+grant execute on function private.taxpayer_held_by_another_firm(uuid, uuid) to authenticated;
+
+-- The guard, with that one call changed. Everything else is as
+-- 20261030100000 left it.
+create or replace function private.engagements_grant_guard()
+returns trigger
+language plpgsql
+set search_path to 'private', 'public'
+as $$
+declare
+  granting constant text[] := array['accepted', 'authorized'];
+  by_the_taxpayer boolean;
+  by_the_firm boolean;
+begin
+  if auth.uid() is null and current_user in ('postgres', 'service_role', 'supabase_admin') then
+    return new;
+  end if;
+
+  by_the_taxpayer := new.taxpayer_id in (select client_taxpayer_ids());
+
+  if tg_op = 'INSERT' then
+    if new.status = any (granting)
+       or new.authorized_at is not null
+       or new.accepted_at is not null then
+      raise exception
+        'an engagement opens as a draft; authorising it is a separate act'
+        using errcode = '42501';
+    end if;
+    return new;
+  end if;
+
+  if new.organization_id is distinct from old.organization_id
+     or new.taxpayer_id is distinct from old.taxpayer_id then
+    raise exception
+      'an engagement cannot be moved to another firm or another taxpayer'
+      using errcode = '42501';
+  end if;
+
+  if new.revoked_at is null and old.revoked_at is not null then
+    raise exception 'a revoked engagement cannot be un-revoked'
+      using errcode = '42501';
+  end if;
+
+  by_the_firm := new.organization_id = current_member_org();
+  if by_the_taxpayer and not coalesce(by_the_firm, false) then
+    if (new.service_code, new.scope_note, new.fee_xaf, new.assigned_to,
+        new.authorized_at, new.revoked_at)
+       is distinct from
+       (old.service_code, old.scope_note, old.fee_xaf, old.assigned_to,
+        old.authorized_at, old.revoked_at) then
+      raise exception
+        'a client may accept an engagement, not change its terms'
+        using errcode = '42501';
+    end if;
+  end if;
+
+  if new.accepted_at is distinct from old.accepted_at then
+    if old.accepted_at is not null then
+      raise exception 'an acceptance already recorded cannot be changed'
+        using errcode = '42501';
+    end if;
+    if not by_the_taxpayer then
+      raise exception 'only the taxpayer records acceptance of an engagement'
+        using errcode = '42501';
+    end if;
+  end if;
+
+  if (new.status = any (granting) and not (old.status = any (granting)))
+     or (new.authorized_at is not null and old.authorized_at is null) then
+    if new.accepted_at is null
+       and taxpayer_held_by_another_firm(new.taxpayer_id, new.organization_id) then
+      raise exception
+        'another firm has held this taxpayer; only the taxpayer can bring in a new firm'
+        using errcode = '42501';
+    end if;
+  end if;
+
+  return new;
+end $$;
+
+drop function if exists private.taxpayer_engaged_elsewhere(uuid, uuid);
