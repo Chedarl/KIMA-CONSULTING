@@ -251,6 +251,15 @@ anyway. The `auth-codes` Edge Function applies the same address rule and reads
 Removing the variable would therefore change nothing on production and would
 break local sign-in, so it stays.
 
+**The synthetic demo accounts cannot sign in on production, and that is correct
+rather than broken.** Their addresses are on `demo.kima.cm` and `example.*`,
+domains that cannot receive mail, so the emailed code never arrives — and with
+`demo_otp_reveal` off, nothing prints it on screen either. Signing in as a demo
+identity now means a local or preview deployment, or putting a real address on
+the member or contact row first. Please do not "fix" this by turning a flag back
+on: on production, every one of those three gates is the one standing between a
+name plus an NIU and somebody's tax file.
+
 ### Testing the pure engines
 
 ```bash
