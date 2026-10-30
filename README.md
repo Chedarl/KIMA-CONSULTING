@@ -202,6 +202,21 @@ must be either committed here or set on the cloud environment.
 - Plan locally, execute in the cloud: agree an approach in plan mode, commit
   the plan, then hand the execution to a cloud session.
 
+### One-time codes are not an open endpoint
+
+`portal_request_code()` is `SECURITY DEFINER` and lived in `public`, the schema
+PostgREST publishes, so it answered at `/rest/v1/rpc/portal_request_code` with
+the anon key that ships in the browser. Given a display name and NIU it rewrites
+that client's `otp_hash` and `otp_expires_at`, with no rate limit — so anyone
+could keep resetting a client's pending code until the code the client was
+actually sent stopped working. Migration `20261029212000` revokes `EXECUTE` from
+`PUBLIC` as well as from `anon` and `authenticated`; `PUBLIC` is where the grant
+really was, and naming only the two roles would have removed nothing. Nothing
+calls it — `portal_issue_code()` replaced it and is service-role only — so
+unlike the other definer helpers it can lose the grant outright rather than
+having to move schema. Tests: `supabase/tests/portal_code_surface_test.sql`
+(T-61, T-62). Risk R-49.
+
 ### Testing the pure engines
 
 ```bash
