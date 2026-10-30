@@ -52,7 +52,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(18);
+select plan(25);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: one firm, one partner. A second firm's partner stands by as the
@@ -105,7 +105,9 @@ select lives_ok(
        p_legal_name => 'Onb New Client',
        p_taxpayer_type => 'sarl',
        p_contact_name => 'Someone',
-       p_contact_email => 'someone@onb.test'
+       p_contact_email => 'someone@onb.test',
+       p_requests => '[]'::jsonb,
+       p_note => 'Dossier ouvert / File opened'
      ) $$,
   'T-109 step 2: the firm opens the client file and gets the taxpayer id'
 );
@@ -116,7 +118,11 @@ create temporary table onb_file as
     p_legal_name => 'Onb Second Client',
     p_taxpayer_type => 'sarl',
     p_niu => 'P099999999999A',
-    p_organizer => '{"taxpayer_type":"sarl"}'::jsonb
+    p_organizer => '{"taxpayer_type":"sarl","niu":"P099999999999A","skipped":null}'::jsonb,
+    p_requests => '[{"key":"bank","label_fr":"Relevé bancaire","label_en":"Bank statement",
+                     "reason_fr":"Pour la TVA","reason_en":"For VAT",
+                     "responsible":"taxpayer","due_on":"2026-11-13"}]'::jsonb,
+    p_note => 'Dossier ouvert pour Onb Second Client / File opened'
   );
 
 -- T-117 and what it created: an authorised engagement in the caller's own firm,
@@ -139,6 +145,87 @@ select is(
   'T-118 and the firm reads the client file it just opened'
 );
 
+-- ---------------------------------------------------------------------------
+-- T-139 .. T-144: the same call saved all of it, or none of it (R-58).
+--
+-- Before 20261030140000 the four writes below followed the RPC from the
+-- browser, so a failure in any of them left a taxpayer that existed, was
+-- authorised and was empty -- and once the NIU became unique, the firm's
+-- obvious retry came back `already_registered` against its own half-saved
+-- client. These assert that one call now produces the whole file.
+-- ---------------------------------------------------------------------------
+
+-- T-139 the answers, and the one the accountant skipped. `answer` is NOT NULL
+-- and a skipped question arrives as a json null; the browser sent those too and
+-- the whole insert failed on them, so the function filters instead.
+select is(
+  (select string_agg(a.question_key, ',' order by a.question_key)
+     from organizer_answers a join onb_file f on f.taxpayer_id = a.taxpayer_id),
+  'niu,taxpayer_type',
+  'T-139 the organizer answers are written, and a skipped question is absent'
+);
+
+-- T-140 the derived requests, in the caller's own firm. deriveRequests() owns
+-- the rules and passes the rows in; the function owns the columns.
+select is(
+  (select r.label_en || ' / ' || r.responsible || ' / ' || r.status || ' / ' ||
+          r.due_on::text || ' / ' || r.organization_id::text
+     from document_requests r join onb_file f on f.taxpayer_id = r.taxpayer_id),
+  'Bank statement / taxpayer / requested / 2026-11-13 / 00000000-0000-4000-9000-0000000000a0',
+  'T-140 the document request is written with the firm, the party and the date'
+);
+
+-- T-141 the client-visible note, with the caller's real role. The wizard sent
+-- `firm_partner` and the label 'Firm' whoever was signed in; this comes from
+-- current_firm_role() and current_member_label(), so a reviewer is recorded as
+-- a reviewer.
+select is(
+  (select c.kind || ' / ' || c.dimension || ' / ' || c.visibility || ' / ' ||
+          c.actor_role || ' / ' || c.actor_label
+     from case_events c join onb_file f on f.taxpayer_id = c.taxpayer_id),
+  'note_added / note / client / firm_partner / Onb Partner A',
+  'T-141 the note is written as a client-visible note by the member who opened it'
+);
+
+-- T-142 and the record of who did it, which is the half the owner named: an
+-- unrecorded creation is a compliance defect, not a lost convenience.
+select is(
+  (select e.action || ' / ' || e.actor || ' / ' || e.actor_member_id::text || ' / ' ||
+          (e.after -> 'requests' -> 0 ->> 'key')
+     from audit_events e join onb_file f on f.taxpayer_id = e.taxpayer_id),
+  'taxpayer.onboarded / firm / 00000000-0000-4000-9000-0000000000a2 / bank',
+  'T-142 the audit entry is written in the same transaction, naming the member'
+);
+
+-- T-143 the half-saving call shape cannot be made. Both parameters are required
+-- in substance and defaulted only because Postgres will not let a required
+-- parameter follow a defaulted one, so the function refuses null rather than
+-- silently writing a file with no requests and no note.
+select throws_ok(
+  $$ select * from open_client_file(p_legal_name => 'Onb No Note') $$,
+  '22023', null,
+  'T-143 a call that omits the requests or the note is refused'
+);
+
+-- T-144 and the atomicity itself, forced rather than asserted: a request row
+-- with a party that does not exist fails the insert inside the function, and
+-- the taxpayer created three statements earlier goes with it.
+select throws_ok(
+  $$ select * from open_client_file(
+       p_legal_name => 'Onb Rolled Back',
+       p_requests => '[{"label_fr":"x","label_en":"x","responsible":"nobody",
+                        "due_on":"2026-11-13"}]'::jsonb,
+       p_note => 'Dossier ouvert / File opened') $$,
+  null, null,
+  'T-144 a failure inside the call raises'
+);
+
+select is(
+  (select count(*) from taxpayers where legal_name = 'Onb Rolled Back'),
+  0::bigint,
+  'T-144b and leaves no taxpayer behind, which is the whole point'
+);
+
 -- Step 3. T-110 the engagement, exactly as lib/engagements.ts draftEngagement()
 -- builds it: status 'draft', both timestamps explicitly null. This is the
 -- assertion that would have caught status 'pending' before it shipped.
@@ -157,9 +244,15 @@ select lives_ok(
 -- Steps 4 to 7. T-111 .. T-114. All four are refused while the engagement is a
 -- draft, because can_see_taxpayer() is false and every one of these policies
 -- asks it.
+--
+-- 20261030140000 moved these four writes inside open_client_file(), so they are
+-- no longer statements the browser sends. They stay asserted here, as the
+-- policies that function depends on: it is SECURITY INVOKER, so if any of these
+-- four stopped being permitted for a firm member, opening a client file would
+-- stop working and T-139 .. T-142 below would say so without saying why.
 select lives_ok(
   $$ insert into organizer_answers (taxpayer_id, question_key, answer)
-     values ((select taxpayer_id from onb_file), 'taxpayer_type', 'sarl') $$,
+     values ((select taxpayer_id from onb_file), 'contact_name', 'Someone') $$,
   'T-111 step 4: the firm stores the organizer answers it just collected'
 );
 
@@ -290,7 +383,9 @@ select is(
   (select outcome || ' / returns ' ||
           case when taxpayer_id is null then 'null' else 'an id' end
      from open_client_file(p_legal_name => 'Second Client again',
-                           p_niu => '  p099999999999a  ')),
+                           p_niu => '  p099999999999a  ',
+                           p_requests => '[]'::jsonb,
+                           p_note => 'Demande / Request')),
   'already_registered / returns null',
   'T-120 a second firm entering a held NIU is routed to ask, not given a file'
 );
