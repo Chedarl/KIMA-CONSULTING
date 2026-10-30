@@ -534,6 +534,52 @@ insert through the onboarding wizard and the engagements screen had been refused
 `20261029213000` merged. `scripts/engine-check.mjs` asserted the wrong value too, which
 is why nothing caught it.
 
+**Opening a client file is one act** (migration `20261030110000`, risk R-54). The
+onboarding wizard used to perform seven statements from the browser and four of them
+were refused, so a firm could not take on a new taxpayer at all. Measured as a signed-in
+firm partner against a replayed schema rather than reasoned about: step 2 sent `insert
+into taxpayers … returning id`, and Postgres applies the SELECT policy to a row returned
+by `RETURNING`, where `can_see_taxpayer(id)` needs a live engagement that cannot exist
+one statement before the engagement is written. The error said `new row violates
+row-level security policy`, which misleads — `private.member_has('case.advance')` is
+true, and the same INSERT without `RETURNING` succeeds. Steps 4 to 7 were then refused
+because an engagement opens as a draft and a draft grants nothing, which is the rule that
+stops a firm self-granting by drafting against another firm's client (T-74).
+
+On the owner's decision of 30 Oct, opening a file for a brand-new client **authorises**
+the engagement. That grants nothing the firm could not grant itself a second later under
+rule 3 — no other firm holds a taxpayer created in that same call — and `accepted_at`
+stays null, so no client consent is claimed and only the taxpayer can ever write it.
+`draftEngagement()`'s "opening a file is not the authorisation" now describes the
+engagements screen, where drafting and authorising remain two separate acts.
+
+`public.open_client_file()` creates both rows atomically. It is **SECURITY INVOKER on
+purpose**: every policy still applies, so the caller needs `case.advance` to create the
+taxpayer and `engagement.authorize` to authorise it, and `engagements_grant_guard()`
+still refuses if another firm holds that taxpayer. The engagement is inserted as a draft
+and then authorised, because `"firm writes engagements"` deliberately refuses an insert
+that is already a grant — the F-01 fix working, not an obstacle to route around. It takes
+no taxpayer id and only ever creates one, so it cannot be used to reach an existing
+client, and T-53's one-definer-in-`public` invariant is untouched. Being atomic also
+removes the orphan risk the old sequence carried: a refused engagement used to leave a
+taxpayer nobody could read.
+
+**How this class of defect is caught now.** Three defects reached production on the
+onboarding path in one morning, every one found by reading code. The reason was the same
+each time: the repository had unit tests over pure functions and pgTAP tests over
+hand-written SQL, and nothing that ran the sequence the application actually performs, as
+the role it performs it as, against the schema the migrations produce. Two things close
+that. The journey test above is one. The other is engine check **T-22**, which parses
+`engagements_status_known` out of the migrations and asserts that every status
+`lib/engagements.ts` writes is one the database allows — the contract the `'pending'`
+defect broke. Reproducing the pre-`20261030070000` state exactly, including the
+hardcoded assertion that agreed with the bug, T-22 is what fails:
+
+```
+lib/engagements.ts writes status 'pending', which engagements_status_known
+does not allow (draft, invited, accepted, authorized, revoked, expired)
+```
+
 **The firm staff directory belongs to the firm** (migration `20261030090000`, risk
 R-53). `firm_members` carried `POLICY "members are readable" FOR SELECT USING (true)`
 with no role named, so every signed-in caller and every anonymous one read every firm's
