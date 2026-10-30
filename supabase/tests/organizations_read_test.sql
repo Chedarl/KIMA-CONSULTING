@@ -146,13 +146,16 @@ select is(
 );
 reset role;
 
--- T-135 and nothing else: the return type is the disclosure, so pin it.
+-- T-135 and nothing else: the return type is the disclosure, so pin it. Three
+-- columns since 20261030150000, which added the verification label the owner
+-- asked clients choosing a firm to see. `kind`, `country` and `created_at` stay
+-- inside the firm.
 select is(
   (select pg_get_function_result(p.oid)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'firm_directory'),
-  'TABLE(id uuid, name text)',
-  'T-135 the lookup returns two columns, so country and created_at cannot leak'
+  'TABLE(id uuid, name text, verification_status text)',
+  'T-135 the lookup returns the name and the label, and nothing else'
 );
 
 -- T-136 no arguments, so there is nothing for a caller to steer.
