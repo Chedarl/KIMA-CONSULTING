@@ -23,7 +23,7 @@ begin
   if v_admin is null then
     raise exception 'KIMA administrator required' using errcode = '42501';
   end if;
-  if p_action not in ('verify','suspend','unsuspend')
+  if p_action is null or p_action not in ('verify','suspend','unsuspend')
      or length(v_reason) not between 12 and 1000 then
     raise exception 'a supported action and documented reason are required'
       using errcode = '22023';
