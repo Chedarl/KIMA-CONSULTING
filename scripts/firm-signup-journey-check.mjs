@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 const root = resolve(process.cwd());
 const out = mkdtempSync(join(tmpdir(), "kima-signup-"));
 const compiled = spawnSync(process.execPath, [join(root,"node_modules/typescript/bin/tsc"),
-  "lib/firm-signup-journey.ts","lib/i18n-firm-signup.ts",
+  "lib/firm-signup-journey.ts","lib/i18n-firm-signup.ts","lib/public-onboarding.ts",
   "--outDir",out,"--module","commonjs","--target","es2020",
   "--skipLibCheck","--moduleResolution","node","--esModuleInterop","--strict",
 ], {cwd:root, encoding:"utf8"});
@@ -16,6 +16,7 @@ assert.equal(compiled.status,0,compiled.stdout || compiled.stderr);
 const require = createRequire(import.meta.url);
 const m = require(join(out,"firm-signup-journey.js"));
 const c = require(join(out,"i18n-firm-signup.js"));
+const onboarding = require(join(out,"public-onboarding.js"));
 const valid = {email:"OWNER@example.cm",firmName:"Cabinet Atelier",
   ownerName:"Aline Example",registrationNumber:" ab-12 / 34 "};
 assert.deepEqual(m.firmSignupIssues(valid),[]);
@@ -35,4 +36,12 @@ for(const t of [fr,en]){
   for(const value of Object.values(t.errors)) assert.ok(value.trim());
   assert.ok(t.pending && t.limitation && t.preview);
 }
-console.log("ok firm signup input, error mapping, FR/EN parity");
+const applicant = { ...onboarding.EMPTY_ONBOARDING, kind:"business",
+  name:"Synthetic Applicant", email:"synthetic@example.test",
+  legalName:"Example Company", services:["tax"] };
+assert.ok(onboarding.issuesFor("verify",applicant,true).includes("firm"));
+assert.deepEqual(onboarding.issuesFor("verify",applicant),[]);
+const assigned = { ...applicant, firmId:"00000000-0000-4000-8000-000000000001" };
+assert.deepEqual(onboarding.issuesFor("verify",assigned,true),[]);
+assert.equal(onboarding.registrationInsert(assigned,"00000000-0000-4000-8000-000000000010").full.organization_id,assigned.firmId);
+console.log("ok firm signup validation, FR/EN, selected-firm queue");
