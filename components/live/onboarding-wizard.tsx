@@ -137,16 +137,19 @@ export function OnboardingWizard({
       // The firm is the signed-in member's own organisation. Never
       // `organizations … limit(1)`: with a second firm that attached every new
       // taxpayer to whichever organisation happened to sort first.
-      const { data: auth } = await db.auth.getUser();
-      if (!auth.user) throw new Error("not signed in");
-      const { data: member, error: memErr } = await db
-        .from("firm_members")
-        .select("organization_id")
-        .eq("auth_user_id", auth.user.id)
-        .eq("active", true)
-        .maybeSingle();
+      //
+      // Through the RPC, not a query. The query this replaces filtered on
+      // `auth_user_id`, and `authenticated` holds no SELECT on that column
+      // (20261022163452 grants seven, and that is not one) -- Postgres needs
+      // the privilege for a column in WHERE, not only in the select list, so
+      // it had been failing with "permission denied for table firm_members"
+      // since #13 introduced it. The intent was right and never worked.
+      // current_firm_intake_identity() resolves auth.uid() in the database and
+      // returns the organisation without exposing auth_user_id.
+      const { data: identities, error: memErr } = await db.rpc("current_firm_intake_identity");
+      const member = (identities as Array<{ organization_id: string }> | null)?.[0];
       if (memErr || !member?.organization_id) throw memErr ?? new Error("no organization");
-      const org = { id: member.organization_id as string };
+      const org = { id: member.organization_id };
 
       const { data: taxpayer, error: tpErr } = await db
         .from("taxpayers")

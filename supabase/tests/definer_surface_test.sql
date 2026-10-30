@@ -54,15 +54,16 @@ select is(
 -- helper has to be added here deliberately, which is the point: this is the
 -- census, and it is the test that notices a definer function appearing.
 -- engagements_grant_guard and taxpayer_engaged_elsewhere arrived with
--- 20261030070000 (F-01).
+-- 20261030070000 (F-01), current_member_id with 20261030080000 and
+-- current_member_org with 20261030090000 (R-53).
 select is(
   (select string_agg(distinct p.proname, ', ' order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'private'),
   'auth_identity_is_single, can_see_taxpayer, client_taxpayer_ids, '
   'current_firm_role, current_member_id, current_member_label, '
-  'demo_taxpayer_id, engagements_grant_guard, firm_member_has, flag_enabled, '
-  'member_has, '
+  'current_member_org, demo_taxpayer_id, engagements_grant_guard, '
+  'firm_member_has, flag_enabled, member_has, '
   'member_has_in_org, portal_request_code, signal_firm_intake_document_change, '
   'taxpayer_engaged_elsewhere',
   'T-52 every moved helper is in private, and nothing else is'

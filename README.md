@@ -522,6 +522,44 @@ insert through the onboarding wizard and the engagements screen had been refused
 `20261029213000` merged. `scripts/engine-check.mjs` asserted the wrong value too, which
 is why nothing caught it.
 
+**The firm staff directory belongs to the firm** (migration `20261030090000`, risk
+R-53). `firm_members` carried `POLICY "members are readable" FOR SELECT USING (true)`
+with no role named, so every signed-in caller and every anonymous one read every firm's
+member rows. The column grants were set deliberately in `20261022163452` and held — a
+probe as a signed-in member got `permission denied for table firm_members` on `email`,
+and `auth_user_id`, `otp_hash`, `otp_expires_at` and `failed_attempts` are equally
+unreadable — so what leaked was the directory, not credentials or client data: id,
+organisation, `person_label`, `role`, `active`. The owner's decision on 30 Oct made it a
+defect rather than an open question. The policy is now
+`organization_id = private.current_member_org()` and names only `authenticated`, so a
+caller with no session is refused by having no policy at all, which is an empty result
+rather than an error. Seven checks in `supabase/tests/firm_directory_test.sql`, both
+directions plus the anonymous case; all seven fail without the migration.
+
+The helper is SECURITY DEFINER because it has to be, not for tidiness: the predicate
+reads `firm_members` from inside a policy *on* `firm_members`, and written inline that
+raises `infinite recursion detected in policy for relation firm_members`. A definer
+helper reads the table as its owner with RLS off, which breaks the cycle.
+
+Tightening it was safe because firm sign-in does not read the table before a session
+exists — `/api/firm/request-code` and `/api/firm/verify-code` go through
+`firm_issue_code()` and `firm_verify_code()`, both SECURITY DEFINER and reachable only by
+the service role or the auth-codes Edge Function, and the route's own `firm_members`
+write uses `supabaseAdmin()`, which bypasses RLS. That was checked rather than assumed.
+
+A member with no organisation is now unreadable, including to themselves, because
+`organization_id = null` matches nothing. Nothing depended on the old behaviour and T-98
+pins the new one, because rows in that shape exist.
+
+The same migration carries a third live break. `components/live/onboarding-wizard.tsx`
+resolved the signed-in member's firm with `.eq("auth_user_id", auth.user.id)`, and
+`authenticated` holds no SELECT on that column — Postgres requires the privilege for a
+column in `WHERE`, not only in the select list, so the query had been failing with
+`permission denied for table firm_members` since #13 introduced it on 27 Oct. The intent
+was right, replacing an unsafe `organizations … limit(1)`, and it never worked. It now
+goes through `current_firm_intake_identity()`, which resolves `auth.uid()` in the
+database and returns the organisation without exposing `auth_user_id`.
+
 **The policy helpers are no longer API endpoints** (migration `20261030020000`,
 merged in #27 and applied to production 30 Oct 2026). Eleven `SECURITY DEFINER` functions sat in `public`, the
 schema PostgREST publishes, so each was an endpoint at `/rest/v1/rpc/<name>` and
