@@ -124,13 +124,14 @@ export function MessageThread({
   senderName: string;
   labels: MessageLabels;
   /** Set on the firm side from the OTP session. Absent means the send is refused. */
-  firmActor?: { role: ActorRole; label: string } | null;
+  firmActor?: { role: ActorRole; label: string; memberId: string } | null;
   sendBlocked?: string | null;
   /** Client portal layout. Firm workspace keeps the default thread. */
   appearance?: "default" | "portal";
   heading?: string;
 }) {
   const toast = useToast();
+  const firmMemberId = firmActor?.memberId ?? null;
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [requests, setRequests] = useState<RequestLite[]>([]);
   const [orgId, setOrgId] = useState<string | null>(null);
@@ -149,18 +150,39 @@ export function MessageThread({
     if (!taxpayerId) return;
     try {
       const db = supabase();
-      // Both parties see only live, RLS-visible engagements for this company.
-      // If there is more than one firm, the user must select one by name.
+      // Firm staff can message only through their own RLS-visible organisation.
+      // Never offer a firm's staff the taxpayer's other active firms as recipients.
+      if (side === "firm" && !firmMemberId) {
+        setFirms([]);
+        setOrgId(null);
+        setMsgs([]);
+        setRequests([]);
+        return;
+      }
+      let firmOrgId: string | null = null;
+      if (side === "firm") {
+        const { data: member, error: memberError } = await db.from("firm_members")
+          .select("organization_id")
+          .eq("id", firmMemberId!)
+          .eq("active", true)
+          .is("deactivated_at", null)
+          .maybeSingle();
+        if (memberError || !member?.organization_id) throw new Error("Firm member unavailable");
+        firmOrgId = member.organization_id as string;
+      }
+      const messageQuery = db.from("messages").select("*").eq("taxpayer_id", taxpayerId);
+      const requestQuery = db.from("document_requests")
+        .select("id, organization_id, label_fr, label_en").eq("taxpayer_id", taxpayerId);
+      const engagementQuery = db.from("engagements")
+        .select("organization_id, status, authorized_at, accepted_at, revoked_at")
+        .eq("taxpayer_id", taxpayerId)
+        .in("status", ["accepted", "authorized"])
+        .is("revoked_at", null);
       const [{ data: m, error: messagesError }, { data: r, error: requestsError },
         { data: grants, error: grantError }, { data: directory }] = await Promise.all([
-        db.from("messages").select("*").eq("taxpayer_id", taxpayerId).order("created_at"),
-        db.from("document_requests")
-          .select("id, organization_id, label_fr, label_en").eq("taxpayer_id", taxpayerId),
-        db.from("engagements")
-          .select("organization_id, status, authorized_at, accepted_at, revoked_at")
-          .eq("taxpayer_id", taxpayerId)
-          .in("status", ["accepted", "authorized"])
-          .is("revoked_at", null),
+        (firmOrgId ? messageQuery.eq("organization_id", firmOrgId) : messageQuery).order("created_at"),
+        firmOrgId ? requestQuery.eq("organization_id", firmOrgId) : requestQuery,
+        firmOrgId ? engagementQuery.eq("organization_id", firmOrgId) : engagementQuery,
         db.rpc("firm_directory"),
       ]);
       if (taxpayerId !== currentTaxpayer.current) return;
@@ -185,7 +207,7 @@ export function MessageThread({
     } catch {
       setError(true);
     }
-  }, [taxpayerId, labels.firmName]);
+  }, [taxpayerId, labels.firmName, side, firmMemberId]);
 
   useEffect(() => {
     setOrgId(null);
@@ -260,6 +282,18 @@ export function MessageThread({
 
     try {
       const db = supabase();
+      if (side === "firm") {
+        if (!firmMemberId) throw new Error("Firm session required");
+        const { data: member, error: memberError } = await db.from("firm_members")
+          .select("organization_id")
+          .eq("id", firmMemberId)
+          .eq("active", true)
+          .is("deactivated_at", null)
+          .maybeSingle();
+        if (memberError || member?.organization_id !== chosenOrg) {
+          throw new Error("Cannot message another firm's client");
+        }
+      }
       const { data: current, error: grantError } = await db.from("engagements")
         .select("status, authorized_at, accepted_at")
         .eq("taxpayer_id", taxpayerId).eq("organization_id", chosenOrg)
