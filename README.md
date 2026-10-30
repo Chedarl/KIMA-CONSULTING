@@ -985,3 +985,7 @@ structurally-valid value.
 ### Contact inquiries versus firm-scoped applications (Phase 2)
 
 A general public contact request goes to `public.contact_inquiries`, an append-only, non-tenant inbox readable only by an active authenticated KIMA administrator. This is **not** a `registrations` row and creates no organization, client, or firm authorization. An ordinary onboarding application instead requires an explicitly selected receiving accounting firm, and its row is visible only to that firm under #42. The contact page UI is a separate Agent B change; deploy the table before the UI in the owner-approved release.
+
+A visitor may write only the message fields (`contact_name`, `contact_email`, `contact_phone`, `inquiry_kind`, `preferred_language`, `note`). `id` and `received_at` are not granted, so a submitter can neither choose their own primary key nor backdate when KIMA received the message (T-232 .. T-234).
+
+**Release gate: this inbox must not go live without a throttle.** The row policy is `with check (true)` and cannot be anything else — `anon` has no identity for a per-sender limit to count by, since `auth.uid()` is null and an IP never reaches Postgres. Throttling therefore belongs in the route handler, the platform firewall, or a captcha, and that is Agent B's contact-page change, not this migration. Nothing posts to the table today, so the endpoint is not yet reachable; it must not be exposed until the throttle exists.

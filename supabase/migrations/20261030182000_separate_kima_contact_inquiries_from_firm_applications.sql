@@ -36,9 +36,29 @@ comment on table public.contact_inquiries is
 
 alter table public.contact_inquiries enable row level security;
 revoke all on public.contact_inquiries from public, anon, authenticated;
-grant insert on public.contact_inquiries to anon, authenticated;
+
+-- A visitor fills in the message, and nothing else. A table-wide INSERT grant
+-- would also hand them `id` and `received_at` -- the two columns the server is
+-- supposed to set -- so a submitter could choose their own primary key or
+-- backdate when KIMA received their message. Granting column by column leaves
+-- both to their defaults, unsettable rather than merely unexpected.
+--
+-- Column grants cannot be carved out of a table-wide one (Postgres accepts
+-- `revoke insert (col)` and does nothing), so the table grant has to go first.
+-- Same shape as the firm_members fix in 20261022163452.
+grant insert (contact_name, contact_email, contact_phone, inquiry_kind,
+              preferred_language, note)
+  on public.contact_inquiries to anon, authenticated;
 grant select on public.contact_inquiries to authenticated;
 
+-- `with check (true)` is the row rule, and it is as open as it looks: anon has
+-- no identity to key a limit on, so a per-sender cap CANNOT live here. There is
+-- nothing to count by -- auth.uid() is null, and an IP never reaches Postgres.
+-- Throttling belongs where the sender is visible: the route handler, the
+-- platform firewall, or a captcha. Nothing posts to this table yet, so the
+-- endpoint is not live and this is a release gate rather than an open hole --
+-- recorded as such in the README. Do not read this policy as "unlimited by
+-- design"; read it as "limited somewhere this file cannot see".
 create policy "any visitor can submit a bounded contact inquiry"
   on public.contact_inquiries for insert to anon, authenticated
   with check (true);

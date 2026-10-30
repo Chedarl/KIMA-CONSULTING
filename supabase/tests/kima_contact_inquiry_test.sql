@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(7);
+select plan(10);
 
 insert into auth.users (id,email) values
  ('00000000-0000-4000-d000-00000000d001','contact-kima-admin@example.test'),
@@ -50,5 +50,46 @@ reset role;
 select is((select count(*) from registrations
  where organization_id='00000000-0000-4000-d000-00000000d012'),0::bigint,
  'T-231 general inquiry creates no third-party firm registration');
+-- ---------------------------------------------------------------------------
+-- T-232 .. T-234: a visitor fills in the message, not the record.
+--
+-- The first version of this table granted INSERT table-wide, so a submitter
+-- could also set `id` and `received_at` -- choose their own primary key, or
+-- backdate when KIMA received the message. The row policy never saw it: the
+-- grant is what decides which columns a caller may write, and `with check
+-- (true)` passes either way. These assert the privilege, since that is where
+-- the fix lives.
+-- ---------------------------------------------------------------------------
+
+select set_config('request.jwt.claims','',true);
+set local role anon;
+
+-- T-232
+select is(
+ (select coalesce(string_agg(column_name, ',' order by column_name), '(none)')
+    from information_schema.column_privileges
+   where table_schema = 'public' and table_name = 'contact_inquiries'
+     and grantee = 'anon' and privilege_type = 'INSERT'),
+ 'contact_email,contact_name,contact_phone,inquiry_kind,note,preferred_language',
+ 'T-232 a visitor may write the message fields, and only those');
+
+-- T-233 the server-set columns, stated as the two that are absent above.
+select throws_ok(
+ $$insert into contact_inquiries (id, contact_name, contact_email, inquiry_kind,
+                                  preferred_language)
+   values ('00000000-0000-4000-d000-00000000dff1', 'Id Chooser',
+           'id@chooser.test', 'individual', 'fr')$$,
+ '42501', null, 'T-233 and cannot choose the row id');
+
+-- T-234
+select throws_ok(
+ $$insert into contact_inquiries (contact_name, contact_email, inquiry_kind,
+                                  preferred_language, received_at)
+   values ('Backdater', 'back@dater.test', 'individual', 'fr',
+           '2020-01-01T00:00:00Z')$$,
+ '42501', null, 'T-234 nor backdate when KIMA received it');
+
+reset role;
+
 select * from finish();
 rollback;
