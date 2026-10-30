@@ -21,16 +21,16 @@ select has_table('public','contact_inquiries',
   'T-225 KIMA general-contact inbox exists separately');
 select set_config('request.jwt.claims','',true);
 set local role anon;
-select throws_ok($insert into contact_inquiries
+select throws_ok($$insert into contact_inquiries
  (contact_name,contact_email,inquiry_kind,preferred_language,note)
- values ('Public Visitor','visitor@example.test','business','en','General question')$,
+ values ('Public Visitor','visitor@example.test','business','en','General question')$$,
  '42501',null,'T-226 direct Data API contact inserts fail closed before abuse controls');
 reset role;
 update app_flags set enabled=true where key='allow_public_contact_inquiries';
 set local role anon;
-select lives_ok($insert into contact_inquiries
+select lives_ok($$insert into contact_inquiries
  (contact_name,contact_email,inquiry_kind,preferred_language,note)
- values ('Public Visitor','visitor@example.test','business','en','General question')$,
+ values ('Public Visitor','visitor@example.test','business','en','General question')$$,
  'T-226a synthetic gate-enabled contact reaches the inbox without a firm');
 select throws_ok($$select count(*) from contact_inquiries$$,
  '42501',null,'T-227 anonymous visitor cannot read the inbox');
