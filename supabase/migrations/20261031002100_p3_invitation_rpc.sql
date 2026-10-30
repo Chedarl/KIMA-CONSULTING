@@ -2,12 +2,12 @@
 -- All decisions derive the sender/recipient from auth.uid(), never a form field.
 -- These functions are draft code only: deploy after security and SQL replay review.
 
-create function public.create_invitation(
+create function private.create_invitation_internal(
   p_direction text, p_organization_id uuid, p_taxpayer_id uuid,
   p_contact_id uuid default null
 ) returns table(invitation_id uuid, expires_at timestamptz)
 language plpgsql security definer
-set search_path to 'pg_catalog', 'public', 'private'
+set search_path to ''
 as $$
 declare
   v_recipient uuid;
@@ -81,9 +81,9 @@ begin
   return query select v_id,v_exp;
 end $$;
 
-create function public.decide_invitation(p_invitation_id uuid, p_action text)
+create function private.decide_invitation_internal(p_invitation_id uuid, p_action text)
 returns text language plpgsql security definer
-set search_path to 'pg_catalog', 'public', 'private'
+set search_path to ''
 as $$
 declare
   v public.engagement_invitations%rowtype;
@@ -133,7 +133,25 @@ begin
   return p_action;
 end $$;
 
-revoke execute on function public.create_invitation(text,uuid,uuid,uuid) from public, anon;
-revoke execute on function public.decide_invitation(uuid,text) from public, anon;
+-- Public API is SECURITY INVOKER. Privileged internals live in private,
+-- which Supabase does not expose as an RPC schema.
+create function public.create_invitation(
+  p_direction text, p_organization_id uuid, p_taxpayer_id uuid,
+  p_contact_id uuid default null
+) returns table(invitation_id uuid, expires_at timestamptz)
+language sql security invoker set search_path to '' as $
+  select * from private.create_invitation_internal($1,$2,$3,$4)
+$;
+create function public.decide_invitation(p_invitation_id uuid, p_action text)
+returns text language sql security invoker set search_path to '' as $
+  select private.decide_invitation_internal($1,$2)
+$;
+
+revoke execute on function private.create_invitation_internal(text,uuid,uuid,uuid) from public,anon;
+revoke execute on function private.decide_invitation_internal(uuid,text) from public,anon;
+grant execute on function private.create_invitation_internal(text,uuid,uuid,uuid) to authenticated;
+grant execute on function private.decide_invitation_internal(uuid,text) to authenticated;
+revoke execute on function public.create_invitation(text,uuid,uuid,uuid) from public,anon;
+revoke execute on function public.decide_invitation(uuid,text) from public,anon;
 grant execute on function public.create_invitation(text,uuid,uuid,uuid) to authenticated;
 grant execute on function public.decide_invitation(uuid,text) to authenticated;
