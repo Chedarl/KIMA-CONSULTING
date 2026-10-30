@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { obligationLabel } from "@/lib/cases";
-import { resolvePortalContext, supabase } from "@/lib/supabase";
+import { resolvePortalContext, savePortalFirmChoice, supabase } from "@/lib/supabase";
 
 type IconName =
   | "home"
@@ -91,6 +91,8 @@ export function ClientPortalShell({
   const [biz, setBiz] = useState<Business[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [multipleFirms, setMultipleFirms] = useState<boolean | undefined>(undefined);
+  const [firmOptions, setFirmOptions] = useState<{ id: string; name: string }[]>([]);
+  const [selectedFirmId, setSelectedFirmId] = useState("");
   const [bizOpen, setBizOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
@@ -145,7 +147,21 @@ export function ClientPortalShell({
         const ids = context.status === "ready"
           ? { taxpayerId: context.taxpayerId, organizationId: context.organizationId }
           : null;
-        setActiveId(ids?.taxpayerId ?? null);
+        const options = context.status === "ready" || context.status === "multiple_firms"
+          ? context.organizationIds : [];
+        setSelectedFirmId(ids?.organizationId ?? "");
+        setFirmOptions([]);
+        if (options.length > 1) {
+          const { data: directory } = await db.rpc("firm_directory");
+          if (cancelled) return;
+          const names = new Map<string, string>(((directory ?? []) as { id: string; name: string }[])
+            .map((firm) => [firm.id, firm.name]));
+          setFirmOptions(options.map((id) => ({
+            id, name: names.get(id) ?? `Cabinet / Firm (${id.slice(0, 8)})`,
+          })));
+        }
+        setActiveId(context.status === "ready" || context.status === "multiple_firms"
+          ? context.taxpayerId : null);
         if (!ids) {
           setBiz([]);
           setUnread(0);
@@ -186,7 +202,8 @@ export function ClientPortalShell({
       } catch {
         if (!cancelled) {
           setBiz([]);
-          setMultipleFirms(false);
+          setMultipleFirms(undefined);
+          setFirmOptions([]);
         }
       }
     })();
@@ -483,6 +500,25 @@ export function ClientPortalShell({
         </div>
 
         <main id="main" className="flex-1 px-4 py-6 pb-28 sm:px-6 lg:px-8 lg:pb-8">
+          {firmOptions.length > 1 && activeId && (
+            <label className="mb-5 flex flex-wrap items-center gap-3 text-sm font-semibold text-fg">
+              {locale === "fr" ? "Cabinet actif pour cette entreprise" : "Active firm for this company"}
+              <select
+                aria-label={locale === "fr" ? "Choisir le cabinet actif" : "Choose active firm"}
+                className="min-h-[44px] rounded-lg border border-border bg-white px-3 text-sm"
+                value={selectedFirmId}
+                onChange={(event) => {
+                  const id = event.target.value;
+                  if (!firmOptions.some((firm) => firm.id === id)) return;
+                  savePortalFirmChoice(activeId, id);
+                  window.location.reload();
+                }}
+              >
+                <option value="">{locale === "fr" ? "Sélectionner un cabinet" : "Select a firm"}</option>
+                {firmOptions.map((firm) => <option key={firm.id} value={firm.id}>{firm.name}</option>)}
+              </select>
+            </label>
+          )}
           {multipleFirms === undefined ? (
             <div className="skeleton h-24 rounded-card" aria-busy="true" />
           ) : multipleFirms && !path.startsWith(`${base}/messages`) ? (
@@ -492,8 +528,8 @@ export function ClientPortalShell({
               </h1>
               <p className="mt-3 text-sm leading-relaxed text-fg-muted">
                 {locale === "fr"
-                  ? "Plusieurs cabinets sont associés à cette entreprise. Choisissez le cabinet destinataire dans Messages. Les autres pages restent protégées en attendant la sélection du contexte entreprise et cabinet."
-                  : "More than one accounting firm is linked to this company. Choose the receiving firm under Messages. Other pages remain protected until company and firm context selection is available."}
+                  ? "Choisissez le cabinet actif ci-dessus pour afficher les dossiers de cette entreprise."
+                  : "Select the active firm above to view this company's cases."}
               </p>
             </section>
           ) : children}
