@@ -125,3 +125,19 @@ a qualified expert-comptable". The wording is Agent B's and needs both locales.
    person to KIMA rather than just say no.
 5. The application form becomes the sign-up form, behind the flag.
 6. The flag flips last, and only after the end-to-end check passes.
+
+## Beyond sign-up: the rest of phase 2
+
+This note covers step one of the plan's four phase 2 items. The others, and
+where they stand on 30 Oct:
+
+| Plan item | State |
+|---|---|
+| Firm sign-up flow | the build order above |
+| Team settings — invite, revoke, assign roles, with an audit event per sensitive change | `manage_firm_staff()` exists and is tested; the **screens do not**, so it is reachable only through the RPC |
+| Onboarding approval in one transaction | **done**, `20261030210000`, `approve_registration()` |
+| Home page and live site consistent with what is open | outstanding |
+
+**Exit:** a new firm signs up, invites staff, and sees nothing from any other
+firm; the two-firm test passes with self-signed-up firms. That last part is
+covered by `two_new_firms_signup_test.sql`.
