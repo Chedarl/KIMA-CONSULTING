@@ -25,8 +25,8 @@ select lives_ok($$insert into contact_inquiries
  (contact_name,contact_email,inquiry_kind,preferred_language,note)
  values ('Public Visitor','visitor@example.test','business','en','General question')$$,
  'T-226 a general KIMA contact reaches the inbox without a selected firm');
-select is((select count(*) from contact_inquiries),0::bigint,
- 'T-227 anonymous visitor cannot enumerate submitted inquiries');
+select throws_ok($$select count(*) from contact_inquiries$$,
+ '42501',null,'T-227 anonymous visitor cannot read the inbox');
 select throws_ok($$insert into contact_inquiries
  (contact_name,contact_email,inquiry_kind,preferred_language)
  values ('Invalid','','business','en')$$,
