@@ -202,6 +202,89 @@ must be either committed here or set on the cloud environment.
 - Plan locally, execute in the cloud: agree an approach in plan mode, commit
   the plan, then hand the execution to a cloud session.
 
+### One-time codes are not an open endpoint
+
+`portal_request_code()` is `SECURITY DEFINER` and lived in `public`, the schema
+PostgREST publishes, so it answered at `/rest/v1/rpc/portal_request_code` with
+the anon key that ships in the browser. Given a display name and NIU it rewrites
+that client's `otp_hash` and `otp_expires_at`, with no rate limit — so anyone
+could keep resetting a client's pending code until the code the client was
+actually sent stopped working. Migration `20261029212000` revokes `EXECUTE` from
+`PUBLIC` as well as from `anon` and `authenticated`; `PUBLIC` is where the grant
+really was, and naming only the two roles would have removed nothing. Nothing
+calls it — `portal_issue_code()` replaced it and is service-role only — so
+unlike the other definer helpers it can lose the grant outright rather than
+having to move schema. Tests: `supabase/tests/portal_code_surface_test.sql`
+(T-61, T-62). Risk R-49.
+### Phase 1 environment settings
+
+Settings that live in a dashboard rather than in this repository, recorded here
+because nothing in the code can show their state and phase 1 cannot close
+without them.
+
+| Setting | Where | State |
+|---|---|---|
+| `app_flags.allow_demo_anon` | Supabase, `app_flags` table | **false** since 30 Oct 2026, 02:13 UTC |
+| `app_flags.demo_otp_reveal` | Supabase, `app_flags` table | **false** since 30 Oct 2026, 02:13 UTC |
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel, all environments | **set** since 23 Oct 2026 |
+| Leaked-password protection | Supabase Auth | **not available** on the current plan (Pro and up) |
+| Minimum password length | Supabase Auth | 6 — see R-50 |
+
+Both demo flags being false is what the plan asks for before any real taxpayer
+data (R-32/R-36). The visible consequence: the signed-out site no longer shows
+the demo taxpayer, and a one-time code is never printed on screen, so a demo
+sign-in now needs the code that arrives by email.
+
+**`KIMA_DEMO_OTP_REVEAL` can stay set, and here is why it is not a second way
+in.** It is one of three conditions in `mayRevealCode()` (`lib/auth-mail.ts`),
+all of which must hold before a code is shown: the flag is `1`, **`VERCEL_ENV`
+is not `production`**, and the destination cannot receive mail at all
+(`demo.kima.cm`, or a domain starting `example.`, reserved by IANA for this).
+Production fails the second condition whatever the variable says, and a failed
+send to a real address is a failure rather than a reason to reveal. `npm test`
+pins both halves on every push (T-18: "production never reveals, even for an
+`example.*` address"). What the variable still does is show the code on a
+preview or local deployment for an address that could not have received it
+anyway. The `auth-codes` Edge Function applies the same address rule and reads
+`app_flags.demo_otp_reveal`, which is now false.
+
+Removing the variable would therefore change nothing on production and would
+break local sign-in, so it stays.
+
+**The synthetic demo accounts cannot sign in on production, and that is correct
+rather than broken.** Their addresses are on `demo.kima.cm` and `example.*`,
+domains that cannot receive mail, so the emailed code never arrives — and with
+`demo_otp_reveal` off, nothing prints it on screen either. That is the three
+gates working.
+
+**Owner decision, 30 Oct 2026, on how to demo on production instead.** Give the
+demo accounts real inboxes the team controls — `demo+client@…`,
+`demo+firm@…` on a KIMA CONSULTING mailbox — and leave `demo_otp_reveal` off.
+The code then arrives by email exactly as it does for a real client, and nothing
+is switched back on. The accepted alternative is a separate demo deployment (a
+Vercel preview against its own Supabase project holding only invented data),
+where showing codes on screen is harmless because there is nothing real behind
+it. **Explicitly rejected: turning `demo_otp_reveal` back on in production, and
+any shared demo password.** Either reopens what was closed on 30 Oct.
+
+Two consequences of that decision worth knowing before you act on it:
+
+- A real address is, correctly, **not** an undeliverable one, so
+  `mayRevealCode()` returns false for it *everywhere*, local included. A
+  developer working offline still wants `demo.kima.cm` or `example.*` on their
+  local rows; the team mailbox belongs on the shared demo, not in
+  `.env.local`-land. The two uses are different and should not converge on one
+  address list.
+- `demo.kima.cm` is hardcoded as undeliverable in `isUndeliverableAddress()`. If
+  that domain is ever given a real mailbox, the code list has to change in the
+  same commit, or a real inbox silently becomes one whose codes are printed on
+  screen.
+
+`supabase/seed/synthetic.sql` keeps `@example.invalid`, which cannot receive mail
+by IANA reservation, so running the seed can never mail a real person by
+accident. Substituting the team mailbox is a deliberate edit for a shared demo,
+not the default.
+
 ### Testing the pure engines
 
 ```bash
@@ -388,11 +471,65 @@ invoice, with any confirmation field, or backdated. A client reads only their ow
 payments. A partner (`billing.manage`) confirms or rejects once. After that the payment is
 final, and the database writes the confirmer's name and the time (migrations
 `20261027210000`, `20261027210100`; tests `supabase/tests/fee_payments_test.sql`, engine
-check T-21). Staff can record a payment only as the firm, and only as pending. **Not yet
-organisation-scoped.** `member_has()` is firm-wide, which is why a second firm stays
-blocked (backlog P2-5, risk R-47, owner D7). Review of #6:
+check T-21). Staff can record a payment only as the firm, and only as pending.
+**Organisation scoping is merged and applied** (PR #22, migration
+`20261029213000`, production 30 Oct 2026 02:42 UTC): `member_has(cap, taxpayer_id)` requires an accepted, unrevoked
+engagement between the caller's organisation and that taxpayer, and the fee-payment
+policies pass the row's taxpayer like every other. A draft engagement grants nothing, and
+setting `revoked_at` removes access on the next call. Rows a firm owns rather than a
+taxpayer (its engagements, its contacts, applications it has taken) go through
+`member_has_in_org(cap, organization_id)` instead, and a public application that belongs
+to no firm yet stays visible to firm members who work client files until one of them
+claims it. `supabase/tests/two_firm_isolation_test.sql` holds the 29 pgTAP checks that
+gate it. A second firm stays blocked until that merges (backlog P2-5, risk R-47, owner
+D7). Review of #6:
 `docs/agents/handoffs/2026-10-27-a-review-of-pr6.md`. auth-codes version history:
 `docs/deployment.md`.
+
+**The policy helpers are no longer API endpoints** (migration `20261030020000`,
+merged in #27 and applied to production 30 Oct 2026). Eleven `SECURITY DEFINER` functions sat in `public`, the
+schema PostgREST publishes, so each was an endpoint at `/rest/v1/rpc/<name>` and
+seven were callable without signing in. Among them `portal_request_code()`,
+which issues a one-time code: an anonymous caller could invalidate a client's
+pending code at will and lock the real client out of signing in (risk R-49).
+They now live in a `private` schema, which PostgREST does not publish, so they
+have no route whatever their privileges. Moving preserves each function's OID, so
+the policy expressions that call them keep working untouched.
+
+**Revoking `EXECUTE` is not the fix, and trying it is instructive.** Postgres
+checks `EXECUTE` on a function in an RLS policy expression against the *querying*
+role, at execution time. The first revision of this migration revoked from
+`PUBLIC`, `anon` and `authenticated`, and CI came back with `permission denied
+for function client_taxpayer_ids` raised from inside an `insert into documents`
+policy, taking six of the P0 write tests with it. A revoke does not close the
+endpoint and leave the policy working — it breaks the policy, for every
+signed-in user. (It also explains why the three `revoke execute … from anon,
+authenticated` lines in `20261029213000` are harmless: those functions were new,
+so `PUBLIC` still held the default grant the two roles inherit, and naming the
+roles removed nothing. They read as a control and are not one;
+`20261030020000` replaces them with explicit grants and says so.)
+
+`supabase/tests/definer_surface_test.sql` holds both halves on every build.
+T-51 … T-53 are catalog facts: nothing is left in the published schema, every
+moved helper is accounted for, and **exactly one** definer function in `public`
+may be executed by `anon` or `authenticated` — so a new definer helper dropped
+into `public` fails the build. T-54 … T-60 are live reads down the three call
+paths that each reach a different moved helper: a firm member through
+`member_has` → `current_firm_role`, a client through `client_taxpayer_ids`, an
+anonymous visitor through `flag_enabled` + `demo_taxpayer_id`.
+
+`app_flags` keeps RLS on with no policy, which is deliberate: nothing reads it
+through the API, `private.flag_enabled()` reads it as its owner, and a permissive
+policy would publish the demo switches to the browser. The table comment says so,
+and the advisor's lint 0008 on it is expected.
+
+The one exposure that stays is `can_write_client_note(taxpayer_id)`, granted to
+`authenticated` only. `/api/inquiry` has to know whether the caller may write a
+client-visible note *before* it sends mail, since a write refused afterwards
+would leave a client emailed with no record of it. It answers about the caller
+alone and returns a boolean, never a row. That route no longer calls
+`member_has()` or `can_see_taxpayer()`: visibility is now a scoped read of
+`taxpayers` under the caller's own session, which is the policy itself.
 
 **P0 security and honesty fixes (27 Oct 2026, merged in #13; migration `20261027120000` applied).** One forward-only
 migration (`20261027120000`) scopes storage to the taxpayer segment of the path, limits
@@ -523,7 +660,9 @@ Still open, and it is the honest limit of this increment:
   delivers it through Resend (or `KIMA_DEMO_OTP_REVEAL=1` for synthetic demos),
   verifies it, and mints a Supabase Auth session. `portal_sign_in` is revoked.
   The anon demo branch of `can_see_taxpayer` is off unless
-  the `allow_demo_anon` row in `app_flags` is true.
+  the `allow_demo_anon` row in `app_flags` is true — **and it is false on
+  production since 30 Oct 2026, 02:13 UTC**, so a visitor who is not signed in
+  now reads no taxpayer at all. See "Phase 1 environment settings".
 - **`case_tasks` is now firm-only**, so with no firm session the work queue's
   task fetch returns empty and the derived blocker falls back to requests.
   Correct behaviour, and a visible consequence of the above.
@@ -663,8 +802,11 @@ Three things that cost real time, recorded so nobody pays twice:
    real taxpayer data exists (R-32).**
 
 **To make the firm and portal screens writable you need `SUPABASE_SERVICE_ROLE_KEY`**
-in `.env.local` — it is not on Vercel either. Without it `/api/firm/request-code`
-answers 503, no session can be minted, and every write is correctly refused.
+in `.env.local`. Without it `/api/firm/request-code` answers 503, no session can
+be minted, and every write is correctly refused. On Vercel it **is** set, for
+every environment, and has been since 23 Oct 2026 — an earlier version of this
+paragraph said otherwise and was wrong. Vercel hides the value, so what is
+confirmed is that the variable exists, not that it holds the current key.
 `KIMA_DEMO_OTP_REVEAL=1` is already set locally, so the one-time code is shown
 in the browser while no mail domain is verified.
 
@@ -698,4 +840,5 @@ structurally-valid value.
   policy, so it is deliberate work rather than a quick patch
 - `portal_sign_in` execute grants are revoked by the auth-closeout migration
 - `demo_taxpayer_id()` remains executable; the anon branch that uses it is off
-  unless the `allow_demo_anon` row in `app_flags` is true
+  unless the `allow_demo_anon` row in `app_flags` is true, and that row is false
+  on production since 30 Oct 2026

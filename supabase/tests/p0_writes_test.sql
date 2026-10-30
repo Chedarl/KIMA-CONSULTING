@@ -20,6 +20,12 @@ insert into organizations (id, name) values ('00000000-0000-4000-a000-0000000000
 insert into taxpayers (id, legal_name) values
   ('00000000-0000-4000-a000-00000000000a', 'Taxpayer A'),
   ('00000000-0000-4000-a000-00000000000b', 'Taxpayer B');
+-- The firm's authorised grant for each taxpayer. Required since
+-- 20261029213000: a firm reaches a taxpayer only through its own engagement,
+-- so a fixture with clients and no engagement is no longer a valid state.
+insert into engagements (organization_id, taxpayer_id) values
+  ('00000000-0000-4000-a000-0000000000f0', '00000000-0000-4000-a000-00000000000a'),
+  ('00000000-0000-4000-a000-0000000000f0', '00000000-0000-4000-a000-00000000000b');
 insert into contacts (id, organization_id, full_name, email, auth_user_id) values
   ('00000000-0000-4000-a000-0000000000ca', '00000000-0000-4000-a000-0000000000f0', 'Client A', 'client-a@example.test', '00000000-0000-4000-a000-0000000001aa'),
   ('00000000-0000-4000-a000-0000000000cb', '00000000-0000-4000-a000-0000000000f0', 'Client B', 'client-b@example.test', '00000000-0000-4000-a000-0000000001bb');

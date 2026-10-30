@@ -39,3 +39,7 @@ supabase/.temp/
 
 # ECC / local agent tooling — install into the project, do not commit
 .cursor/
+
+# Git worktrees created for subagents. Transient checkouts of this repository
+# inside itself; the agent definitions in .claude/agents/ stay tracked.
+.claude/worktrees/

@@ -259,18 +259,45 @@ engagement. The figures in this document hold.
 
 ### Phase 1: Security and per-firm isolation (blocks launch)
 
-- [ ] Revoke `EXECUTE` from `anon` and `authenticated` on these functions, or move them out of the `public` schema: `auth_identity_is_single`, `can_see_taxpayer`, `client_taxpayer_ids`, `current_firm_role`, `current_member_label`, `demo_taxpayer_id`, `member_has`, `portal_request_code`. Keep only the calls RLS needs, and record in writing why each remaining one is justified.
-- [ ] Scope `member_has()` and `can_see_taxpayer()` to the member's organisation (backlog P2-5 / R-47).
-- [ ] Make sure revoked engagements (`revoked_at`) remove access in every policy and helper.
-- [ ] Add policies to `app_flags`, or document why it has none (advisor note: RLS on, no policy).
-- [ ] Set `app_flags.allow_demo_anon` and `app_flags.demo_otp_reveal` to false in any environment that will hold real data (R-32/R-36).
-- [ ] Set `SUPABASE_SERVICE_ROLE_KEY` in the Vercel environment through the dashboard, never in the repo. Then remove the fallback to the `auth-codes` Edge Function where it's no longer needed.
-- [ ] Enable leaked-password protection in Supabase Auth.
-- [ ] Write a pgTAP and route test suite for two firms: Firm A can't read Firm B's clients, documents, invoices, tasks or storage objects.
+- [x] Revoke `EXECUTE` from `anon` and `authenticated` on these functions, or move them out of the `public` schema: `auth_identity_is_single`, `can_see_taxpayer`, `client_taxpayer_ids`, `current_firm_role`, `current_member_label`, `demo_taxpayer_id`, `member_has`, `portal_request_code`. Keep only the calls RLS needs, and record in writing why each remaining one is justified. — **Moved, not revoked** (#27, `20261030020000`). Revoking is not available: Postgres checks `EXECUTE` in a policy expression against the querying role, so it breaks the policy instead of closing the endpoint; proven in CI. Eleven helpers now live in a `private` schema PostgREST does not publish. One justified exposure, `can_write_client_note`, with T-53 asserting it is the only one.
+- [x] Scope `member_has()` and `can_see_taxpayer()` to the member's organisation (backlog P2-5 / R-47). — #22, `20261029213000`. Access runs through an accepted, unrevoked engagement; ~40 policies rewritten; the production backfill gave all 3 `firm_members` rows an organisation.
+- [x] Make sure revoked engagements (`revoked_at`) remove access in every policy and helper. — T-49 sets `revoked_at` alone, leaving `status` untouched, and the next read is refused.
+- [x] Add policies to `app_flags`, or document why it has none (advisor note: RLS on, no policy). — Documented in a `comment on table` and the grants revoked as well. Nothing reads it through the API; `private.flag_enabled()` reads it as its owner. Lint 0008 on this table is expected from here on.
+- [x] Set `app_flags.allow_demo_anon` and `app_flags.demo_otp_reveal` to false in any environment that will hold real data (R-32/R-36). — Both `false` on production 30 Oct 02:13 UTC, verified after the change.
+- [x] Set `SUPABASE_SERVICE_ROLE_KEY` in the Vercel environment through the dashboard, never in the repo. Then remove the fallback to the `auth-codes` Edge Function where it's no longer needed. — The key has been set for every environment since 23 Oct. **Removing the fallback is still open** and is the one half of this item not done.
+- [ ] Enable leaked-password protection in Supabase Auth. — **Blocked:** Pro-plan feature, refused on the current plan. Justified in writing as R-50: no account in this product has a password, so neither a leaked one nor a short one is reachable today. Both become live the moment any password flow is enabled.
+- [x] Write a pgTAP and route test suite for two firms: Firm A can't read Firm B's clients, documents, invoices, tasks or storage objects. — 31 pgTAP checks in `supabase/tests/two_firm_isolation_test.sql`, both directions, reads and writes. **The route half is not written**; the suite is SQL only.
 
 **Exit:** the security advisor is clear, or each remaining item is justified in writing; the two-firm test is green; an anonymous visitor sees no taxpayer data.
 **Depends on:** phase 0.
 **Out of scope:** new screens.
+
+**Phase 1 exit met 30 Oct 2026, with two new findings that are not in the list above.**
+All three exit conditions hold: the security advisor is down from 17 findings to 3, and
+each of the 3 is justified in writing (`can_write_client_note` — the one deliberate
+exposure, T-53; `app_flags` RLS with no policy — the table comment; leaked-password
+protection — R-50). The two-firm suite is green at 31 checks. An anonymous visitor reads
+no taxpayer: `allow_demo_anon` is false and T-57 pins the behaviour.
+
+Two items not on the list surfaced while doing it, and **neither is closed**:
+
+- **A firm can grant itself access.** The `engagements` INSERT policy asks only for
+  `engagement.create` in the row's own organisation, and `status` defaults to
+  `'authorized'`, so any firm can insert an authorised engagement against any taxpayer
+  and read that taxpayer immediately. The taxpayer never consents. Per-firm isolation
+  holds — a firm cannot read what it has no engagement for — but a firm can give itself
+  one. The invitation flow in phase 3 is the real answer; a narrower interim fix is to
+  refuse an INSERT that is not `draft` or `invited`, since neither grants access, which
+  also matches what phase 2 says the onboarding transaction should create. That needs an
+  owner decision, because it changes who may start work with a taxpayer.
+- **A public application is not routed to a chosen firm.** An unassigned application is
+  readable by any firm member who works client files, and the first firm with
+  `engagement.create` to act on it claims it. That was the deliberate fix for the review
+  queue going permanently empty, but it is not the same as an applicant choosing a firm.
+  Phase 2 owns onboarding and should decide the routing rule.
+
+Two further open items carried from the list: the `auth-codes` fallback removal, and the
+route-level half of the two-firm suite.
 
 ### Phase 2: Firm self-sign-up and onboarding (blocks launch)
 
