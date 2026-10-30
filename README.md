@@ -981,3 +981,7 @@ structurally-valid value.
 - `demo_taxpayer_id()` remains executable; the anon branch that uses it is off
   unless the `allow_demo_anon` row in `app_flags` is true, and that row is false
   on production since 30 Oct 2026
+
+### Contact inquiries versus firm-scoped applications (Phase 2)
+
+A general public contact request goes to `public.contact_inquiries`, an append-only, non-tenant inbox readable only by an active authenticated KIMA administrator. This is **not** a `registrations` row and creates no organization, client, or firm authorization. An ordinary onboarding application instead requires an explicitly selected receiving accounting firm, and its row is visible only to that firm under #42. The contact page UI is a separate Agent B change; deploy the table before the UI in the owner-approved release.
