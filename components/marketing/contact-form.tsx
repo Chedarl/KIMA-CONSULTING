@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { insertRegistration } from "@/lib/insert-registration";
+import { submitKimaContact } from "@/lib/submit-kima-contact";
 import type { getPublicCopy } from "@/lib/i18n-public";
 import {
   contactLeadIssues,
@@ -51,7 +51,7 @@ export function ContactForm({ locale, copy }: { locale: "fr" | "en"; copy: Copy 
     setFailed(false);
     if (found.length > 0) return;
     setBusy(true);
-    const result = await insertRegistration(draft, crypto.randomUUID());
+    const result = await submitKimaContact(draft);
     setBusy(false);
     if (result === "ok") setDone(true);
     else setFailed(true);
@@ -123,6 +123,7 @@ export function ContactForm({ locale, copy }: { locale: "fr" | "en"; copy: Copy 
         {t.contactMessage}
         <textarea
           value={note}
+          maxLength={2000}
           onChange={(e) => setNote(e.target.value)}
           rows={4}
           className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"

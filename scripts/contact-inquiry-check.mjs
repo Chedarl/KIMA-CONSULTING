@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const component=readFileSync("components/marketing/contact-form.tsx","utf8");
+const helper=readFileSync("lib/submit-kima-contact.ts","utf8");
+assert.match(component,/submitKimaContact\(draft\)/);
+assert.doesNotMatch(component,/insertRegistration\(/);
+assert.match(helper,/\.from\("contact_inquiries"\)\.insert\(/);
+assert.doesNotMatch(helper,/\.from\("registrations"\)/);
+assert.match(helper,/return error \? "failed" : "ok"/);
+console.log("ok marketing contact does not create firm registrations");
