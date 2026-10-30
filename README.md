@@ -323,8 +323,10 @@ CI runs it on every push (`.github/workflows/ci.yml`, Agent A's).
 **Firm sign-up name hygiene (Phase 2 / OD-2).** A new accounting firm name
 will use a deterministic collision key (case, accents, punctuation, spacing
 and legal-form labels ignored) to refuse look-alike names. This is not an
-official registration or ONECCA format check; the registration number still
-has to be supplied separately by the later atomic signup RPC.
+official registration or ONECCA format check. Draft D2 (#46) adds an
+atomic, verified-email `sign_up_firm()` RPC: it creates the unverified firm,
+its partner and an audit record, but `allow_firm_signup` defaults OFF until
+owner-approved release. No production sign-up is enabled.
 
 ### Two synthetic tenants
 
