@@ -43,8 +43,8 @@ begin
   if v_groups > 0 then
     raise exception
       'firm_members holds % duplicate email address(es), so a unique index '
-      'cannot be created: %. Resolve each one (deactivate the stale member or '
-      'correct the address) and re-run this migration. firm_issue_code() '
+      'cannot be created: %. Resolve each one (correct or clear the stale email; deactivation alone is '
+      'insufficient) and re-run this migration. firm_issue_code() '
       'selects a member by email, so these must be unique before staff '
       'management ships.', v_groups, v_which
       using errcode = '23505';
