@@ -44,6 +44,7 @@ export const SIDEBAR_STEPS: OnboardingStep[] = [
 
 export type OnboardingDraft = {
   kind: WorkspaceKind | "";
+  firmId: string;
   intake: PublicIntake;
   name: string;
   email: string;
@@ -62,6 +63,7 @@ export type OnboardingDraft = {
 
 export const EMPTY_ONBOARDING: OnboardingDraft = {
   kind: "",
+  firmId: "",
   intake: "online",
   name: "",
   email: "",
@@ -80,6 +82,7 @@ export const EMPTY_ONBOARDING: OnboardingDraft = {
 
 export type OnboardingIssue =
   | "kind"
+  | "firm"
   | "name"
   | "contact"
   | "email"
@@ -134,19 +137,22 @@ export function displayName(draft: Pick<OnboardingDraft, "kind" | "name" | "lega
   return draft.name.trim();
 }
 
-export function issuesFor(step: OnboardingStep, draft: OnboardingDraft): OnboardingIssue[] {
+export function issuesFor(step: OnboardingStep, draft: OnboardingDraft, requireFirm = false): OnboardingIssue[] {
   if (step === "type") return draft.kind ? [] : ["kind"];
   if (step === "account") return accountIssues(draft);
   if (step === "company") return companyIssues(draft);
   if (step === "contacts") return contactIssues(draft);
-  if (step === "services") return draft.services.length > 0 ? [] : ["services"];
+  if (step === "services") return [
+    ...(draft.services.length > 0 ? [] : ["services" as const]),
+    ...(requireFirm && !draft.firmId ? ["firm" as const] : []),
+  ];
   if (step === "verify" || step === "ready") {
     return [
       ...issuesFor("type", draft),
       ...issuesFor("account", draft),
       ...issuesFor("company", draft),
       ...issuesFor("contacts", draft),
-      ...issuesFor("services", draft),
+      ...issuesFor("services", draft, requireFirm),
     ];
   }
   return [];
@@ -201,6 +207,7 @@ export function registrationInsert(draft: OnboardingDraft, workspaceRef: string)
   if (!draft.kind) throw new Error("workspace kind is required");
   const legal = needsLegalName(draft.kind) ? draft.legalName.trim() || null : null;
   const base: Record<string, unknown> = {
+    ...(draft.firmId ? { organization_id: draft.firmId } : {}),
     applicant_name: draft.name.trim(),
     applicant_email: draft.email.trim() || null,
     applicant_phone: draft.phone.trim() || null,
