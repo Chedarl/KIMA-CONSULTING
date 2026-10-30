@@ -11,6 +11,7 @@ type Invitation = {
   expires_at: string;
 };
 type Firm = { id: string; name: string };
+type DraftEngagement = { id: string; taxpayer_id: string };
 
 export function InvitationsPanel({ locale, side }: {
   locale: "fr" | "en"; side: "taxpayer" | "firm";
@@ -21,6 +22,9 @@ export function InvitationsPanel({ locale, side }: {
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [firms, setFirms] = useState<Firm[]>([]);
   const [firm, setFirm] = useState("");
+  const [drafts, setDrafts] = useState<DraftEngagement[]>([]);
+  const [engagement, setEngagement] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -40,11 +44,14 @@ export function InvitationsPanel({ locale, side }: {
       setError(fr ? "Compte client requis." : "A client account is required.");
       return;
     }
-    const [rows, directory] = await Promise.all([
+    const [rows, directory, engagements] = await Promise.all([
       db.from("engagement_invitations")
         .select("id,organization_id,taxpayer_id,direction,initiated_by,recipient_user_id,status,expires_at")
         .order("created_at", { ascending: false }).limit(100),
       side === "taxpayer" ? db.rpc("firm_directory") : Promise.resolve({ data: [] }),
+      side === "firm" ? db.from("engagements")
+        .select("id,taxpayer_id").in("status", ["draft", "invited"])
+        .is("revoked_at", null) : Promise.resolve({ data: [] }),
     ]);
     if (rows.error || (side === "taxpayer" && "error" in directory && directory.error)) {
       setError(fr ? "Invitations indisponibles." : "Invitations unavailable.");
@@ -52,6 +59,7 @@ export function InvitationsPanel({ locale, side }: {
     }
     setInvites((rows.data ?? []) as Invitation[]);
     setFirms((directory.data ?? []) as Firm[]);
+    setDrafts((engagements.data ?? []) as DraftEngagement[]);
     setError("");
   }, [fr, side]);
 
@@ -82,6 +90,21 @@ export function InvitationsPanel({ locale, side }: {
     setBusy(false);
   }
 
+  async function inviteContact() {
+    if (!engagement || !recipientEmail.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    const { error: failure } = await supabase().rpc("create_invitation_for_contact", {
+      p_engagement_id: engagement, p_email: recipientEmail.trim(),
+    });
+    if (failure) setError(fr
+      ? "Destinataire indisponible. Vérifiez le compte client et l'adresse."
+      : "Recipient unavailable. Check the client account and email.");
+    else setRecipientEmail("");
+    await load();
+    setBusy(false);
+  }
+
   return (
     <section className="flex flex-col gap-4">
       <h1 className="font-display text-xl font-semibold">
@@ -100,6 +123,31 @@ export function InvitationsPanel({ locale, side }: {
           <button type="button" disabled={busy || !firm} onClick={() => void requestFirm()}
             className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-white disabled:opacity-50">
             {fr ? "Envoyer la demande" : "Send request"}
+          </button>
+        </div>
+      )}
+      {side === "firm" && userId && (
+        <div className="flex flex-wrap items-end gap-3 rounded-card border border-border p-4">
+          <label className="flex min-w-[12rem] flex-1 flex-col gap-2 text-sm">
+            {fr ? "Dossier en attente" : "Pending engagement"}
+            <select value={engagement} onChange={(e) => setEngagement(e.target.value)}
+              className="min-h-[44px] rounded-lg border border-border p-2">
+              <option value="">{fr ? "Choisir le dossier" : "Select engagement"}</option>
+              {drafts.map((d) => <option key={d.id} value={d.id}>
+                {d.taxpayer_id.slice(0, 8)} · {d.id.slice(0, 8)}
+              </option>)}
+            </select>
+          </label>
+          <label className="flex min-w-[12rem] flex-1 flex-col gap-2 text-sm">
+            {fr ? "E-mail du contact connu" : "Known contact email"}
+            <input type="email" value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.target.value)}
+              className="min-h-[44px] rounded-lg border border-border p-2" />
+          </label>
+          <button type="button" disabled={busy || !engagement || !recipientEmail.trim()}
+            onClick={() => void inviteContact()}
+            className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-white disabled:opacity-50">
+            {fr ? "Inviter le client" : "Invite client"}
           </button>
         </div>
       )}
