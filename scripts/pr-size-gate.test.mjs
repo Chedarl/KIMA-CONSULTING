@@ -11,6 +11,17 @@ test('300 changed lines is permitted', () => {
 test('301 changed lines is blocked', () => {
   assert.throws(() => validatePullRequest({ number: 45, additions: 300, deletions: 1 }), /301.*300/);
 });
+test('explicit release aggregation #64 may exceed 300 changed lines, not other PRs', () => {
+  const release = {
+    number: 64, additions: 4200, deletions: 200,
+    base: { ref: 'main' }, head: { ref: 'phase2/integration-20261030' },
+  };
+  assert.equal(validatePullRequest(release), 4400);
+  assert.throws(() => validatePullRequest({ ...release, number: 65 }), /4400.*300/);
+  assert.throws(() => validatePullRequest({ ...release, base: { ref: 'develop' } }), /4400.*300/);
+  assert.throws(() => validatePullRequest({ ...release, head: { ref: 'another-branch' } }), /4400.*300/);
+});
+
 test('missing or invalid size metadata fails closed', () => {
   for (const payload of [{}, { additions: 0 }, { additions: -1, deletions: 2 },
     { additions: 3.5, deletions: 0 }, { additions: '100', deletions: 2 }]) {
