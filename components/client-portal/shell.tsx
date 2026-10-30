@@ -301,7 +301,7 @@ export function ClientPortalShell({
                 {biz.length === 0 && (
                   <li className="px-3 py-2 text-sm text-fg-muted">
                     {multipleFirms
-                      ? (locale === "fr" ? "Plusieurs cabinets associés : sélection indisponible" : "Multiple firms linked: selection unavailable")
+                      ? (locale === "fr" ? "Choisir le cabinet dans Messages" : "Choose firm in Messages")
                       : copy.offline}
                   </li>
                 )}
@@ -485,15 +485,15 @@ export function ClientPortalShell({
         <main id="main" className="flex-1 px-4 py-6 pb-28 sm:px-6 lg:px-8 lg:pb-8">
           {multipleFirms === undefined ? (
             <div className="skeleton h-24 rounded-card" aria-busy="true" />
-          ) : multipleFirms ? (
+          ) : multipleFirms && !path.startsWith(`${base}/messages`) ? (
             <section role="status" className="max-w-2xl rounded-card border border-border bg-surface p-6">
               <h1 className="font-display text-xl font-semibold text-fg">
                 {locale === "fr" ? "Sélection du cabinet requise" : "Accounting firm selection required"}
               </h1>
               <p className="mt-3 text-sm leading-relaxed text-fg-muted">
                 {locale === "fr"
-                  ? "Plusieurs cabinets comptables sont associés à votre compte. Pour protéger vos dossiers, aucun cabinet n'a été sélectionné automatiquement. La sélection du cabinet n'est pas encore disponible. Contactez votre cabinet pour obtenir de l'aide."
-                  : "More than one accounting firm is linked to your account. To protect your records, no firm has been selected automatically. Firm selection is not available yet. Contact your accounting firm for assistance."}
+                  ? "Plusieurs cabinets sont associés à cette entreprise. Choisissez le cabinet destinataire dans Messages. Les autres pages restent protégées en attendant la sélection du contexte entreprise et cabinet."
+                  : "More than one accounting firm is linked to this company. Choose the receiving firm under Messages. Other pages remain protected until company and firm context selection is available."}
               </p>
             </section>
           ) : children}
