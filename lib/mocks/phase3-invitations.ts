@@ -58,8 +58,15 @@ export function previewInvitationAcceptance(
         !actor.owned_companies.includes(invitation.taxpayer_id)) {
       return { ok: false, code: "wrong_recipient" };
     }
-  } else if (!actor.firm_ids.includes(invitation.firm_id)) {
-    return { ok: false, code: "forbidden" };
+  } else {
+    if (!actor.firm_ids.includes(invitation.firm_id)) {
+      return { ok: false, code: "forbidden" };
+    }
+    // Firm membership alone is not an invitation: bind acceptance to the
+    // addressed account as well (synthetic preview only, not an auth gate).
+    if (actor.email.toLowerCase() !== invitation.recipient_email.toLowerCase()) {
+      return { ok: false, code: "wrong_recipient" };
+    }
   }
   return {
     ok: true,
