@@ -1,6 +1,56 @@
 -- Phase 2 staff management. No generic firm_members write policy.
--- Global email uniqueness is required: firm_issue_code() selects by email.
--- Preflight (aggregate-only, 30 Oct): no duplicate normalized emails.
+--
+-- Global email uniqueness is required: firm_issue_code() selects a member by
+-- email, so two rows sharing one address make sign-in ambiguous.
+--
+-- A preflight on 30 Oct found no duplicate normalized emails, and one was run
+-- again against production before release: 3 member rows, 3 with an email, 3
+-- distinct, 0 duplicate groups. But a preflight someone remembers to repeat is
+-- not a guard, and duplicates can appear between now and the deploy.
+--
+-- What the bare statement does on its own, measured rather than assumed:
+--
+--   ERROR:  could not create unique index "firm_members_email_global_unique"
+--   DETAIL:  Key (lower(btrim(email)))=(shared@firm.test) is duplicated.
+--
+-- Which is better than nothing -- it names one colliding address. What it does
+-- not say is how many there are, which the deployer needs to know whether this
+-- is one stale invite or a systemic problem, or what to do about it. So the
+-- check below refuses first, with the count, every address, and the remedy:
+--
+--   ERROR:  firm_members holds 1 duplicate email address(es), so a unique index
+--   cannot be created: shared@firm.test. Resolve each one (deactivate the stale
+--   member or correct the address) and re-run this migration. firm_issue_code()
+--   selects a member by email, so these must be unique before staff management
+--   ships.
+--
+-- It still blocks the deploy, which is correct -- silently dropping or renaming
+-- a duplicate would decide a staffing question the database has no business
+-- deciding -- but it blocks it with what is needed to resolve it, on a plan
+-- with no point-in-time recovery.
+do $$
+declare
+  v_groups bigint;
+  v_which text;
+begin
+  select count(*), coalesce(string_agg(k, ', ' order by k), '')
+    into v_groups, v_which
+    from (select lower(btrim(email)) as k
+            from public.firm_members
+           where email is not null and btrim(email) <> ''
+           group by 1 having count(*) > 1) d;
+
+  if v_groups > 0 then
+    raise exception
+      'firm_members holds % duplicate email address(es), so a unique index '
+      'cannot be created: %. Resolve each one (deactivate the stale member or '
+      'correct the address) and re-run this migration. firm_issue_code() '
+      'selects a member by email, so these must be unique before staff '
+      'management ships.', v_groups, v_which
+      using errcode = '23505';
+  end if;
+end $$;
+
 create unique index if not exists firm_members_email_global_unique
   on public.firm_members (lower(btrim(email)))
   where email is not null and btrim(email) <> '';
