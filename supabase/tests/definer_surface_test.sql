@@ -93,7 +93,7 @@ select is(
       and p.prosecdef
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
-  'can_write_client_note, firm_directory, sign_up_firm',
+  'admin_review_firm, can_write_client_note, firm_directory, sign_up_firm',
   'T-53 only the definer functions named here stay callable in public'
 );
 
