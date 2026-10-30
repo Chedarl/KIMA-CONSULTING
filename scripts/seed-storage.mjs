@@ -8,9 +8,9 @@
 // It uploads a generated one-page PDF per seeded document, then writes the real
 // `byte_size` and `sha256` back onto the row, so the record and the file agree.
 //
-// SYNTHETIC ONLY. It touches rows whose id carries the seed's `5e5d0000-`
-// prefix and nothing else, and it refuses to run without the same explicit
-// opt-in the SQL seed demands. Never point it at production.
+// SYNTHETIC ONLY. It touches the document ids the seed creates and nothing
+// else, and it refuses to run without the same explicit opt-in the SQL seed
+// demands. Never point it at production.
 //
 //   KIMA_ALLOW_SYNTHETIC_SEED=yes \
 //   NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
@@ -20,7 +20,13 @@ import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const BUCKET = "kima-demo";
-const SEED_PREFIX = "5e5d0000-";
+
+// The seed's document rows, listed rather than matched by prefix: `id` is a
+// uuid column, and asking Postgres for `id like '5e5d0000-%'` is a type error,
+// not a filter. Keep this in step with supabase/seed/synthetic.sql — the
+// uploader refusing to find a row is a better failure than it reaching for one
+// it should not touch.
+const SEED_DOCUMENT_IDS = ["5e5d0000-0000-4000-8000-00000000a700"];
 
 /** A minimal valid one-page PDF, so what lands in the bucket really opens. */
 function syntheticPdf(title) {
@@ -68,12 +74,19 @@ async function main() {
   const { data: documents, error } = await db
     .from("documents")
     .select("id, taxpayer_id, file_name, storage_path")
-    .like("id", `${SEED_PREFIX}%`)
+    .in("id", SEED_DOCUMENT_IDS)
     .not("storage_path", "is", null);
   if (error) throw new Error(`Could not read the seeded documents: ${error.message}`);
   if (!documents?.length) {
     console.log("No synthetic document rows found. Run the SQL seed first.");
     return;
+  }
+  if (documents.length !== SEED_DOCUMENT_IDS.length) {
+    const found = new Set(documents.map((d) => d.id));
+    const missing = SEED_DOCUMENT_IDS.filter((id) => !found.has(id));
+    console.warn(
+      `Warning: ${missing.length} seeded document id(s) not found or without a storage_path: ${missing.join(", ")}`,
+    );
   }
 
   for (const doc of documents) {
