@@ -24,6 +24,7 @@ jobs:
       # no-authorization disclaimer could be deleted, and CI would stay green.
       - run: npm run test:marketing
       - run: npm run test:staff:contract
+      - run: npm run test:staff:screen
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
