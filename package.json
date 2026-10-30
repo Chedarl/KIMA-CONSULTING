@@ -15,6 +15,7 @@
     "test:staff:screen": "node scripts/staff-screen-smoke.mjs",
     "test:staff:route": "node scripts/staff-route-smoke.mjs",
     "test:staff": "node scripts/firm-staff-check.mjs",
+    "fonts": "node scripts/fetch-fonts.mjs",
     "seed:storage": "node scripts/seed-storage.mjs",
     "test:marketing": "node scripts/marketing-consistency-check.mjs"
   },
