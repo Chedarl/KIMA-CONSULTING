@@ -409,6 +409,7 @@ const fr = {
       notPartner:
         "Seul un associé gère le personnel. Vous voyez la liste, sans pouvoir la modifier.",
       empty: "Aucun membre actif en dehors de vous.",
+      loading: "Chargement du personnel…",
       colPerson: "Personne",
       colRole: "Rôle",
       colState: "État",
@@ -1391,6 +1392,7 @@ const en: WorkspaceDictionary = {
       notPartner:
         "Only a partner manages staff. You can see the list but not change it.",
       empty: "No active member other than you.",
+      loading: "Loading firm staff…",
       colPerson: "Person",
       colRole: "Role",
       colState: "State",
