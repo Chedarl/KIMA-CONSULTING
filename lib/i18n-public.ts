@@ -102,7 +102,9 @@ const fr = {
     contactSend: "Envoyer",
     contactSending: "Envoi…",
     contactDone: "Message reçu. Nous vous répondons sous un jour ouvré.",
-    contactFailed: "Envoi impossible pour le moment. Réessayez dans un instant.",
+    contactFailed: "Votre message n’a pas été envoyé. Vous pouvez le copier pour contacter KIMA par un autre canal.",
+    contactCopy: "Copier mon message",
+    contactCopied: "Message copié",
     kinds: {
       individual: "Particulier",
       business: "Entreprise",
@@ -366,7 +368,9 @@ const en: PublicCopy = {
     contactSend: "Send",
     contactSending: "Sending…",
     contactDone: "Message received. We reply within one working day.",
-    contactFailed: "Could not send just now. Try again in a moment.",
+    contactFailed: "Your message was not sent. You can copy it to contact KIMA through another channel.",
+    contactCopy: "Copy my message",
+    contactCopied: "Message copied",
     kinds: {
       individual: "Individual",
       business: "Business",
