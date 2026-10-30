@@ -33,7 +33,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(30);
+select plan(37);
 
 -- ---------------------------------------------------------------------------
 -- Fixture. Two firms, each holding one taxpayer. A prospect no firm holds.
@@ -59,7 +59,8 @@ insert into taxpayers (id, legal_name) values
   -- the only other engagement on it is a draft, which granted nothing.
   ('00000000-0000-4000-c000-00000000000c', 'Prospect with a stranger''s draft'),
   -- A second prospect, kept untouched for T-106 and T-107.
-  ('00000000-0000-4000-c000-00000000000e', 'Second prospect no firm holds');
+  ('00000000-0000-4000-c000-00000000000e', 'Second prospect no firm holds'),
+  ('00000000-0000-4000-c000-0000000000cc', 'Prospect for timestamp immutability');
 
 insert into engagements (id, organization_id, taxpayer_id, status, authorized_at) values
   ('00000000-0000-4000-c000-0000000000e1', '00000000-0000-4000-c000-0000000000a0',
@@ -417,6 +418,57 @@ select throws_ok(
       where id = '00000000-0000-4000-c000-0000000000e8' $$,
   '42501', null,
   'T-158 and cannot authorise it now that Firm A has been granted'
+);
+
+-- T-159 .. T-165: Codex P1 -- status alone must not grant access;
+-- a recorded authorization timestamp must never be erased or rewritten.
+select lives_ok(
+  $ insert into engagements (id, organization_id, taxpayer_id)
+     values ('00000000-0000-4000-c000-0000000000eb',
+             '00000000-0000-4000-c000-0000000000b0',
+             '00000000-0000-4000-c000-0000000000cc') $,
+  'T-159 control: Firm B may create a draft for an unheld prospect'
+);
+
+select throws_ok(
+  $ update engagements set status = 'authorized'
+      where id = '00000000-0000-4000-c000-0000000000eb' $,
+  '23514', null,
+  'T-160 authorized status alone without a date never grants access'
+);
+
+select lives_ok(
+  $ update engagements set status = 'authorized', authorized_at = now()
+      where id = '00000000-0000-4000-c000-0000000000eb' $,
+  'T-161 control: a dated authorization for a free prospect works'
+);
+
+select throws_ok(
+  $ update engagements set authorized_at = null
+      where id = '00000000-0000-4000-c000-0000000000eb' $,
+  '42501', null,
+  'T-162 a firm cannot clear an authorization date to hide a prior grant'
+);
+
+select throws_ok(
+  $ update engagements set authorized_at = now() + interval '1 day'
+      where id = '00000000-0000-4000-c000-0000000000eb' $,
+  '42501', null,
+  'T-163 a firm cannot rewrite the recorded authorization date'
+);
+
+select lives_ok(
+  $ update engagements set status = 'expired'
+      where id = '00000000-0000-4000-c000-0000000000eb' $,
+  'T-164 expiry may change status without deleting the prior grant'
+);
+
+select is(
+  (select count(*) from engagements
+     where id = '00000000-0000-4000-c000-0000000000eb'
+       and authorized_at is not null),
+  1::bigint,
+  'T-165 the dated grant survives a later non-granting status'
 );
 
 reset role;
