@@ -13,6 +13,7 @@
  */
 
 import assert from "node:assert/strict";
+import ts from "typescript";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -131,18 +132,36 @@ check("the staff screen has French and English parity", () => {
   }
 });
 
-check("nothing writes firm_members except through the function", () => {
-  // The screen reads the table and writes nothing: the only route in is the
-  // RPC, because firm_members has no write policy.
+// Enforce the stronger UI invariant: this component is read-only. A query
+// builder may insert/update after select(), or be stored in a variable; text
+// matching the characters adjacent to from("firm_members") misses both.
+function directWriteCalls(source) {
+  const ast = ts.createSourceFile("staff-workspace.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const writes = [];
+  function visit(node) {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
+        ["insert", "update", "upsert", "delete"].includes(node.expression.name.text)) {
+      writes.push(node.expression.name.text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  return writes;
+}
+
+check("staff screen has no direct database writes, even through chained or aliased builders", () => {
   const screen = readFileSync(join(root, "components", "live", "staff-workspace.tsx"), "utf8");
   ok(screen.includes('.from("firm_members")'), "the screen should read the staff list");
-  for (const write of [".insert(", ".update(", ".upsert(", ".delete("]) {
-    ok(
-      !screen.includes(`"firm_members")${write}`) && !screen.includes(`firm_members").${write}`),
-      `the screen must not ${write} firm_members directly`,
-    );
-  }
-  ok(wrapper.includes('rpc("manage_firm_staff"'), "the wrapper should call the RPC");
+  eq(directWriteCalls(screen), [], "staff screen must use audited RPC wrappers, never data API writes");
+  eq(directWriteCalls('supabase().from("firm_members").select("id").update({active:false});'),
+     ["update"], "a chained UPDATE must be detected");
+  eq(directWriteCalls('const query = supabase().from("firm_members"); query.insert({});'),
+     ["insert"], "an aliased INSERT must be detected");
+  eq(directWriteCalls('supabase().from("firm_members").upsert({});'),
+     ["upsert"], "an UPSERT must be detected");
+  eq(directWriteCalls('supabase().from("firm_members").delete();'),
+     ["delete"], "a DELETE must be detected");
+  ok(wrapper.includes('rpc("manage_firm_staff"'), "the wrapper should call the audited RPC");
 });
 
 console.log(`\n${checks} checks, ${assertions} assertions passed.`);
