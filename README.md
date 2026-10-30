@@ -327,6 +327,12 @@ a shared firm queue and cannot be claimed by whichever firm arrives first.
 A legacy unassigned production registration still needs an explicit routing
 or closure decision; this change does not alter that row.
 
+**Suspension is enforced across all firm identity helpers (R-57).** Alongside
+the original tenant-scoped access checks, the older `firm_member_has()`,
+`current_member_id()` and `current_member_label()` now deny access for
+a suspended firm. A firm's own access returns only after authorized
+unsuspension; its clients remain able to view their own files.
+
 ### Two synthetic tenants
 
 Isolation cannot be asserted against one tenant, so there is a seed that creates
