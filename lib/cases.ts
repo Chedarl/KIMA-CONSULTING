@@ -634,6 +634,10 @@ export const ADVANCE_REFUSAL_LABELS: Record<
     fr: "Dépôt non vérifié : la livraison attend l'accusé de réception.",
     en: "Filing not verified: delivery waits on the acknowledgment.",
   },
+  client_approval_required: {
+    fr: "La validation du client doit être confirmée avant la livraison.",
+    en: "Client approval must be confirmed before delivery.",
+  },
 };
 
 export const advanceRefusalLabel = (
