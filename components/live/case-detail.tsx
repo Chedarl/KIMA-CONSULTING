@@ -210,6 +210,7 @@ export function CaseDetail({
   const [members, setMembers] = useState<FirmMember[]>([]);
   const [session, setSession] = useState<FirmSession | null>(null);
   const [disclose, setDisclose] = useState(false);
+  const [clientApproved, setClientApproved] = useState(false);
   const [tab, setTab] = useState<"firm" | "client">("firm");
   const [note, setNote] = useState("");
   const [noteClient, setNoteClient] = useState(false);
@@ -241,7 +242,7 @@ export function CaseDetail({
       const kase = c as unknown as ComplianceCase;
       setRow(kase);
 
-      const [tp, eng, assigned, reqs, tsk, evs, mem] = await Promise.all([
+      const [tp, eng, assigned, reqs, tsk, evs, mem, consent] = await Promise.all([
         db
           .from("taxpayers")
           .select("id, legal_name, profile_verified, tax_centre, accounting_framework, tax_regime")
@@ -274,8 +275,13 @@ export function CaseDetail({
           .order("occurred_at", { ascending: true })
           .order("created_at", { ascending: true }),
         db.from("firm_members").select("id, person_label, role, active, deactivated_at"),
+        db.from("case_client_approvals").select("case_id")
+          .eq("case_id", caseId).eq("approval_round", kase.approval_round)
+          .maybeSingle(),
       ]);
 
+      if (consent.error) throw consent.error;
+      setClientApproved(Boolean(consent.data));
       setTaxpayer((tp.data ?? null) as Taxpayer | null);
       setEngagement((eng.data ?? null) as Engagement | null);
       setAssignments((assigned.data ?? []) as { taxpayer_id: string; assigned_to: string | null }[]);
@@ -408,8 +414,9 @@ export function CaseDetail({
       // Supplied only where the gate asks for it. Everywhere else no approval
       // decision has been taken, and pretending otherwise would be the bug.
       approval: to === "filing" && approval ? approval : undefined,
+      clientApproved: to === "delivered" ? clientApproved : undefined,
     }),
-    [member, findings, requests, row, approval],
+    [member, findings, requests, row, approval, clientApproved],
   );
 
   /** Ask the engine what would happen, so the screen can say so in advance. */
