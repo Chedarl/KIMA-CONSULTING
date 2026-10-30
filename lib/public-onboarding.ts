@@ -44,7 +44,7 @@ export const SIDEBAR_STEPS: OnboardingStep[] = [
 
 export type OnboardingDraft = {
   kind: WorkspaceKind | "";
-  firmId: string;
+  firmId?: string;
   intake: PublicIntake;
   name: string;
   email: string;
