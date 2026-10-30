@@ -46,6 +46,7 @@ export type WizardLabels = {
   reviewerHint: string;
   required: string;
   created: string;
+  alreadyRegistered: string;
   failed: string;
   nothingYet: string;
 };
@@ -165,7 +166,7 @@ export function OnboardingWizard({
       if (memErr || !member?.organization_id) throw memErr ?? new Error("no organization");
       const org = { id: member.organization_id };
 
-      const { data: newTaxpayerId, error: openErr } = await db.rpc("open_client_file", {
+      const { data: opened, error: openErr } = await db.rpc("open_client_file", {
         p_legal_name: answers.legal_name || answers.full_name,
         p_taxpayer_type: answers.taxpayer_type || null,
         p_contact_name: answers.contact_name,
@@ -179,8 +180,23 @@ export function OnboardingWizard({
           answers.accounting_framework === "unknown" ? null : answers.accounting_framework,
         p_organizer: answers,
       });
-      if (openErr || !newTaxpayerId) throw openErr ?? new Error("could not open the client file");
-      const taxpayer = { id: newTaxpayerId as string };
+      const result = (opened as Array<{
+        outcome: "opened" | "already_registered";
+        taxpayer_id: string | null;
+      }> | null)?.[0];
+      if (openErr || !result) throw openErr ?? new Error("could not open the client file");
+
+      // Somebody already holds this NIU, so nothing was created and nothing is
+      // disclosed: no taxpayer id comes back, and this firm reads none of that
+      // client's record. What it has is a drafted engagement the client has to
+      // accept (migration 20261030120000, risk R-56). Stop here rather than
+      // carry on writing answers and requests against a file we cannot see.
+      if (result.outcome === "already_registered" || !result.taxpayer_id) {
+        toast(labels.alreadyRegistered, "error");
+        setBusy(false);
+        return;
+      }
+      const taxpayer = { id: result.taxpayer_id };
 
       // The engagement is created and authorised inside open_client_file():
       // for a brand-new client, opening the file is the authorisation (owner

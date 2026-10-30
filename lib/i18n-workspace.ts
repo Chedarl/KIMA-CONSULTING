@@ -207,6 +207,10 @@ const fr = {
       reviewerHint: "Ce questionnaire ne décide pas des obligations déclaratives.",
       required: "Champ obligatoire",
       created: "Dossier ouvert",
+      // Ne nomme pas le cabinet qui suit déjà ce client : les cabinets restent
+      // privés les uns des autres (R-56).
+      alreadyRegistered:
+        "Ce contribuable est déjà enregistré sur KIMA. Votre demande a été transmise : il doit l'accepter avant que vous puissiez ouvrir son dossier.",
       failed: "Création interrompue. Une partie du dossier a pu être enregistrée : vérifiez la liste des clients avant de recommencer.",
       nothingYet: "Répondez aux questions pour voir la liste se construire.",
       listTitle: "Clients",
@@ -1133,6 +1137,10 @@ const en: WorkspaceDictionary = {
       reviewerHint: "This questionnaire does not decide filing obligations.",
       required: "Required field",
       created: "File opened",
+      // Does not name the firm that already holds this client: firms stay
+      // private from each other (R-56).
+      alreadyRegistered:
+        "This taxpayer is already registered on KIMA. Your request has been sent: they must accept it before you can open their file.",
       failed: "Creation stopped. Part of the file may have been saved: check the client list before trying again.",
       nothingYet: "Answer the questions to watch the list build itself.",
       listTitle: "Clients",

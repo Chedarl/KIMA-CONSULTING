@@ -42,6 +42,7 @@ export default function ClientsPage({ params }: { params: { locale: string } }) 
           reviewerHint: o.reviewerHint,
           required: o.required,
           created: o.created,
+          alreadyRegistered: o.alreadyRegistered,
           failed: o.failed,
           nothingYet: o.nothingYet,
           listTitle: o.listTitle,

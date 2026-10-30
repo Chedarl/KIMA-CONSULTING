@@ -52,7 +52,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(11);
+select plan(15);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: one firm, one partner. A second firm's partner stands by as the
@@ -93,7 +93,7 @@ select is(
 -- Step 2. T-109 one call, and the id comes back. This is what replaced the
 -- insert-with-RETURNING the wizard used to send.
 select lives_ok(
-  $$ select open_client_file(
+  $$ select * from open_client_file(
        p_legal_name => 'Onb New Client',
        p_taxpayer_type => 'sarl',
        p_contact_name => 'Someone',
@@ -104,11 +104,12 @@ select lives_ok(
 
 -- The same call again, keeping the id, so the rest of the journey can use it.
 create temporary table onb_file as
-  select open_client_file(
+  select taxpayer_id from open_client_file(
     p_legal_name => 'Onb Second Client',
     p_taxpayer_type => 'sarl',
+    p_niu => 'P099999999999A',
     p_organizer => '{"taxpayer_type":"sarl"}'::jsonb
-  ) as taxpayer_id;
+  );
 
 -- T-117 and what it created: an authorised engagement in the caller's own firm,
 -- with no acceptance claimed. accepted_at stays null -- consent is the
@@ -219,6 +220,57 @@ select throws_ok(
 );
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- T-120 .. T-123: one NIU is one client (R-56).
+--
+-- Before 20261030120000 a second firm entering a NIU another firm held got a
+-- duplicate taxpayer with an auto-authorised engagement: 2 rows, 2 authorised
+-- engagements across 2 firms, the shared record split and the client's consent
+-- skipped. It is now routed to draft-and-accept instead, and told nothing about
+-- whose client it is.
+-- ---------------------------------------------------------------------------
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-9000-0000000000b1","role":"authenticated"}', true);
+
+-- T-120 messier spelling of the same NIU, so normalisation is under test too.
+select is(
+  (select outcome || ' / taxpayer ' ||
+          case when taxpayer_id is null then 'withheld' else 'DISCLOSED' end
+     from open_client_file(p_legal_name => 'Second Client again',
+                           p_niu => '  p099999999999a  ')),
+  'already_registered / taxpayer withheld',
+  'T-120 a second firm entering a held NIU is routed to ask, and told no id'
+);
+
+-- T-121 and still reads nothing of that client.
+select is(
+  (select count(*) from taxpayers t join onb_file f on f.taxpayer_id = t.id),
+  0::bigint,
+  'T-121 and the second firm reads none of that client''s record'
+);
+
+-- T-122 what it got is a draft, which grants nothing until the client accepts.
+select is(
+  (select e.status from engagements e join onb_file f on f.taxpayer_id = e.taxpayer_id
+    where e.organization_id = '00000000-0000-4000-9000-0000000000b0'),
+  'draft',
+  'T-122 what the second firm gets is a draft for the client to accept'
+);
+
+reset role;
+
+-- T-123 one client, one authorised engagement. This is the count that was
+-- 2 across 2 firms before the fix.
+select is(
+  (select count(*)::text || ' row, ' || count(distinct e.organization_id)::text || ' firm authorised'
+     from taxpayers t left join engagements e
+       on e.taxpayer_id = t.id and e.status = 'authorized'
+    where upper(btrim(t.niu)) = 'P099999999999A'),
+  '1 row, 1 firm authorised',
+  'T-123 the client record is not split: one taxpayer, one authorised firm'
+);
 
 select * from finish();
 rollback;
