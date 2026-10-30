@@ -6,13 +6,13 @@ name: Supabase migrations
 # deploys every push (main -> production, any other branch -> preview). Adding a
 # Vercel step to this workflow would deploy twice.
 
+# Run only after the complete application CI for a push to main has passed.
+# workflow_dispatch is intentionally absent: it must not bypass the CI gate.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'supabase/**'
-      - '.github/workflows/supabase-migrations.yml'
-  workflow_dispatch:
 
 # Never cancel a migration mid-flight: a half-applied migration is worse than a
 # queued one.
@@ -30,6 +30,11 @@ env:
 jobs:
   apply:
     name: Apply migrations to production (eu-west-3)
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
 
     # The approval gate lives in GitHub settings, not in this file. With no
@@ -39,9 +44,29 @@ jobs:
     environment: production
 
     steps:
+      # workflow_run normally checks out the latest default branch, not the
+      # commit that passed CI. Always use the verified exact SHA.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # If main has advanced since this CI run, the later push's CI will
+      # trigger its own migration job. Never deploy an obsolete revision.
+      - name: Confirm verified commit is still main
+        id: head
+        env:
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git fetch origin main --depth=1
+          if [ "$(git rev-parse FETCH_HEAD)" = "$VERIFIED_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping obsolete CI commit; main has advanced."
+          fi
 
       - name: Check for migrations to apply
+        if: steps.head.outputs.current == 'true'
         id: check
         run: |
           if [ -z "$(find supabase/migrations -name '*.sql' -print -quit 2>/dev/null)" ]; then
@@ -54,7 +79,7 @@ jobs:
           fi
 
       - name: Verify required secrets are present
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -75,33 +100,41 @@ jobs:
           fi
 
       - uses: supabase/setup-cli@v1
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         with:
           version: latest
 
       - name: Link project
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Show pending migrations
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: supabase migration list --linked
 
       - name: Apply migrations
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: supabase db push
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # Refuse a stale run even if main advanced during setup/linking.
+          git fetch origin main --depth=1
+          if [ "$(git rev-parse FETCH_HEAD)" != "$VERIFIED_SHA" ]; then
+            echo "::error::main advanced after CI; refusing migration deployment."
+            exit 1
+          fi
+          supabase db push
 
       - name: Confirm applied state
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
