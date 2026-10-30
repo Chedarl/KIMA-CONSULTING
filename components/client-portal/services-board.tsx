@@ -64,10 +64,17 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       const db = supabase();
       const resolved = await demoIds();
       setIds(resolved);
+      if (!resolved) {
+        setCases([]);
+        setRequests([]);
+        setEngagements([]);
+        setOffline(true);
+        return;
+      }
       const [cs, rq, eng] = await Promise.all([
-        db.from("compliance_cases").select(CASE_COLUMNS).order("due_on", { ascending: true }),
-        db.from("document_requests").select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count"),
-        db.from("engagements").select("id, taxpayer_id, status, service_code, scope_note, fee_xaf, assigned_to, authorized_at, accepted_at, revoked_at"),
+        db.from("compliance_cases").select(CASE_COLUMNS).eq("taxpayer_id", resolved.taxpayerId).order("due_on", { ascending: true }),
+        db.from("document_requests").select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count").eq("taxpayer_id", resolved.taxpayerId),
+        db.from("engagements").select("id, taxpayer_id, status, service_code, scope_note, fee_xaf, assigned_to, authorized_at, accepted_at, revoked_at").eq("taxpayer_id", resolved.taxpayerId),
       ]);
       if (cs.error) throw cs.error;
       setCases((cs.data ?? []) as ComplianceCase[]);
@@ -160,8 +167,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
     setBusy(true);
     try {
       const db = supabase();
-      const { data: org } = await db.from("organizations").select("id").order("created_at").limit(1).maybeSingle();
-      const organizationId = (org?.id as string | undefined) ?? ids.organizationId;
+      const organizationId = ids.organizationId;
       const id = crypto.randomUUID();
       const { error } = await db.from("messages").insert({
         id,
