@@ -35,7 +35,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(37);
+select plan(44);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: two unrelated firms, each with one taxpayer, one engagement and one
@@ -141,15 +141,13 @@ insert into case_tasks (id, case_id, title) values
   ('00000000-0000-4000-a000-00000000b00a', '00000000-0000-4000-a000-00000000b005',
    'Chase the bank statement for B');
 
--- Applications. Every application from the public wizard arrives owned by no
--- firm, which is why scoping reads by organisation alone would empty the
--- review queue. Two unassigned, so T-47 can claim one and T-50 still has one
--- to look at, and one already claimed by Firm B.
+-- Applications: an unassigned row is private until deliberately routed to a
+-- chosen firm. One belongs to A and one to B; neither can claim the null row.
 insert into registrations (id, organization_id, applicant_name, taxpayer_type) values
   ('00000000-0000-4000-a000-0000000000a1', null,
    'Unclaimed Applicant', 'business_moral'),
-  ('00000000-0000-4000-a000-0000000000a2', null,
-   'Second Unclaimed Applicant', 'business_moral'),
+  ('00000000-0000-4000-a000-0000000000a2', '00000000-0000-4000-a000-00000000a001',
+   'Applicant of Firm A', 'business_moral'),
   ('00000000-0000-4000-a000-0000000000b1', '00000000-0000-4000-a000-00000000b001',
    'Applicant of Firm B', 'business_moral');
 
@@ -315,12 +313,12 @@ select is(
   'T-42 control: Firm A reads its own case task'
 );
 
--- T-44 the public application queue still reaches an unclaimed application.
+-- T-44 an applicant who chose no firm is invisible to Firm A.
 select is(
   (select count(*) from registrations
     where id = '00000000-0000-4000-a000-0000000000a1'),
-  1::bigint,
-  'T-44 Firm A reads an application that belongs to no firm yet'
+  0::bigint,
+  'T-44 Firm A cannot read an unassigned application'
 );
 
 -- T-45 but not one another firm has already taken.
@@ -409,6 +407,23 @@ select is(
 reset role;
 
 -- ---------------------------------------------------------------------------
+-- T-175/T-176: routing is confined to B, not to the null queue.
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-a000-00000000b003","role":"authenticated"}', true);
+select is(
+  (select count(*) from registrations where id = '00000000-0000-4000-a000-0000000000b1'),
+  1::bigint,
+  'T-175 Firm B sees its assigned application'
+);
+select is(
+  (select count(*) from registrations where id = '00000000-0000-4000-a000-0000000000a1'),
+  0::bigint,
+  'T-176 Firm B sees no unassigned application'
+);
+reset role;
+
+-- ---------------------------------------------------------------------------
 -- As the KIMA admin. It holds case.view and belongs to Firm B, so only an
 -- explicit exclusion keeps it out of the queue of prospective clients.
 -- ---------------------------------------------------------------------------
@@ -450,33 +465,52 @@ select is(
 reset role;
 
 -- ---------------------------------------------------------------------------
--- As Partner A. Claiming an application is the only write that is allowed to
--- touch a row belonging to no firm, and it must leave the row inside the
--- caller's own firm.
+-- As Partner A. A firm may update its own assigned application, never an
+-- unassigned application or an application belonging to another firm.
 -- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-a000-00000000a00b","role":"authenticated"}', true);
 
--- T-46 claiming it for somebody else is not claiming it.
-select throws_ok(
-  $$ update registrations
+-- T-46 the unassigned row is invisible for UPDATE too, so this affects 0 rows.
+select lives_ok(
+  $ update registrations
         set organization_id = '00000000-0000-4000-a000-00000000b001'
-      where id = '00000000-0000-4000-a000-0000000000a1' $$,
-  '42501', null,
-  'T-46 Partner A cannot assign an application to Firm B'
+      where id = '00000000-0000-4000-a000-0000000000a1' $,
+  'T-46 Partner A cannot assign an unassigned application to Firm B'
 );
 
--- T-47 control: into its own firm it works, and the application is now Firm
--- A's to answer.
+-- T-47 control: a firm may still manage its own assigned application.
 select lives_ok(
-  $$ update registrations
-        set organization_id = '00000000-0000-4000-a000-00000000a001'
-      where id = '00000000-0000-4000-a000-0000000000a1' $$,
-  'T-47 control: Partner A claims an unassigned application for Firm A'
+  $ update registrations
+        set applicant_name = 'Reviewed by Firm A'
+      where id = '00000000-0000-4000-a000-0000000000a2' $,
+  'T-47 Partner A can update its own assigned application'
+);
+
+select is(
+  (select count(*) from registrations where id = '00000000-0000-4000-a000-0000000000a2'),
+  1::bigint,
+  'T-171 Partner A can read its assigned application'
+);
+select lives_ok(
+  $ update registrations set applicant_name = 'Unauthorized edit'
+      where id = '00000000-0000-4000-a000-0000000000a1' $,
+  'T-172 Partner A cannot update an unassigned application'
 );
 
 reset role;
+
+select is(
+  (select applicant_name from registrations where id = '00000000-0000-4000-a000-0000000000a1'),
+  'Unclaimed Applicant',
+  'T-173 no denied update changed the unassigned application'
+);
+select is(
+  (select applicant_name from registrations where id = '00000000-0000-4000-a000-0000000000a2'),
+  'Reviewed by Firm A',
+  'T-174 a firm update persists for its assigned application'
+);
 
 -- ---------------------------------------------------------------------------
 -- Revocation. Firm B keeps its engagement row and loses its access the moment
@@ -523,6 +557,14 @@ select is(
   'T-50 a firm member with no organisation reads no unclaimed application'
 );
 
+reset role;
+
+set local role anon;
+select is(
+  (select count(*) from registrations where organization_id is null),
+  0::bigint,
+  'T-177 anonymous visitor cannot read an unassigned application'
+);
 reset role;
 
 select * from finish();
