@@ -131,11 +131,11 @@ on conflict (id) do nothing;
 
 -- The authorised access grant. Firm A ↔ Taxpayer A, Firm B ↔ Taxpayer B, and
 -- deliberately no cross link: the isolation test asserts the absence.
-insert into engagements (id, organization_id, taxpayer_id, status) values
+insert into engagements (id, organization_id, taxpayer_id, status, authorized_at) values
   ('5e5d0000-0000-4000-8000-00000000a200', '5e5d0000-0000-4000-8000-00000000a001',
-   '5e5d0000-0000-4000-8000-00000000a100', 'authorized'),
+   '5e5d0000-0000-4000-8000-00000000a100', 'authorized', now()),
   ('5e5d0000-0000-4000-8000-00000000b200', '5e5d0000-0000-4000-8000-00000000b001',
-   '5e5d0000-0000-4000-8000-00000000b100', 'authorized')
+   '5e5d0000-0000-4000-8000-00000000b100', 'authorized', now())
 on conflict (organization_id, taxpayer_id) do nothing;
 
 -- Contacts, their link to the file, and the portal account that signs in.

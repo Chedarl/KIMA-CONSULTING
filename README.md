@@ -480,11 +480,47 @@ setting `revoked_at` removes access on the next call. Rows a firm owns rather th
 taxpayer (its engagements, its contacts, applications it has taken) go through
 `member_has_in_org(cap, organization_id)` instead, and a public application that belongs
 to no firm yet stays visible to firm members who work client files until one of them
-claims it. `supabase/tests/two_firm_isolation_test.sql` holds the 29 pgTAP checks that
-gate it. A second firm stays blocked until that merges (backlog P2-5, risk R-47, owner
-D7). Review of #6:
+claims it. `supabase/tests/two_firm_isolation_test.sql` holds the 37 pgTAP checks that
+gate it, and R-47 is closed: a second firm is no longer blocked by scoping (backlog
+P2-5, owner D7). Review of #6:
 `docs/agents/handoffs/2026-10-27-a-review-of-pr6.md`. auth-codes version history:
 `docs/deployment.md`.
+
+**An engagement is not something a firm can write itself** (migration
+`20261030070000`, risk R-51). Scoping a firm's reach to its own engagement is only
+half of tenant isolation; the other half is who may create the engagement. Until this
+migration the INSERT policy asked only for `engagement.create` in the row's own
+organisation, `status` defaulted to `'authorized'` and `authorized_at` to `now()`, so a
+single INSERT naming any taxpayer id produced a live grant and opened that taxpayer's
+whole file. Reproduced on a replayed database before it was fixed: the insert raised
+nothing, and the next read returned Firm B's taxpayer to Firm A. Four rules now hold, and
+`private.engagements_grant_guard()` carries the three that RLS cannot see because they
+are about a transition rather than a row:
+
+1. An engagement **opens as a draft**. The `status` default is `'draft'`, `authorized_at`
+   has no default, and an INSERT that names a granting status is refused — so the
+   two-step draft-then-authorise route is closed with the one-step one.
+2. **Only the taxpayer records acceptance.** `accepted_at` is writable by the taxpayer's
+   own session and by nobody else, and once written it cannot be changed or cleared.
+   `"client accepts engagements"` is the policy that lets them.
+3. **A firm authorises alone only for a taxpayer no other firm currently holds**
+   (`private.taxpayer_engaged_elsewhere()`). This is what keeps onboarding working: a
+   firm that has just created a taxpayer is the only firm engaged with them. With the
+   taxpayer's acceptance it may authorise regardless, which is how a second firm joins.
+4. An engagement **never moves** between firms or taxpayers, and a revocation is final.
+
+`supabase/tests/engagement_grant_test.sql` holds 17 checks; ten fail without the
+migration. **The residual gap, stated rather than implied:** a firm can still open and
+authorise an engagement against a taxpayer that *no* firm holds, without consent. It
+cannot learn such a taxpayer's id through the API — it reads no taxpayer it has no
+engagement for — so it would have to guess a UUID, but the gap is real and only the phase
+3 invitation lifecycle closes it. Carried as R-51.
+
+The same migration fixed a live break: `draftEngagement()` wrote `status: 'pending'`,
+which is not one of the six states `engagements_status_known` allows, so every engagement
+insert through the onboarding wizard and the engagements screen had been refused since
+`20261029213000` merged. `scripts/engine-check.mjs` asserted the wrong value too, which
+is why nothing caught it.
 
 **The policy helpers are no longer API endpoints** (migration `20261030020000`,
 merged in #27 and applied to production 30 Oct 2026). Eleven `SECURITY DEFINER` functions sat in `public`, the

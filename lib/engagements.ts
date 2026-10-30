@@ -79,7 +79,13 @@ export function revokeEngagement(
 
 export type DraftEngagement = {
   taxpayer_id: string;
-  status: "pending";
+  /**
+   * 'draft', not 'pending'. The `engagements_status_known` CHECK added in
+   * 20261029213000 names six states -- draft, invited, accepted, authorized,
+   * revoked, expired -- and 'pending' is not among them, so every insert
+   * through this path was refused from the moment that migration landed.
+   */
+  status: "draft";
   authorized_at: null;
   revoked_at: null;
   accepted_at: null;
@@ -116,7 +122,7 @@ export function draftEngagement(input: {
     ok: true,
     row: {
       taxpayer_id: taxpayerId,
-      status: "pending",
+      status: "draft",
       authorized_at: null,
       revoked_at: null,
       accepted_at: null,
@@ -148,5 +154,53 @@ export const ENGAGEMENT_REFUSAL_LABELS: Record<EngagementRefusal, { fr: string; 
   fee_invalid: {
     fr: "Les honoraires sont un nombre entier de francs, ou bien ils ne sont pas encore fixés.",
     en: "The fee is a whole number of francs, or it is not agreed yet.",
+  },
+};
+
+/**
+ * What the database refused when an engagement write came back as an error.
+ *
+ * `private.engagements_grant_guard()` (migration 20261030070000, F-01) holds
+ * the four rules RLS cannot express, and it raises a message rather than
+ * returning no rows. Without this mapping the screen shows a generic failure
+ * for a refusal the accountant can act on -- above all the first one, which is
+ * not a fault but a fact about the taxpayer.
+ *
+ * Matching on the message text couples this to the migration. Both live in this
+ * repository and the messages are fixed strings; anything unrecognised returns
+ * null and the caller keeps its own generic wording.
+ */
+export type EngagementWriteRefusal =
+  | "taxpayer_holds_another_firm"
+  | "acceptance_is_the_taxpayers"
+  | "engagement_cannot_move"
+  | "revocation_is_final";
+
+export function engagementWriteRefusal(detail: string | null | undefined): EngagementWriteRefusal | null {
+  const d = (detail ?? "").toLowerCase();
+  if (!d) return null;
+  if (d.includes("another firm holds this taxpayer")) return "taxpayer_holds_another_firm";
+  if (d.includes("only the taxpayer records acceptance")) return "acceptance_is_the_taxpayers";
+  if (d.includes("cannot be moved to another firm or another taxpayer")) return "engagement_cannot_move";
+  if (d.includes("cannot be un-revoked")) return "revocation_is_final";
+  return null;
+}
+
+export const ENGAGEMENT_WRITE_REFUSAL_LABELS: Record<EngagementWriteRefusal, { fr: string; en: string }> = {
+  taxpayer_holds_another_firm: {
+    fr: "Un autre cabinet suit déjà ce contribuable. Lui seul peut autoriser un second cabinet.",
+    en: "Another firm already works with this taxpayer. Only the taxpayer can bring in a second firm.",
+  },
+  acceptance_is_the_taxpayers: {
+    fr: "L'acceptation appartient au contribuable. Vous ne pouvez pas la saisir à sa place.",
+    en: "Acceptance belongs to the taxpayer. You cannot record it for them.",
+  },
+  engagement_cannot_move: {
+    fr: "Une mission ne change ni de cabinet ni de contribuable. Créez-en une nouvelle.",
+    en: "An engagement cannot change firm or taxpayer. Create a new one.",
+  },
+  revocation_is_final: {
+    fr: "Une mission révoquée ne peut pas être rétablie. Une nouvelle mission est nécessaire.",
+    en: "A revoked engagement cannot be restored. A new engagement is needed.",
   },
 };

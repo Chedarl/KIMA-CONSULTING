@@ -264,7 +264,10 @@ try {
       scopeNote: "TVA mensuelle",
     });
     assert.equal(draft.ok, true);
-    assert.equal(draft.row.status, "pending");
+    // 'draft', one of the six states engagements_status_known allows. It said
+    // "pending" until 20261030070000, which the CHECK constraint added in
+    // 20261029213000 had been refusing on every insert since it landed.
+    assert.equal(draft.row.status, "draft");
     assert.equal(draft.row.authorized_at, null);
     assert.equal(draft.row.fee_xaf, 7500);
     assert.equal(engagements.draftEngagement({ taxpayerId: "tp", feeXaf: 1.5 }).reason, "fee_invalid");
