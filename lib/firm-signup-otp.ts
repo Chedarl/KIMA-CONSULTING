@@ -20,10 +20,53 @@ export type SignupVerifyResult =
   | { ok: true; userId: string }
   | { ok: false; reason: "invalid_email" | "invalid_code" | "rate_limited" | "verification_failed" | "session_missing" };
 
-export async function sendFirmSignupOtp(_auth: SignupOtpAuth, _rawEmail: string): Promise<SignupSendResult> {
-  return { ok: false, reason: "send_failed" };
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CODE = /^\d{6}$/;
+
+function emailAddress(raw: string): string | null {
+  const email = raw.trim().toLowerCase();
+  return email.length <= 254 && EMAIL.test(email) ? email : null;
 }
 
-export async function verifyFirmSignupOtp(_auth: SignupOtpAuth, _rawEmail: string, _token: string): Promise<SignupVerifyResult> {
-  return { ok: false, reason: "verification_failed" };
+function rateLimited(error: { message: string; status?: number }): boolean {
+  return error.status === 429 || /rate.limit|too many requests/i.test(error.message);
+}
+
+/** Supabase sends its own code; no code is created, stored or returned here. */
+export async function sendFirmSignupOtp(auth: SignupOtpAuth, rawEmail: string): Promise<SignupSendResult> {
+  const email = emailAddress(rawEmail);
+  if (!email) return { ok: false, reason: "invalid_email" };
+
+  try {
+    const { error } = await auth.signInWithOtp({
+      email, options: { shouldCreateUser: true },
+    });
+    if (error) return { ok: false, reason: rateLimited(error) ? "rate_limited" : "send_failed" };
+    return { ok: true, email };
+  } catch {
+    return { ok: false, reason: "send_failed" };
+  }
+}
+
+/** A verified OTP alone is not a firm membership: D must still create it. */
+export async function verifyFirmSignupOtp(
+  auth: SignupOtpAuth,
+  rawEmail: string,
+  token: string,
+): Promise<SignupVerifyResult> {
+  const email = emailAddress(rawEmail);
+  if (!email) return { ok: false, reason: "invalid_email" };
+  const code = token.trim();
+  if (!CODE.test(code)) return { ok: false, reason: "invalid_code" };
+
+  try {
+    const { data, error } = await auth.verifyOtp({ email, token: code, type: "email" });
+    if (error) return { ok: false, reason: rateLimited(error) ? "rate_limited" : "verification_failed" };
+    if (!data?.session || !data.user?.id || data.user.email?.toLowerCase() !== email) {
+      return { ok: false, reason: "session_missing" };
+    }
+    return { ok: true, userId: data.user.id };
+  } catch {
+    return { ok: false, reason: "verification_failed" };
+  }
 }
