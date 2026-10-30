@@ -474,17 +474,17 @@ select set_config('request.jwt.claims',
 
 -- T-46 the unassigned row is invisible for UPDATE too, so this affects 0 rows.
 select lives_ok(
-  $ update registrations
+  $$ update registrations
         set organization_id = '00000000-0000-4000-a000-00000000b001'
-      where id = '00000000-0000-4000-a000-0000000000a1' $,
+      where id = '00000000-0000-4000-a000-0000000000a1' $$,
   'T-46 Partner A cannot assign an unassigned application to Firm B'
 );
 
 -- T-47 control: a firm may still manage its own assigned application.
 select lives_ok(
-  $ update registrations
+  $$ update registrations
         set applicant_name = 'Reviewed by Firm A'
-      where id = '00000000-0000-4000-a000-0000000000a2' $,
+      where id = '00000000-0000-4000-a000-0000000000a2' $$,
   'T-47 Partner A can update its own assigned application'
 );
 
@@ -494,8 +494,8 @@ select is(
   'T-171 Partner A can read its assigned application'
 );
 select lives_ok(
-  $ update registrations set applicant_name = 'Unauthorized edit'
-      where id = '00000000-0000-4000-a000-0000000000a1' $,
+  $$ update registrations set applicant_name = 'Unauthorized edit'
+      where id = '00000000-0000-4000-a000-0000000000a1' $$,
   'T-172 Partner A cannot update an unassigned application'
 );
 
