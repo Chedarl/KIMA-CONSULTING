@@ -108,7 +108,7 @@ set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a103","role":"authenticated"}',true);
 select throws_ok(
- $select sign_up_firm('Different Firm',' AB-12 / 34 ','Other Founder')$,
+ $$select sign_up_firm('Different Firm',' AB-12 / 34 ','Other Founder')$$,
  '23505',null,'T-211 registration-number spacing cannot bypass uniqueness');
 reset role;
 
