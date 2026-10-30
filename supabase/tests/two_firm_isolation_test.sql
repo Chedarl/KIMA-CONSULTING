@@ -35,7 +35,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(31);
+select plan(37);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: two unrelated firms, each with one taxpayer, one engagement and one
@@ -111,10 +111,12 @@ insert into document_requests (id, taxpayer_id, organization_id, label_fr, label
 
 -- A reviewed document and the file behind it, one per firm. These are the
 -- records a leak would actually hurt: the client's own paperwork.
-insert into documents (id, taxpayer_id, file_name, storage_path) values
-  ('00000000-0000-4000-a000-00000000a007', '00000000-0000-4000-a000-00000000a002',
+insert into documents (id, request_id, taxpayer_id, file_name, storage_path) values
+  ('00000000-0000-4000-a000-00000000a007', '00000000-0000-4000-a000-00000000a006',
+   '00000000-0000-4000-a000-00000000a002',
    'statement-a.pdf', '00000000-0000-4000-a000-00000000a002/r/statement-a.pdf'),
-  ('00000000-0000-4000-a000-00000000b007', '00000000-0000-4000-a000-00000000b002',
+  ('00000000-0000-4000-a000-00000000b007', '00000000-0000-4000-a000-00000000b006',
+   '00000000-0000-4000-a000-00000000b002',
    'statement-b.pdf', '00000000-0000-4000-a000-00000000b002/r/statement-b.pdf');
 
 -- An invoice each. Billing is a separate read path: firm_reviewer does not
@@ -207,6 +209,28 @@ select is(
   (select count(*) from documents where id = '00000000-0000-4000-a000-00000000b007'),
   0::bigint,
   'T-33 Firm A cannot read Firm B''s document'
+);
+
+-- T-65–T-66: the joined document/request query used by the firm's intake.
+select is(
+  (select count(*) from documents d join document_requests r on r.id = d.request_id
+   where r.organization_id = '00000000-0000-4000-a000-00000000a001'
+     and r.taxpayer_id = d.taxpayer_id
+     and d.id = '00000000-0000-4000-a000-00000000a007'),
+  1::bigint,
+  'T-65 Firm A intake shows only its own linked document'
+);
+select is(
+  (select count(*) from documents d join document_requests r on r.id = d.request_id
+   where r.organization_id = '00000000-0000-4000-a000-00000000a001'
+     and d.id = '00000000-0000-4000-a000-00000000b007'),
+  0::bigint,
+  'T-66 Firm A intake excludes Firm B document'
+);
+select is(
+  (select member_id from current_firm_intake_identity()),
+  '00000000-0000-4000-a000-00000000a004'::uuid,
+  'T-67 intake identity resolves signed-in firm member A'
 );
 
 -- T-34 the stored file behind it.
@@ -350,6 +374,28 @@ select is(
   (select count(*) from taxpayers where id = '00000000-0000-4000-a000-00000000a002'),
   0::bigint,
   'T-28 Firm B cannot read Firm A''s taxpayer'
+);
+
+-- T-68–T-69: reverse-tenant checks for the joined intake query.
+select is(
+  (select count(*) from documents d join document_requests r on r.id = d.request_id
+   where r.organization_id = '00000000-0000-4000-a000-00000000b001'
+     and r.taxpayer_id = d.taxpayer_id
+     and d.id = '00000000-0000-4000-a000-00000000b007'),
+  1::bigint,
+  'T-68 Firm B intake shows only its own linked document'
+);
+select is(
+  (select count(*) from documents d join document_requests r on r.id = d.request_id
+   where r.organization_id = '00000000-0000-4000-a000-00000000b001'
+     and d.id = '00000000-0000-4000-a000-00000000a007'),
+  0::bigint,
+  'T-69 Firm B intake excludes Firm A document'
+);
+select is(
+  (select member_id from current_firm_intake_identity()),
+  '00000000-0000-4000-a000-00000000b004'::uuid,
+  'T-70 intake identity resolves signed-in firm member B'
 );
 
 -- T-29

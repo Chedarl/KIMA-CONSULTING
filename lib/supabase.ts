@@ -90,9 +90,14 @@ export type ActivityRow = {
  * identity. If several firms are engaged, the UI must ask which firm to
  * contact rather than arbitrarily selecting one.
  */
-export async function demoIds(): Promise<{ taxpayerId: string; organizationId: string } | null> {
+export type PortalContext =
+  | { status: "ready"; taxpayerId: string; organizationId: string }
+  | { status: "multiple_firms" | "no_firm" | "no_session" | "unavailable" };
+
+/** Distinguish an ambiguous firm relationship from a network or auth failure. */
+export async function resolvePortalContext(): Promise<PortalContext> {
   const taxpayerId = await sessionTaxpayerId();
-  if (!taxpayerId) return null;
+  if (!taxpayerId) return { status: "no_session" };
 
   const { data, error } = await supabase()
     .from("engagements")
@@ -100,15 +105,23 @@ export async function demoIds(): Promise<{ taxpayerId: string; organizationId: s
     .eq("taxpayer_id", taxpayerId)
     .in("status", ["accepted", "authorized"])
     .is("revoked_at", null);
-  if (error || !data) return null;
+  if (error || !data) return { status: "unavailable" };
 
   const organizationIds = [...new Set(
     data.map((engagement) => engagement.organization_id as string | null).filter(
       (id): id is string => Boolean(id),
     ),
   )];
-  if (organizationIds.length !== 1) return null;
-  return { taxpayerId, organizationId: organizationIds[0] };
+  if (organizationIds.length > 1) return { status: "multiple_firms" };
+  if (organizationIds.length === 0) return { status: "no_firm" };
+  return { status: "ready", taxpayerId, organizationId: organizationIds[0] };
+}
+
+export async function demoIds(): Promise<{ taxpayerId: string; organizationId: string } | null> {
+  const context = await resolvePortalContext();
+  return context.status === "ready"
+    ? { taxpayerId: context.taxpayerId, organizationId: context.organizationId }
+    : null;
 }
 
 /**
@@ -143,22 +156,25 @@ export async function audit(entry: {
   taxpayerId: string;
   organizationId?: string;
   actor: "taxpayer" | "firm";
+  actorMemberId?: string;
   action: string;
   resourceType: string;
   resourceId?: string;
   before?: unknown;
   after?: unknown;
-}) {
-  await supabase()
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabase()
     .from("audit_events")
     .insert({
       taxpayer_id: entry.taxpayerId,
       organization_id: entry.organizationId ?? null,
       actor: entry.actor,
+      ...(entry.actorMemberId ? { actor_member_id: entry.actorMemberId } : {}),
       action: entry.action,
       resource_type: entry.resourceType,
       resource_id: entry.resourceId ?? null,
       before: entry.before ?? null,
       after: entry.after ?? null,
     });
+  return error ? { ok: false, error: error.message } : { ok: true };
 }

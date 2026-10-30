@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { updateById } from "@/lib/db-write";
-import { audit, demoIds, supabase, type DocumentRow } from "@/lib/supabase";
+import { audit, supabase, type DocumentRow } from "@/lib/supabase";
+import { subscribeFirmSession, type FirmSession } from "@/lib/firm-auth";
+import { recordCaseEvent } from "@/lib/record-event";
 import { useToast } from "@/components/toast";
 
 /**
@@ -30,83 +32,135 @@ export type IntakeLabels = {
 
 export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: IntakeLabels }) {
   const toast = useToast();
-  const [docs, setDocs] = useState<DocumentRow[] | null>(null);
-  const [fresh, setFresh] = useState<Set<string>>(new Set());
-  const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
+  type ScopedDocument = DocumentRow & {
+    document_requests: {
+      taxpayer_id: string;
+      organization_id: string;
+      case_id: string | null;
+    };
+  };
+  type VerifiedFirm = { memberId: string; organizationId: string; personLabel: string; role: "firm_staff" | "firm_reviewer" | "firm_partner" | "kima_admin" };
+
+  const [session, setSession] = useState<FirmSession | null | undefined>(undefined);
+  const [docs, setDocs] = useState<ScopedDocument[] | null>(null);
+  const [firm, setFirm] = useState<VerifiedFirm | null>(null);
   const [live, setLive] = useState(false);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [reloadVersion, setReloadVersion] = useState(0);
+
+  useEffect(() => subscribeFirmSession(setSession), []);
 
   useEffect(() => {
+    if (session === undefined) return;
+    setDocs(null);
+    setFirm(null);
+    setError(false);
+    setLive(false);
+    if (!session) {
+      setDocs([]);
+      setError(true);
+      return;
+    }
+
     let cancelled = false;
-    let cleanup: (() => void) | undefined;
+    let channel: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const memberId = session.memberId;
+    const db = supabase();
 
-    (async () => {
+    async function refresh(): Promise<string | null> {
       try {
-        const db = supabase();
-        const resolved = await demoIds();
-        if (cancelled) return;
-        if (!resolved) {
-          setError(true);
-          return;
+        // The RPC resolves auth.uid() in the database and does not expose
+        // firm_members.auth_user_id, which cannot be SELECTed by portal users.
+        const { data: identities, error: identityError } = await db.rpc("current_firm_intake_identity");
+        const member = (identities as Array<{
+          member_id: string;
+          organization_id: string;
+          person_label: string;
+          member_role: VerifiedFirm["role"];
+        }> | null)?.[0];
+        if (identityError || !member || member.member_id !== memberId || !member.organization_id) {
+          throw new Error("Signed-in firm membership unavailable");
         }
-        setIds(resolved);
 
-        const { data } = await db
+        const { data, error: documentError } = await db
           .from("documents")
-          .select("*")
+          .select("*, document_requests!inner(taxpayer_id, organization_id, case_id)")
+          .eq("document_requests.organization_id", member.organization_id)
           .order("created_at", { ascending: false })
           .limit(12);
-        if (cancelled) return;
-        setDocs((data ?? []) as DocumentRow[]);
-
-        const channel = db
-          .channel("firm-intake")
-          .on(
-            "postgres_changes",
-            { event: "INSERT", schema: "public", table: "documents" },
-            (payload) => {
-              const row = payload.new as DocumentRow;
-              setDocs((prev) => (prev ? [row, ...prev.filter((d) => d.id !== row.id)] : [row]));
-              // Mark it new for a moment so the eye catches the arrival.
-              setFresh((prev) => new Set(prev).add(row.id));
-              window.setTimeout(
-                () =>
-                  setFresh((prev) => {
-                    const next = new Set(prev);
-                    next.delete(row.id);
-                    return next;
-                  }),
-                4000,
-              );
-            },
-          )
-          .on(
-            "postgres_changes",
-            { event: "UPDATE", schema: "public", table: "documents" },
-            (payload) => {
-              const row = payload.new as DocumentRow;
-              setDocs((prev) => (prev ? prev.map((d) => (d.id === row.id ? row : d)) : prev));
-            },
-          )
-          .subscribe((status) => setLive(status === "SUBSCRIBED"));
-
-        cleanup = () => {
-          db.removeChannel(channel);
-        };
+        if (documentError) throw documentError;
+        if (cancelled) return null;
+        const scoped = ((data ?? []) as unknown as ScopedDocument[]).filter(
+          (doc) =>
+            doc.request_id &&
+            doc.document_requests?.organization_id === member.organization_id &&
+            doc.document_requests.taxpayer_id === doc.taxpayer_id,
+        );
+        setFirm({
+          memberId: member.member_id,
+          organizationId: member.organization_id,
+          personLabel: member.person_label,
+          role: member.member_role,
+        });
+        setDocs(scoped);
+        setError(false);
+        return member.organization_id;
       } catch {
-        if (!cancelled) setError(true);
+        if (!cancelled) {
+          setDocs([]);
+          setFirm(null);
+          setError(true);
+        }
+        return null;
       }
+    }
+
+    void (async () => {
+      const organizationId = await refresh();
+      if (!organizationId || cancelled) return;
+
+      // Never subscribe to raw documents: those rows have no firm column.
+      // Instead receive only this firm's request changes, and refetch the
+      // firm-scoped joined documents. Other firms' changes never reach us.
+      const queueRefresh = () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          debounce = null;
+          if (!cancelled) void refresh();
+        }, 200);
+      };
+      channel = db
+        .channel("firm-intake-" + memberId)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "document_requests",
+            filter: "organization_id=eq." + organizationId,
+          },
+          queueRefresh,
+        )
+        .subscribe((status) => {
+          if (!cancelled) setLive(status === "SUBSCRIBED");
+        });
+      // Close the window between the initial snapshot and subscription setup.
+      queueRefresh();
     })();
 
     return () => {
       cancelled = true;
-      cleanup?.();
+      if (debounce) clearTimeout(debounce);
+      if (channel) void db.removeChannel(channel);
     };
-  }, []);
+  }, [session, reloadVersion]);
 
-  async function decide(doc: DocumentRow, decision: "accepted" | "returned") {
-    if (!ids) return;
+  async function decide(doc: ScopedDocument, decision: "accepted" | "returned") {
+    const request = doc.document_requests;
+    if (!firm || !doc.request_id || !request || doc.review_status !== "pending" ||
+        request.organization_id !== firm.organizationId || request.taxpayer_id !== doc.taxpayer_id) return;
     setBusy(doc.id);
     const previous = doc.review_status;
     setDocs((prev) =>
@@ -125,32 +179,36 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
         if (!reqWritten.ok) throw new Error(reqWritten.reason);
       }
 
-      const { recordCaseEvent } = await import("@/lib/record-event");
-      await recordCaseEvent({
-        taxpayerId: ids.taxpayerId,
-        organizationId: ids.organizationId,
-        actor: { role: "firm_staff", label: "Firm" },
+      const event = await recordCaseEvent({
+        caseId: request.case_id,
+        taxpayerId: doc.taxpayer_id,
+        organizationId: request.organization_id,
+        actor: { role: firm.role, label: firm.personLabel },
         kind: decision === "accepted" ? "request_accepted" : "request_returned",
         from: previous,
         to: decision === "accepted" ? "accepted" : "returned",
         subject: doc.file_name,
       });
-      await audit({
-        taxpayerId: ids.taxpayerId,
-        organizationId: ids.organizationId,
+      if (!event.ok) throw new Error(event.error);
+      const audited = await audit({
+        taxpayerId: doc.taxpayer_id,
+        organizationId: request.organization_id,
         actor: "firm",
+        actorMemberId: firm.memberId,
         action: `document.${decision}`,
         resourceType: "document",
         resourceId: doc.id,
         before: { review_status: previous },
         after: { review_status: decision },
       });
+      if (!audited.ok) throw new Error(audited.error);
 
       toast(decision === "accepted" ? labels.accepted : labels.returned);
     } catch {
-      setDocs((prev) =>
-        prev ? prev.map((d) => (d.id === doc.id ? { ...d, review_status: previous } : d)) : prev,
-      );
+      // A document, request or history write may already have committed.
+      // Never revert the UI to the pre-decision state without re-reading.
+      setDocs(null);
+      setReloadVersion((version) => version + 1);
       toast(labels.offline, "error");
     } finally {
       setBusy(null);
@@ -188,7 +246,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
           {docs.map((d) => (
             <li
               key={d.id}
-              className={`px-3 py-2.5 ${fresh.has(d.id) ? "flash-change" : ""}`}
+              className="px-3 py-2.5"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate font-mono text-xs text-fg">{d.file_name}</span>
