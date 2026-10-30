@@ -21,7 +21,26 @@ begin
     if new.stage <> 'documents' then
       raise exception 'new cases must start in documents' using errcode = '23514';
     end if;
+    if not (auth.uid() is null and current_user in
+        ('postgres','service_role','supabase_admin')) and not (
+      new.organization_id = private.current_member_org()
+      and private.member_has_in_org('case.advance', new.organization_id)
+      and exists (
+        select 1 from public.engagements e where e.id = new.engagement_id
+          and e.organization_id = new.organization_id
+          and e.taxpayer_id = new.taxpayer_id and e.revoked_at is null
+          and e.status in ('accepted','authorized')
+      )
+    ) then raise exception 'case requires an active firm engagement' using errcode='42501';
+    end if;
     return new;
+  end if;
+
+  if new.taxpayer_id is distinct from old.taxpayer_id
+     or new.organization_id is distinct from old.organization_id
+     or new.engagement_id is distinct from old.engagement_id then
+    raise exception 'case tenant and engagement cannot be reassigned'
+      using errcode='42501';
   end if;
 
   if new.stage is distinct from old.stage then
@@ -29,7 +48,16 @@ begin
     -- Service-role writes are reserved for migrations, not ordinary users.
     if not (auth.uid() is null and current_user in
         ('postgres','service_role','supabase_admin'))
-       and not coalesce(private.member_has('case.advance', old.taxpayer_id), false) then
+       and not (
+         old.organization_id = private.current_member_org()
+         and private.member_has_in_org('case.advance', old.organization_id)
+         and exists (
+           select 1 from public.engagements e where e.id=old.engagement_id
+             and e.organization_id=old.organization_id
+             and e.taxpayer_id=old.taxpayer_id
+             and e.revoked_at is null and e.status in ('accepted','authorized')
+         )
+       ) then
       raise exception 'case advancement requires current firm authority'
         using errcode = '42501';
     end if;
