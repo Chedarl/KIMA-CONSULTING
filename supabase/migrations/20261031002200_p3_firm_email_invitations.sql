@@ -1,10 +1,10 @@
 -- Firm send: resolve a known contact email inside the database.
 -- Do not expose contact links / auth identifiers for draft engagements.
-create function public.create_invitation_for_contact(
+create function private.create_invitation_for_contact_internal(
   p_engagement_id uuid, p_email text
 ) returns table(invitation_id uuid, expires_at timestamptz)
 language plpgsql security definer
-set search_path to 'pg_catalog', 'public', 'private'
+set search_path to ''
 as $$
 declare
   v_org uuid;
@@ -36,6 +36,17 @@ begin
   );
 end $$;
 
+-- Only this invoker wrapper is an exposed public API route.
+create function public.create_invitation_for_contact(
+  p_engagement_id uuid, p_email text
+) returns table(invitation_id uuid, expires_at timestamptz)
+language sql security invoker set search_path to '' as $
+  select * from private.create_invitation_for_contact_internal($1,$2)
+$;
+revoke execute on function private.create_invitation_for_contact_internal(uuid,text)
+  from public, anon;
+grant execute on function private.create_invitation_for_contact_internal(uuid,text)
+  to authenticated;
 revoke execute on function public.create_invitation_for_contact(uuid,text)
   from public, anon;
 grant execute on function public.create_invitation_for_contact(uuid,text)
