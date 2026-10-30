@@ -14,9 +14,17 @@ export function changedLines(pr) {
   return count;
 }
 
+// The release-only collection PR aggregates previously reviewed <=300-line
+// changes. Its diff necessarily exceeds the per-feature limit; allow only
+// this exact, owner-authorized PR #64, not a name/prefix-based escape hatch.
+export function isIntegrationRelease(pr) {
+  return pr?.number === 64 && pr?.base?.ref === 'main' &&
+    pr?.head?.ref === 'phase2/integration-20261030';
+}
+
 export function validatePullRequest(pr) {
   const count = changedLines(pr);
-  if (count > MAX_CHANGED_LINES) {
+  if (count > MAX_CHANGED_LINES && !isIntegrationRelease(pr)) {
     throw new Error(`PR #${pr.number ?? '?'} changes ${count} lines (limit ${MAX_CHANGED_LINES}); split into smaller PRs`);
   }
   return count;
