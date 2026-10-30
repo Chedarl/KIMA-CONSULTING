@@ -113,13 +113,14 @@ insert into documents (id, taxpayer_id, file_name, storage_path) values
 -- hold billing.view, so these are reached through the engagement, like
 -- everything else.
 insert into invoices (id, organization_id, taxpayer_id, number,
-                      description_fr, description_en, total_minor) values
+                      description_fr, description_en, total_minor,
+                      issued_on, due_on) values
   ('00000000-0000-4000-a000-00000000a009', '00000000-0000-4000-a000-00000000a001',
    '00000000-0000-4000-a000-00000000a002', 'KMC-A-1',
-   'Honoraires A', 'Fees A', 150000),
+   'Honoraires A', 'Fees A', 150000, '2026-03-01', '2026-03-31'),
   ('00000000-0000-4000-a000-00000000b009', '00000000-0000-4000-a000-00000000b001',
    '00000000-0000-4000-a000-00000000b002', 'KMC-B-1',
-   'Honoraires B', 'Fees B', 150000);
+   'Honoraires B', 'Fees B', 150000, '2026-03-01', '2026-03-31');
 
 -- A task each. case_tasks names only a case, so it reaches its taxpayer
 -- through compliance_cases rather than directly.
