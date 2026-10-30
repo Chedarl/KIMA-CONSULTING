@@ -52,7 +52,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(11);
+select plan(12);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: one firm, one partner. A second firm's partner stands by as the
@@ -74,6 +74,14 @@ insert into firm_members
   ('00000000-0000-4000-9000-0000000000b2', '00000000-0000-4000-9000-0000000000b0',
    'Onb Partner B', 'partner-b@onb.test', 'firm_partner',
    '00000000-0000-4000-9000-0000000000b1');
+
+-- A client Firm B already holds. T-119 uses it to check that the new function
+-- cannot become a way around F-01.
+insert into taxpayers (id, legal_name, profile_verified) values
+  ('00000000-0000-4000-9000-00000000000b', 'Client of Onboarding Firm B', false);
+insert into engagements (organization_id, taxpayer_id, status, authorized_at) values
+  ('00000000-0000-4000-9000-0000000000b0', '00000000-0000-4000-9000-00000000000b',
+   'authorized', now());
 
 -- ---------------------------------------------------------------------------
 -- As Partner A, signed in. Everything below runs under RLS as `authenticated`.
@@ -188,6 +196,20 @@ select lives_ok(
              'firm', '00000000-0000-4000-9000-0000000000a2',
              'taxpayer.onboarded', 'taxpayer') $$,
   'T-114 step 7: audit() records who onboarded the taxpayer'
+);
+
+-- T-119 the F-01 regression guard on the new function. open_client_file()
+-- authorises an engagement, which is the one thing F-01 exists to control, so
+-- the question is whether it can be aimed at somebody else's client. It cannot
+-- by construction -- it takes no taxpayer id and only ever inserts a fresh
+-- one, so the engagement it authorises always names a taxpayer no firm can
+-- hold -- and this asserts the consequence rather than trusting the argument:
+-- having just opened a file, Firm A still reads only its own.
+select is(
+  (select count(*) from taxpayers
+    where id = '00000000-0000-4000-9000-00000000000b'),
+  0::bigint,
+  'T-119 opening a client file gives Firm A no reach into Firm B''s client'
 );
 
 reset role;
