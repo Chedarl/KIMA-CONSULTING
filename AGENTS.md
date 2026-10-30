@@ -59,6 +59,7 @@ Gate 5 (integration with the real backend) still needs the owner's go per PR.
 - Never change a schema or security policy you do not own; write a handoff instead.
 - Synthetic data only (`docs/foundation/risk-register.md` R-32, R-36).
 - Every PR: one coherent change, its own branch, CI green, README updated when behaviour changes.
+- **PR size limit:** 300 changed lines maximum (additions plus deletions) at the final PR commit, including tests, documentation and comments. Split larger changes before review; only the owner may authorize an explicit exception.
 
 ## Handoffs
 
