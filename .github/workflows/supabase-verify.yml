@@ -4,13 +4,23 @@ name: Verify migrations
 # migration that cannot replay never reaches the production database.
 #
 # This is the guard that makes auto-applying migrations on main defensible:
-# nothing lands in Paris that has not already replayed cleanly here.
+# nothing lands in Paris that has not already replayed cleanly here. That was
+# only true of pull requests until 30 Oct -- this workflow did not run on a push
+# to main at all, so the migrations workflow had nothing to wait for and applied
+# on CI alone. It now runs on main too, and the apply job requires it.
 
+# The paths filter is on pull_request only, deliberately. On main this must run
+# for EVERY push: the migrations workflow waits for this check before it touches
+# the production database, and a run that never happens because the push touched
+# no supabase/ file would hold that gate open for ever. A few wasted minutes on
+# an unrelated push is the cheaper side of that trade.
 on:
   pull_request:
     paths:
       - 'supabase/**'
       - '.github/workflows/supabase-verify.yml'
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
