@@ -216,6 +216,40 @@ calls it — `portal_issue_code()` replaced it and is service-role only — so
 unlike the other definer helpers it can lose the grant outright rather than
 having to move schema. Tests: `supabase/tests/portal_code_surface_test.sql`
 (T-61, T-62). Risk R-49.
+### Phase 1 environment settings
+
+Settings that live in a dashboard rather than in this repository, recorded here
+because nothing in the code can show their state and phase 1 cannot close
+without them.
+
+| Setting | Where | State |
+|---|---|---|
+| `app_flags.allow_demo_anon` | Supabase, `app_flags` table | **false** since 30 Oct 2026, 02:13 UTC |
+| `app_flags.demo_otp_reveal` | Supabase, `app_flags` table | **false** since 30 Oct 2026, 02:13 UTC |
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel, all environments | **set** since 23 Oct 2026 |
+| Leaked-password protection | Supabase Auth | **not available** on the current plan (Pro and up) |
+| Minimum password length | Supabase Auth | 6 — see R-50 |
+
+Both demo flags being false is what the plan asks for before any real taxpayer
+data (R-32/R-36). The visible consequence: the signed-out site no longer shows
+the demo taxpayer, and a one-time code is never printed on screen, so a demo
+sign-in now needs the code that arrives by email.
+
+**`KIMA_DEMO_OTP_REVEAL` can stay set, and here is why it is not a second way
+in.** It is one of three conditions in `mayRevealCode()` (`lib/auth-mail.ts`),
+all of which must hold before a code is shown: the flag is `1`, **`VERCEL_ENV`
+is not `production`**, and the destination cannot receive mail at all
+(`demo.kima.cm`, or a domain starting `example.`, reserved by IANA for this).
+Production fails the second condition whatever the variable says, and a failed
+send to a real address is a failure rather than a reason to reveal. `npm test`
+pins both halves on every push (T-18: "production never reveals, even for an
+`example.*` address"). What the variable still does is show the code on a
+preview or local deployment for an address that could not have received it
+anyway. The `auth-codes` Edge Function applies the same address rule and reads
+`app_flags.demo_otp_reveal`, which is now false.
+
+Removing the variable would therefore change nothing on production and would
+break local sign-in, so it stays.
 
 ### Testing the pure engines
 
@@ -495,7 +529,9 @@ Still open, and it is the honest limit of this increment:
   delivers it through Resend (or `KIMA_DEMO_OTP_REVEAL=1` for synthetic demos),
   verifies it, and mints a Supabase Auth session. `portal_sign_in` is revoked.
   The anon demo branch of `can_see_taxpayer` is off unless
-  the `allow_demo_anon` row in `app_flags` is true.
+  the `allow_demo_anon` row in `app_flags` is true — **and it is false on
+  production since 30 Oct 2026, 02:13 UTC**, so a visitor who is not signed in
+  now reads no taxpayer at all. See "Phase 1 environment settings".
 - **`case_tasks` is now firm-only**, so with no firm session the work queue's
   task fetch returns empty and the derived blocker falls back to requests.
   Correct behaviour, and a visible consequence of the above.
@@ -635,8 +671,11 @@ Three things that cost real time, recorded so nobody pays twice:
    real taxpayer data exists (R-32).**
 
 **To make the firm and portal screens writable you need `SUPABASE_SERVICE_ROLE_KEY`**
-in `.env.local` — it is not on Vercel either. Without it `/api/firm/request-code`
-answers 503, no session can be minted, and every write is correctly refused.
+in `.env.local`. Without it `/api/firm/request-code` answers 503, no session can
+be minted, and every write is correctly refused. On Vercel it **is** set, for
+every environment, and has been since 23 Oct 2026 — an earlier version of this
+paragraph said otherwise and was wrong. Vercel hides the value, so what is
+confirmed is that the variable exists, not that it holds the current key.
 `KIMA_DEMO_OTP_REVEAL=1` is already set locally, so the one-time code is shown
 in the browser while no mail domain is verified.
 
@@ -670,4 +709,5 @@ structurally-valid value.
   policy, so it is deliberate work rather than a quick patch
 - `portal_sign_in` execute grants are revoked by the auth-closeout migration
 - `demo_taxpayer_id()` remains executable; the anon branch that uses it is off
-  unless the `allow_demo_anon` row in `app_flags` is true
+  unless the `allow_demo_anon` row in `app_flags` is true, and that row is false
+  on production since 30 Oct 2026
