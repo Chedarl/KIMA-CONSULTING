@@ -165,7 +165,7 @@ export function MessageThread({
       const liveIds = [...new Set((grants ?? [])
         .filter((grant) => grant.authorized_at || grant.accepted_at)
         .map((grant) => grant.organization_id as string))];
-      const names = new Map((directory ?? []).map(
+      const names = new Map<string, string>((directory ?? []).map(
         (firm: { id: string; name: string }) => [firm.id, firm.name] as const));
       setFirms(liveIds.map((id) => ({
         id,
