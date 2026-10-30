@@ -9,12 +9,11 @@ set search_path = ''
 as $$
 declare
   v_admin uuid;
-  v_kima_org uuid;
   v_before jsonb;
   v_after jsonb;
   v_reason text := btrim(coalesce(p_reason, ''));
 begin
-  select fm.id, fm.organization_id into v_admin, v_kima_org
+  select fm.id into v_admin
     from public.firm_members fm
     join public.organizations root on root.id = fm.organization_id
    where fm.auth_user_id = auth.uid()
@@ -64,11 +63,8 @@ begin
   insert into public.audit_events
     (organization_id, actor, actor_member_id, action, resource_type,
      resource_id, before, after)
-  -- This is KIMA's internal decision, not an event performed by the target
-  -- accounting firm. Store it inside the KIMA vendor organisation: the firm
-  -- cannot see the private review reason through its own audit feed.
   values
-    (v_kima_org, 'firm', v_admin, 'firm.admin_'||p_action, 'organization',
+    (p_firm_id, 'firm', v_admin, 'firm.admin_'||p_action, 'organization',
      p_firm_id, v_before, v_after);
 end $$;
 
