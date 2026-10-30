@@ -11,7 +11,8 @@
     "lint": "next lint",
     "test": "node scripts/engine-check.mjs",
     "test:journey": "node scripts/journey-check.mjs",
-    "seed:storage": "node scripts/seed-storage.mjs"
+    "seed:storage": "node scripts/seed-storage.mjs",
+    "test:marketing": "node scripts/marketing-consistency-check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

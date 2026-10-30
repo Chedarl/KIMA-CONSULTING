@@ -452,6 +452,33 @@ under their remote versions, verified on every PR and applied on push to `main`
 
 ---
 
+### What the public site offers (Phase 2)
+
+`OPEN_WORKSPACE_KINDS` decides what the home page offers, and it is still
+`individual` and `business` — **the accounting-firm plan exists in the copy and
+is not rendered.** It appears the moment that constant admits
+`accounting_firm`, which is the last step of phase 2 and happens only after two
+firms have been tested side by side.
+
+The pricing section pairs each plan to its workspace **by kind**. It used to
+walk `OPEN_WORKSPACE_KINDS` and take `t.pricing[i]`, which worked only while
+both arrays began with the same two entries in the same order; the third plan
+was simply never reached, and reordering either array would have rendered one
+plan's words under another plan's link.
+
+The firm plan's copy said *"activation goes through a review"*. That was true of
+the design Agent A proposed and false of the one the owner chose on 30 Oct: it
+now says the workspace opens at sign-up and stays marked **unverified** until
+KIMA checks the registration number, which is the safeguard that replaced the
+review.
+
+`npm run test:marketing` holds both: every plan must name its kind, the two
+locales must list the same kinds in the same order, the home page must filter
+rather than pair by position, and the firm plan must not promise a review. It
+also asserts the disclaimer that **no tax-authority authorization, partnership
+or e-filing integration is established or claimed** is still present in both
+locales — a hard constraint, asserted rather than trusted.
+
 ## Where the work stands
 
 **Status, 29 October 2026: not client-ready.** The QA and adoption plan in

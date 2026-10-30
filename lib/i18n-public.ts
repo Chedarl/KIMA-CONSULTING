@@ -47,19 +47,24 @@ const fr = {
       "Le prix dépend du travail réel. Nous le chiffrons après un court échange — pas de barème inventé ici.",
     pricing: [
       {
+        kind: "individual",
         title: "Particulier",
         body: "Déclarations personnelles et un interlocuteur qui vous répond.",
         cta: "Créer un espace particulier",
       },
       {
+        kind: "business",
         title: "Entreprise",
         body: "Suivi fiscal et comptable de la société, pièces et échéances.",
         cta: "Créer un espace entreprise",
       },
       {
+        // Pas encore proposé : OPEN_WORKSPACE_KINDS décide ce qui s'affiche.
+        kind: "accounting_firm",
         title: "Cabinet comptable",
-        body: "Un espace pour votre cabinet. L'activation passe par une revue.",
-        cta: "Demander un espace cabinet",
+        body:
+          "Un espace pour votre cabinet, ouvert dès l'inscription. Il reste marqué non vérifié tant que KIMA n'a pas contrôlé votre numéro d'inscription.",
+        cta: "Créer un espace cabinet",
       },
     ],
     aboutTitle: "À propos",
@@ -299,19 +304,24 @@ const en: PublicCopy = {
       "The price follows the actual work. We quote it after a short conversation — no invented price list here.",
     pricing: [
       {
+        kind: "individual",
         title: "Individual",
         body: "Personal filings and a person who answers you.",
         cta: "Create an individual workspace",
       },
       {
+        kind: "business",
         title: "Business",
         body: "Company tax and accounting, documents and deadlines.",
         cta: "Create a business workspace",
       },
       {
+        // Not offered yet: OPEN_WORKSPACE_KINDS decides what appears.
+        kind: "accounting_firm",
         title: "Accounting firm",
-        body: "A workspace for your practice. Activation goes through a review.",
-        cta: "Request a firm workspace",
+        body:
+          "A workspace for your practice, open as soon as you sign up. It stays marked unverified until KIMA has checked your registration number.",
+        cta: "Create a firm workspace",
       },
     ],
     aboutTitle: "About",
