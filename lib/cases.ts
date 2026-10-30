@@ -539,12 +539,11 @@ export function advance(
     }
   }
 
-  // Delivery asserts an outcome to the client, so it waits on the
-  // administration rather than on us. Checked here and in the database, because
-  // a rule that lives only in TypeScript is one SQL write from being untrue.
-  // Absent filing information the move is refused rather than assumed: the
-  // safe default for a claim about the state is "we do not know".
-  if (input.to === "delivered" && !canDeliver(input.filing ?? FILING_UNKNOWN)) {
+  // Neither requesting client sign-off nor delivery may imply a successful
+  // filing before its acknowledgment is verified. Missing filing facts fail closed.
+  // The database must enforce this as well before Phase 4 can be released.
+  if ((input.to === "client_approval" || input.to === "delivered") &&
+      !canDeliver(input.filing ?? FILING_UNKNOWN)) {
     return { ok: false, reason: "filing_not_verified" };
   }
   if (current.stage === "client_approval" && input.to === "delivered" &&
