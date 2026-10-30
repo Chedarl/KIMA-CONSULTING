@@ -39,15 +39,15 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
       case_id: string | null;
     };
   };
-  type VerifiedFirm = { organizationId: string; personLabel: string; role: "firm_staff" | "firm_reviewer" | "firm_partner" | "kima_admin" };
+  type VerifiedFirm = { memberId: string; organizationId: string; personLabel: string; role: "firm_staff" | "firm_reviewer" | "firm_partner" | "kima_admin" };
 
   const [session, setSession] = useState<FirmSession | null | undefined>(undefined);
   const [docs, setDocs] = useState<ScopedDocument[] | null>(null);
-  const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [firm, setFirm] = useState<VerifiedFirm | null>(null);
   const [live, setLive] = useState(false);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [reloadVersion, setReloadVersion] = useState(0);
 
   useEffect(() => subscribeFirmSession(setSession), []);
 
@@ -64,26 +64,26 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
     }
 
     let cancelled = false;
+    let channel: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
+    let debounce: ReturnType<typeof setTimeout> | null = null;
     const memberId = session.memberId;
     const db = supabase();
 
-    // Firm sign-in is independent of taxpayer portal sign-in. Resolve the
-    // authenticated member, not a portal taxpayer or any seeded fallback.
-    async function refresh(newDocumentId?: string) {
+    async function refresh(): Promise<string | null> {
       try {
-        const { data: auth, error: authError } = await db.auth.getUser();
-        if (authError || !auth.user) throw new Error("No authenticated firm member");
-        const { data: member, error: memberError } = await db
-          .from("firm_members")
-          .select("organization_id, person_label, role, auth_user_id, active")
-          .eq("id", memberId)
-          .eq("auth_user_id", auth.user.id)
-          .eq("active", true)
-          .maybeSingle();
-        if (memberError || !member?.organization_id) throw new Error("Firm membership unavailable");
+        // The RPC resolves auth.uid() in the database and does not expose
+        // firm_members.auth_user_id, which cannot be SELECTed by portal users.
+        const { data: identities, error: identityError } = await db.rpc("current_firm_intake_identity");
+        const member = (identities as Array<{
+          member_id: string;
+          organization_id: string;
+          person_label: string;
+          member_role: VerifiedFirm["role"];
+        }> | null)?.[0];
+        if (identityError || !member || member.member_id !== memberId || !member.organization_id) {
+          throw new Error("Signed-in firm membership unavailable");
+        }
 
-        // The request owns the firm identity. Documents themselves carry a
-        // taxpayer but no organisation, so a taxpayer-only query mixes firms.
         const { data, error: documentError } = await db
           .from("documents")
           .select("*, document_requests!inner(taxpayer_id, organization_id, case_id)")
@@ -91,7 +91,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
           .order("created_at", { ascending: false })
           .limit(12);
         if (documentError) throw documentError;
-        if (cancelled) return;
+        if (cancelled) return null;
         const scoped = ((data ?? []) as unknown as ScopedDocument[]).filter(
           (doc) =>
             doc.request_id &&
@@ -99,54 +99,63 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
             doc.document_requests.taxpayer_id === doc.taxpayer_id,
         );
         setFirm({
-          organizationId: member.organization_id as string,
-          personLabel: member.person_label as string,
-          role: member.role as VerifiedFirm["role"],
+          memberId: member.member_id,
+          organizationId: member.organization_id,
+          personLabel: member.person_label,
+          role: member.member_role,
         });
         setDocs(scoped);
         setError(false);
-        if (newDocumentId && scoped.some((doc) => doc.id === newDocumentId)) {
-          setFresh((previous) => new Set(previous).add(newDocumentId));
-          window.setTimeout(() => {
-            if (cancelled) return;
-            setFresh((previous) => {
-              const next = new Set(previous);
-              next.delete(newDocumentId);
-              return next;
-            });
-          }, 4000);
-        }
+        return member.organization_id;
       } catch {
         if (!cancelled) {
           setDocs([]);
           setFirm(null);
           setError(true);
         }
+        return null;
       }
     }
 
-    void refresh();
-    const channel = db
-      .channel("firm-intake-" + memberId)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "documents" },
-        (payload) => void refresh(payload.eventType === "INSERT" ? (payload.new as DocumentRow).id : undefined),
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "document_requests" },
-        () => void refresh(),
-      )
-      .subscribe((status) => {
-        if (!cancelled) setLive(status === "SUBSCRIBED");
-      });
+    void (async () => {
+      const organizationId = await refresh();
+      if (!organizationId || cancelled) return;
+
+      // Never subscribe to raw documents: those rows have no firm column.
+      // Instead receive only this firm's request changes, and refetch the
+      // firm-scoped joined documents. Other firms' changes never reach us.
+      const queueRefresh = () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          debounce = null;
+          if (!cancelled) void refresh();
+        }, 200);
+      };
+      channel = db
+        .channel("firm-intake-" + memberId)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "document_requests",
+            filter: "organization_id=eq." + organizationId,
+          },
+          queueRefresh,
+        )
+        .subscribe((status) => {
+          if (!cancelled) setLive(status === "SUBSCRIBED");
+        });
+      // Close the window between the initial snapshot and subscription setup.
+      queueRefresh();
+    })();
 
     return () => {
       cancelled = true;
-      void db.removeChannel(channel);
+      if (debounce) clearTimeout(debounce);
+      if (channel) void db.removeChannel(channel);
     };
-  }, [session]);
+  }, [session, reloadVersion]);
 
   async function decide(doc: ScopedDocument, decision: "accepted" | "returned") {
     const request = doc.document_requests;
@@ -185,6 +194,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
         taxpayerId: doc.taxpayer_id,
         organizationId: request.organization_id,
         actor: "firm",
+        actorMemberId: firm.memberId,
         action: `document.${decision}`,
         resourceType: "document",
         resourceId: doc.id,
@@ -195,10 +205,10 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
 
       toast(decision === "accepted" ? labels.accepted : labels.returned);
     } catch {
-      setDocs((prev) =>
-        prev ? prev.map((d) => (d.id === doc.id ? { ...d, review_status: previous } : d)) : prev,
-      );
-      setError(true);
+      // A document, request or history write may already have committed.
+      // Never revert the UI to the pre-decision state without re-reading.
+      setDocs(null);
+      setReloadVersion((version) => version + 1);
       toast(labels.offline, "error");
     } finally {
       setBusy(null);
@@ -236,7 +246,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
           {docs.map((d) => (
             <li
               key={d.id}
-              className={`px-3 py-2.5 ${fresh.has(d.id) ? "flash-change" : ""}`}
+              className="px-3 py-2.5"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate font-mono text-xs text-fg">{d.file_name}</span>
