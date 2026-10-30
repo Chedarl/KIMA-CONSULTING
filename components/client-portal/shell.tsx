@@ -141,7 +141,13 @@ export function ClientPortalShell({
         const ids = await demoIds();
         if (cancelled) return;
         setActiveId(ids?.taxpayerId ?? null);
-        const { data } = await db.from("taxpayers").select("id, legal_name").order("legal_name");
+        if (!ids) {
+          setBiz([]);
+          setUnread(0);
+          catalogue.current = [];
+          return;
+        }
+        const { data } = await db.from("taxpayers").select("id, legal_name").eq("id", ids.taxpayerId);
         if (cancelled) return;
         setBiz((data ?? []) as Business[]);
         const tid = ids?.taxpayerId;
@@ -155,8 +161,8 @@ export function ClientPortalShell({
           if (!cancelled) setUnread(count ?? 0);
         }
         const [cases, requests] = await Promise.all([
-          db.from("compliance_cases").select("id, obligation_code, period_token").order("due_on"),
-          db.from("document_requests").select("id, label_fr, label_en"),
+          db.from("compliance_cases").select("id, obligation_code, period_token").eq("taxpayer_id", ids.taxpayerId).order("due_on"),
+          db.from("document_requests").select("id, label_fr, label_en").eq("taxpayer_id", ids.taxpayerId),
         ]);
         if (cancelled) return;
         const found: Hit[] = [
@@ -197,7 +203,7 @@ export function ClientPortalShell({
 
   async function chooseBusiness(id: string) {
     setBizOpen(false);
-    if (id === activeId) return;
+    if (id === activeId || !biz.some((business) => business.id === id)) return;
     try {
       const raw = sessionStorage.getItem("kima.portal.session");
       const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};

@@ -86,9 +86,9 @@ export function DocumentsPanel({
     }
     setIds(resolved);
     const [{ data: reqs }, { data: documents }, { data: cs }] = await Promise.all([
-      db.from("document_requests").select("*").order("due_on"),
-      db.from("documents").select("*").order("created_at", { ascending: false }),
-      db.from("compliance_cases").select("id, obligation_code, period_token"),
+      db.from("document_requests").select("*").eq("taxpayer_id", resolved.taxpayerId).order("due_on"),
+      db.from("documents").select("*").eq("taxpayer_id", resolved.taxpayerId).order("created_at", { ascending: false }),
+      db.from("compliance_cases").select("id, obligation_code, period_token").eq("taxpayer_id", resolved.taxpayerId),
     ]);
     setRequests((reqs ?? []) as DocumentRequestRow[]);
     setDocs((documents ?? []) as DocumentRow[]);
@@ -137,7 +137,7 @@ export function DocumentsPanel({
         requestId,
         file,
         taxpayerId: ids.taxpayerId,
-        organizationId: ids.organizationId,
+        organizationId: req.organization_id,
         caseId: req.case_id ?? null,
         label: locale === "fr" ? req.label_fr : req.label_en,
         actorLabel: "Client",

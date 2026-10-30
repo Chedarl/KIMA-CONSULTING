@@ -74,26 +74,36 @@ export function ClientDashboard({
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      setIds(await demoIds());
+      const resolved = await demoIds();
+      setIds(resolved);
+      if (!resolved) {
+        setCases([]);
+        setRequests([]);
+        setOffline(true);
+        return;
+      }
       const [cs, rq, tp] = await Promise.all([
         db
           .from("compliance_cases")
           .select(
             "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved",
           )
+          .eq("taxpayer_id", resolved.taxpayerId)
           .is("closed_at", null),
         db
           .from("document_requests")
           .select(
             "id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count",
-          ),
-        db.from("taxpayers").select("legal_name").limit(1),
+          )
+          .eq("taxpayer_id", resolved.taxpayerId),
+        db.from("taxpayers").select("legal_name").eq("id", resolved.taxpayerId).maybeSingle(),
       ]);
       if (cs.error) throw cs.error;
-      const who = (tp.data ?? [])[0] as { legal_name?: string } | undefined;
+      const who = tp.data as { legal_name?: string } | null;
       if (who?.legal_name) setClientName(who.legal_name);
       setCases((cs.data ?? []) as ComplianceCase[]);
       setRequests((rq.data ?? []) as CaseRequest[]);
+      setOffline(false);
     } catch {
       setOffline(true);
       setCases([]);
