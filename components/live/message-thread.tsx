@@ -143,14 +143,25 @@ export function MessageThread({
     if (!taxpayerId) return;
     try {
       const db = supabase();
-      const [{ data: m }, { data: r }, { data: o }] = await Promise.all([
+      // Only a live engagement can route a message to a firm. Never pick the
+      // oldest organization: in a multi-tenant portal that could be another firm.
+      // Multiple live firms remain ambiguous until the portal adds explicit
+      // firm selection (owner decision D-7); fail closed rather than guessing.
+      const [{ data: m }, { data: r }, { data: grants, error: grantError }] = await Promise.all([
         db.from("messages").select("*").eq("taxpayer_id", taxpayerId).order("created_at"),
         db.from("document_requests").select("id, label_fr, label_en").eq("taxpayer_id", taxpayerId),
-        db.from("organizations").select("id").order("created_at").limit(1).maybeSingle(),
+        db.from("engagements")
+          .select("organization_id, status, authorized_at, accepted_at, revoked_at")
+          .eq("taxpayer_id", taxpayerId)
+          .in("status", ["accepted", "authorized"])
+          .is("revoked_at", null)
+          .limit(2),
       ]);
+      if (grantError) throw grantError;
+      const live = (grants ?? []).filter((grant) => grant.authorized_at || grant.accepted_at);
       setMsgs((m ?? []) as Msg[]);
       setRequests((r ?? []) as RequestLite[]);
-      setOrgId((o?.id as string) ?? null);
+      setOrgId(live.length === 1 ? live[0].organization_id : null);
     } catch {
       setError(true);
     }
