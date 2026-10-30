@@ -132,10 +132,12 @@
 }
 
 /*
- * next/font defines --font-plex-sans on <body>, not on :root, so the aliases
- * are declared here too. Declaring them on :root resolves them in a scope where
- * the font variables do not exist, which invalidates the whole font-family
- * declaration and drops the page to the browser default serif.
+ * The --font-* variables these alias are declared on :root in app/fonts.css,
+ * which is imported before this file. They were on <body> while next/font
+ * generated them; :root resolves everywhere, so the aliases below now work in
+ * any scope rather than only under <body>. If app/fonts.css ever stops being
+ * imported, these resolve to nothing and the page drops to the browser default
+ * serif — which is the visible symptom to look for.
  */
 /* The header is sticky, so anchored and focused targets need clearance or the
    header covers them (WCAG 2.4.11). */
