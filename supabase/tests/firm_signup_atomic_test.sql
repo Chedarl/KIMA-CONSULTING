@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(16);
+select plan(19);
 
 insert into auth.users (id, email, email_confirmed_at) values
  ('00000000-0000-4000-d000-00000000a101','founder-a@signup.test',now()),
@@ -154,6 +154,49 @@ select throws_ok(
  $$select sign_up_firm('Fresh Firm','FR-001','Invite Founder')$$,
  '42501',null,'T-212 an unbound existing staff email cannot sign up a new firm');
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- T-213 .. T-215: one login, one firm -- including two sign-ups at once.
+--
+-- The checks inside sign_up_firm() cannot see an uncommitted row, so two
+-- concurrent calls from the same login both pass them. What stops the second
+-- firm existing is firm_members_auth_user_id_key: the losing insert raises
+-- unique_violation and its organisation rolls back with it. Measured with two
+-- concurrent sessions against a replayed schema -- 1 organisation, 1
+-- membership, with distinct names and numbers throughout, so nothing but the
+-- login collided.
+--
+-- That constraint predates this function and was asserted only in a comment in
+-- 20261030080000 ("auth_user_id is UNIQUE, so the limit is a formality").
+-- Nothing failed if it were dropped. T-213 is that missing pin: the whole
+-- concurrent case rests on it, and a single pgTAP transaction cannot reach the
+-- race itself, so the catalog fact is the honest thing to assert.
+-- ---------------------------------------------------------------------------
+
+-- T-213
+select is(
+ (select coalesce(string_agg(pg_get_constraintdef(oid), '; ' order by conname), '(none)')
+    from pg_constraint
+   where conrelid = 'public.firm_members'::regclass and contype = 'u'
+     and pg_get_constraintdef(oid) = 'UNIQUE (auth_user_id)'),
+ 'UNIQUE (auth_user_id)',
+ 'T-213 one login holds at most one membership, enforced by the database');
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-d000-00000000a101","role":"authenticated"}',true);
+
+-- T-214 the sequential case, which the pre-check catches first. The message is
+-- about the caller's own identity, not a name or number nobody else holds.
+select throws_ok(
+ $$select sign_up_firm('Second Firm Same Login','SL-002','Founder A Again')$$,
+ '42501',null,'T-214 a login that already has a firm cannot create another');
+reset role;
+
+-- T-215 and nothing is left behind by the refusal.
+select is(
+ (select count(*) from organizations where name='Second Firm Same Login'),
+ 0::bigint,'T-215 and the refused attempt leaves no organisation');
 
 select * from finish();
 rollback;

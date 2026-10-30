@@ -16,6 +16,7 @@ as $$
 declare
   v_user uuid := auth.uid();
   v_email text;
+  v_constraint text;
   v_name text := btrim(coalesce(p_name, ''));
   v_owner text := btrim(coalesce(p_owner_name, ''));
   -- Remove formatting whitespace, but do NOT invent an ONECCA number format.
@@ -75,8 +76,25 @@ begin
           v_org, jsonb_build_object('verification_status','unverified'));
   return v_org;
 exception when unique_violation then
-  -- Both name and number collisions require human support; no raw constraint
-  -- name or another firm's private record is disclosed to the caller.
+  get stacked diagnostics v_constraint = constraint_name;
+  -- WHICH unique rule fired matters, because one of them is not about the firm
+  -- at all. The checks above cannot see an uncommitted row, so two sign-ups
+  -- from the SAME login race past them and collide on
+  -- firm_members_auth_user_id_key -- that constraint, not those checks, is what
+  -- keeps one login to one firm, and the loser's organisation rolls back with
+  -- it. Measured with two concurrent sessions against a replayed schema:
+  -- 1 organisation, 1 membership, distinct names and numbers throughout.
+  --
+  -- Reporting that as "firm name or registration number is in use" was wrong
+  -- twice over: it sends the caller to support for something they can fix
+  -- themselves, and it asserts that a name and number nobody else holds are
+  -- taken. The caller already knows their own login, so naming it discloses
+  -- nothing.
+  if v_constraint = 'firm_members_auth_user_id_key' then
+    raise exception 'this identity already has a firm' using errcode = '42501';
+  end if;
+  -- Otherwise a name or number collision, which does need human support; no
+  -- raw constraint name or other firm's private record is disclosed.
   raise exception 'Firm name or registration number is in use; contact KIMA support'
     using errcode = '23505';
 end $$;
