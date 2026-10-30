@@ -74,7 +74,7 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000b001","role":"authenticated"}',true);
-select lives_ok($select admin_review_firm(
+select lives_ok($$select admin_review_firm(
  '00000000-0000-4000-d000-00000000b011','suspend','Suspected impersonation case')$$,
  'Administrator can suspend');
 reset role;
