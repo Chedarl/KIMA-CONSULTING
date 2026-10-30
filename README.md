@@ -443,6 +443,51 @@ D7). Review of #6:
 `docs/agents/handoffs/2026-10-27-a-review-of-pr6.md`. auth-codes version history:
 `docs/deployment.md`.
 
+**The policy helpers are no longer API endpoints** (migration `20261030020000`,
+written but not merged). Eleven `SECURITY DEFINER` functions sat in `public`, the
+schema PostgREST publishes, so each was an endpoint at `/rest/v1/rpc/<name>` and
+seven were callable without signing in. Among them `portal_request_code()`,
+which issues a one-time code: an anonymous caller could invalidate a client's
+pending code at will and lock the real client out of signing in (risk R-49).
+They now live in a `private` schema, which PostgREST does not publish, so they
+have no route whatever their privileges. Moving preserves each function's OID, so
+the policy expressions that call them keep working untouched.
+
+**Revoking `EXECUTE` is not the fix, and trying it is instructive.** Postgres
+checks `EXECUTE` on a function in an RLS policy expression against the *querying*
+role, at execution time. The first revision of this migration revoked from
+`PUBLIC`, `anon` and `authenticated`, and CI came back with `permission denied
+for function client_taxpayer_ids` raised from inside an `insert into documents`
+policy, taking six of the P0 write tests with it. A revoke does not close the
+endpoint and leave the policy working — it breaks the policy, for every
+signed-in user. (It also explains why the three `revoke execute … from anon,
+authenticated` lines in `20261029213000` are harmless: those functions were new,
+so `PUBLIC` still held the default grant the two roles inherit, and naming the
+roles removed nothing. They read as a control and are not one;
+`20261030020000` replaces them with explicit grants and says so.)
+
+`supabase/tests/definer_surface_test.sql` holds both halves on every build.
+T-51 … T-53 are catalog facts: nothing is left in the published schema, every
+moved helper is accounted for, and **exactly one** definer function in `public`
+may be executed by `anon` or `authenticated` — so a new definer helper dropped
+into `public` fails the build. T-54 … T-60 are live reads down the three call
+paths that each reach a different moved helper: a firm member through
+`member_has` → `current_firm_role`, a client through `client_taxpayer_ids`, an
+anonymous visitor through `flag_enabled` + `demo_taxpayer_id`.
+
+`app_flags` keeps RLS on with no policy, which is deliberate: nothing reads it
+through the API, `private.flag_enabled()` reads it as its owner, and a permissive
+policy would publish the demo switches to the browser. The table comment says so,
+and the advisor's lint 0008 on it is expected.
+
+The one exposure that stays is `can_write_client_note(taxpayer_id)`, granted to
+`authenticated` only. `/api/inquiry` has to know whether the caller may write a
+client-visible note *before* it sends mail, since a write refused afterwards
+would leave a client emailed with no record of it. It answers about the caller
+alone and returns a boolean, never a row. That route no longer calls
+`member_has()` or `can_see_taxpayer()`: visibility is now a scoped read of
+`taxpayers` under the caller's own session, which is the policy itself.
+
 **P0 security and honesty fixes (27 Oct 2026, draft PR, not merged).** One forward-only
 migration (`20261027120000`) scopes storage to the taxpayer segment of the path, limits
 what a client may write (`client_may_record()` = `CLIENT_EVENT_KINDS`; no message as

@@ -10,6 +10,11 @@
 -- function through PUBLIC rather than through a grant of their own, and a
 -- revoke that names only one of them would look like it worked.
 --
+-- Schema-qualified as `private.`: 20261030020000 moved this function out of the
+-- published schema as well as revoking it. Calling it by its bare name would
+-- fail with "does not exist" instead of "permission denied", which would pass
+-- `throws_ok` for the wrong reason if the errcode were ever loosened.
+--
 -- Run with `supabase test db` (pgTAP). Synthetic data only; rolled back.
 
 begin;
@@ -29,7 +34,7 @@ insert into portal_accounts (id, taxpayer_id, identifier, display_name, status) 
 -- T-61
 set local role anon;
 select throws_ok(
-  $$ select portal_request_code('Client F', 'P000000000009F') $$,
+  $$ select private.portal_request_code('Client F', 'P000000000009F') $$,
   '42501', null,
   'T-61 anon cannot issue a one-time code'
 );
@@ -38,7 +43,7 @@ reset role;
 -- T-62
 set local role authenticated;
 select throws_ok(
-  $$ select portal_request_code('Client F', 'P000000000009F') $$,
+  $$ select private.portal_request_code('Client F', 'P000000000009F') $$,
   '42501', null,
   'T-62 a signed-in caller cannot issue a one-time code either'
 );
