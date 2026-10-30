@@ -1,7 +1,11 @@
 # Deployment
 
-How a commit reaches production. Two independent pipelines, deliberately not
-coupled: Vercel deploys code, GitHub Actions applies database migrations.
+How a commit reaches production. Vercel deploys code independently through
+its Git integration; GitHub Actions applies database migrations **only after
+both `CI` and `Verify migrations`** for that exact `main` commit. Vercel
+production releases are
+not gated by CI. Merge new database schema first, confirm its deployment,
+and then merge screens that depend on those new columns or tables.
 
 **Status of the migration pipeline:** it has run, and it has not yet changed
 the database. GitHub Actions run
@@ -109,14 +113,25 @@ Two workflows:
 Postgres, replays a second time to catch migrations that are not re-runnable,
 and checks that the committed migrations fully describe the schema they produce.
 
-**`.github/workflows/supabase-migrations.yml`** — on push to `main` touching
-`supabase/**`. Links the production project and runs `supabase db push`.
-Concurrency is set so a migration is never cancelled mid-flight.
+**`.github/workflows/supabase-migrations.yml`** — after successful application
+`CI` and `Verify migrations` for a push to `main`. It fires once as each
+finishes and applies only when both are green on that commit; it deploys only
+that commit and skips
+an obsolete commit if `main` has advanced. It rechecks the SHA immediately
+before `supabase db push`. Migrations are serialized and never cancelled
+mid-flight. There is no manual `workflow_dispatch` button: to retry a failed
+migration, **re-run the existing `main` runs** for that commit — both `CI` and
+`Verify migrations` — and verify the migration result. Re-running a run keeps
+its original `push` event, which is what the gate looks for. Starting a fresh
+`Verify migrations` via `workflow_dispatch` will **not** satisfy the gate: that
+run carries the `workflow_dispatch` event and is deliberately ignored, so that a
+manual dispatch cannot stand in for the check on the commit being deployed.
+The Supabase CLI remains on `latest` pending a separately reviewed version pin.
 
 Both skip cleanly while `supabase/migrations/` holds no `.sql` files, so a
 doc-only push does not go red for lack of SQL. PR #1 confirmed that skip. SQL
 is present now, so the verify job replays the full history on a pull request
-and `db push` runs on `main`.
+and `db push` runs only once both `main` gates are green.
 
 ### The Supabase GitHub App is also connected
 
