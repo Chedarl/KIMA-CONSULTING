@@ -14,8 +14,9 @@
  * never as part of a build or a test.
  */
 
-import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,9 +61,15 @@ async function faceList(family) {
 }
 
 async function main() {
-  rmSync(OUT, { recursive: true, force: true });
-  mkdirSync(OUT, { recursive: true });
-
+  /*
+   * Everything is fetched and validated BEFORE anything committed is touched.
+   *
+   * The first version emptied public/fonts first and downloaded second, so one
+   * failed request — offline, a non-200, a parse error — left the directory
+   * empty while app/fonts.css still pointed at the files, and the site served
+   * no webfont until someone restored them from git. A refresh that fails
+   * should leave the fonts exactly as they were.
+   */
   const fetched = [];
   for (const family of FAMILIES) {
     for (const face of await faceList(family)) {
@@ -88,13 +95,16 @@ async function main() {
     groups.get(key).push(face);
   }
 
+  // Staged in a temp directory, then swapped in one move once the whole set is
+  // on disk. Nothing committed is removed until this point.
+  const staging = mkdtempSync(join(tmpdir(), "kima-fonts-"));
   const written = [];
   for (const members of groups.values()) {
     const weights = [...new Set(members.map((m) => Number(m.weight)))].sort((a, b) => a - b);
     const variable = weights.length > 1;
     const { slug, subset, range } = members[0];
     const file = variable ? `${slug}-${subset}.woff2` : `${slug}-${weights[0]}-${subset}.woff2`;
-    writeFileSync(join(OUT, file), members[0].bytes);
+    writeFileSync(join(staging, file), members[0].bytes);
     written.push({
       slug,
       subset,
@@ -105,6 +115,14 @@ async function main() {
       size: members[0].bytes.length,
     });
   }
+
+  if (written.length === 0) throw new Error("no font files were produced; leaving public/fonts untouched");
+
+  // The swap. Only now does anything committed change.
+  rmSync(OUT, { recursive: true, force: true });
+  mkdirSync(OUT, { recursive: true });
+  for (const f of written) renameSync(join(staging, f.file), join(OUT, f.file));
+  rmSync(staging, { recursive: true, force: true });
 
   written.sort((a, b) => ORDER[a.slug] - ORDER[b.slug] || a.subset.localeCompare(b.subset) || a.weight.localeCompare(b.weight));
 
