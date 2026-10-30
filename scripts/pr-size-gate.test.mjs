@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { changedLines, validatePullRequest } from './pr-size-gate.mjs';
+import { changedLines, validatePullRequest, runGate } from './pr-size-gate.mjs';
 
 test('counts additions plus deletions (not just additions)', () => {
   assert.equal(changedLines({ additions: 175, deletions: 125 }), 300);
@@ -19,4 +19,24 @@ test('missing or invalid size metadata fails closed', () => {
 });
 test('valid smaller pull request is accepted', () => {
   assert.equal(validatePullRequest({ number: 51, additions: 20, deletions: 4 }), 24);
+});
+
+const env = { GITHUB_TOKEN: 'test-token', GITHUB_REPOSITORY: 'owner/repo', PR_NUMBER: '67' };
+test('GitHub API errors fail closed', async () => {
+  await assert.rejects(runGate(env, async () => ({ ok: false, status: 403 })), /HTTP 403/);
+});
+test('missing GitHub token fails closed without fetching', async () => {
+  await assert.rejects(runGate({ ...env, GITHUB_TOKEN: '' }, () => {
+    throw new Error('fetch should not be called');
+  }), /Missing or invalid/);
+});
+test('unexpected PR identity fails closed', async () => {
+  await assert.rejects(runGate(env, async () => ({
+    ok: true, json: async () => ({ number: 68, additions: 2, deletions: 3 }),
+  })), /Unexpected PR identity/);
+});
+test('live lookup rejects an oversized PR', async () => {
+  await assert.rejects(runGate(env, async () => ({
+    ok: true, json: async () => ({ number: 67, additions: 301, deletions: 0 }),
+  })), /301.*300/);
 });
