@@ -104,6 +104,13 @@ begin
   end if;
 
   if p_action='accepted' then
+    if v.direction='taxpayer_to_firm' then
+      -- The grant trigger requires a recorded recipient decision first.
+      -- The outer transaction rolls this status back if authorization fails.
+      update public.engagement_invitations
+        set status='accepted',decided_at=now(),decided_by=auth.uid()
+        where id=v.id;
+    end if;
     if v.direction='firm_to_taxpayer' then
       if not exists (
         select 1 from public.contacts c
@@ -127,9 +134,11 @@ begin
     end if;
     if not found then raise exception 'engagement not available' using errcode='23514'; end if;
   end if;
-  update public.engagement_invitations
-    set status=p_action,decided_at=now(),decided_by=auth.uid()
-    where id=v.id;
+  if not (p_action='accepted' and v.direction='taxpayer_to_firm') then
+    update public.engagement_invitations
+      set status=p_action,decided_at=now(),decided_by=auth.uid()
+      where id=v.id;
+  end if;
   return p_action;
 end $$;
 
