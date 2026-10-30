@@ -64,6 +64,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
     }
 
     let cancelled = false;
+    const memberId = session.memberId;
     const db = supabase();
 
     // Firm sign-in is independent of taxpayer portal sign-in. Resolve the
@@ -75,7 +76,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
         const { data: member, error: memberError } = await db
           .from("firm_members")
           .select("organization_id, person_label, role, auth_user_id, active")
-          .eq("id", session.memberId)
+          .eq("id", memberId)
           .eq("auth_user_id", auth.user.id)
           .eq("active", true)
           .maybeSingle();
@@ -126,7 +127,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
 
     void refresh();
     const channel = db
-      .channel("firm-intake-" + session.memberId)
+      .channel("firm-intake-" + memberId)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "documents" },
