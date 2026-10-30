@@ -68,10 +68,18 @@ export function ClientService({
       const db = supabase();
       const resolved = await demoIds();
       setIds(resolved);
+      if (!resolved) {
+        setRow(null);
+        setRequests([]);
+        setEvents([]);
+        setOffline(true);
+        return;
+      }
       const { data, error } = await db
         .from("compliance_cases")
         .select(CASE_COLUMNS)
         .eq("id", caseId)
+        .eq("taxpayer_id", resolved.taxpayerId)
         .maybeSingle();
       if (error) throw error;
       if (!data) {
