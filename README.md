@@ -320,6 +320,13 @@ waiting period before `disputed`; no next action or prototype string shows a
 number of days). Each check counts its own assertions and fails if none ran.
 CI runs it on every push (`.github/workflows/ci.yml`, Agent A's).
 
+**Registration privacy (Phase 2 / OD-5).** Public registrations are visible
+to an accounting firm only when `organization_id` names that firm and the
+member holds the required capability. Unassigned applications are **not**
+a shared firm queue and cannot be claimed by whichever firm arrives first.
+A legacy unassigned production registration still needs an explicit routing
+or closure decision; this change does not alter that row.
+
 ### Two synthetic tenants
 
 Isolation cannot be asserted against one tenant, so there is a seed that creates
