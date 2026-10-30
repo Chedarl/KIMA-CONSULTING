@@ -51,17 +51,18 @@ grant insert (contact_name, contact_email, contact_phone, inquiry_kind,
   on public.contact_inquiries to anon, authenticated;
 grant select on public.contact_inquiries to authenticated;
 
--- `with check (true)` is the row rule, and it is as open as it looks: anon has
--- no identity to key a limit on, so a per-sender cap CANNOT live here. There is
--- nothing to count by -- auth.uid() is null, and an IP never reaches Postgres.
--- Throttling belongs where the sender is visible: the route handler, the
--- platform firewall, or a captcha. Nothing posts to this table yet, so the
--- endpoint is not live and this is a release gate rather than an open hole --
--- recorded as such in the README. Do not read this policy as "unlimited by
--- design"; read it as "limited somewhere this file cannot see".
-create policy "any visitor can submit a bounded contact inquiry"
+-- PostgREST exposes direct INSERT; a web route's throttle is not enough.
+-- Keep ALL Data API writes disabled until a reviewed abuse-control layer is
+-- deployed. The default OFF flag cannot be enabled as part of Phase 2 release.
+insert into public.app_flags(key, enabled, note)
+values ('allow_public_contact_inquiries', false,
+  'OFF until direct Data API inserts are abuse-controlled and owner approved.')
+on conflict (key) do nothing;
+-- This helper is in an unexposed schema. RLS needs EXECUTE as the caller.
+grant execute on function private.flag_enabled(text) to anon, authenticated;
+create policy "public contact inquiries require abuse gate"
   on public.contact_inquiries for insert to anon, authenticated
-  with check (true);
+  with check (private.flag_enabled('allow_public_contact_inquiries'));
 
 create policy "only KIMA administrators view general inquiries"
   on public.contact_inquiries for select to authenticated
