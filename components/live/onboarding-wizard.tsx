@@ -134,60 +134,58 @@ export function OnboardingWizard({
     setBusy(true);
     try {
       const db = supabase();
-      // The firm is the signed-in member's own organisation. Never
-      // `organizations … limit(1)`: with a second firm that attached every new
-      // taxpayer to whichever organisation happened to sort first.
+      // Opening a client file is one call, not seven statements.
+      // open_client_file() creates the taxpayer and the authorised engagement
+      // that holds it, in the caller's own firm, atomically (migration
+      // 20261030110000, risk R-54).
       //
-      // Through the RPC, not a query. The query this replaces filtered on
-      // `auth_user_id`, and `authenticated` holds no SELECT on that column
-      // (20261022163452 grants seven, and that is not one) -- Postgres needs
-      // the privilege for a column in WHERE, not only in the select list, so
-      // it had been failing with "permission denied for table firm_members"
-      // since #13 introduced it. The intent was right and never worked.
-      // current_firm_intake_identity() resolves auth.uid() in the database and
-      // returns the organisation without exposing auth_user_id.
+      // What it replaced did not work on production. The taxpayer insert ended
+      // in `.select("id").single()`, and Postgres applies the SELECT policy to
+      // a row returned by RETURNING: can_see_taxpayer(id) needs a live
+      // engagement, which cannot exist one statement before the engagement is
+      // written. Everything after it was refused too, because an engagement
+      // opens as a draft and a draft grants no access to the taxpayer it names.
+      //
+      // The function is SECURITY INVOKER, so this is still the signed-in
+      // member's own write under every policy: it needs case.advance to create
+      // the taxpayer, engagement.authorize to authorise it, and the grant guard
+      // still refuses if another firm holds that taxpayer.
+      //
+      // The organisation is still resolved separately, because the document
+      // requests, the case event and the audit entry below all name it. Through
+      // the RPC rather than a query on firm_members: the query this replaced
+      // filtered on `auth_user_id`, which `authenticated` holds no SELECT on
+      // (20261022163452 grants seven columns and that is not one), and Postgres
+      // needs the privilege for a column in WHERE and not only in the select
+      // list. It had been failing since #13 introduced it. Never
+      // `organizations … limit(1)` either: with a second firm that attached
+      // every new taxpayer to whichever organisation happened to sort first.
       const { data: identities, error: memErr } = await db.rpc("current_firm_intake_identity");
       const member = (identities as Array<{ organization_id: string }> | null)?.[0];
       if (memErr || !member?.organization_id) throw memErr ?? new Error("no organization");
       const org = { id: member.organization_id };
 
-      const { data: taxpayer, error: tpErr } = await db
-        .from("taxpayers")
-        .insert({
-          // An individual has no registered business name. `legal_name` is the
-          // taxpayer's name on the file, whichever kind of taxpayer they are.
-          legal_name: answers.legal_name || answers.full_name,
-          taxpayer_type: answers.taxpayer_type || null,
-          contact_name: answers.contact_name,
-          contact_email: answers.contact_email,
-          niu: answers.niu || null,
-          // Both stay null for an individual: neither question was asked, and a
-          // blank is not a classification.
-          tax_centre: answers.tax_centre === "unknown" ? null : answers.tax_centre || null,
-          tax_regime: answers.tax_regime === "unknown" ? null : answers.tax_regime || null,
-          accounting_framework:
-            answers.accounting_framework === "unknown" ? null : answers.accounting_framework,
-          // Never true on creation: a profile is verified by a reviewer against
-          // the taxpayer's official records, not by a questionnaire.
-          profile_verified: false,
-          onboarded_at: new Date().toISOString(),
-          organizer: answers,
-        })
-        .select("id")
-        .single();
-      if (tpErr || !taxpayer) throw tpErr ?? new Error("insert failed");
+      const { data: newTaxpayerId, error: openErr } = await db.rpc("open_client_file", {
+        p_legal_name: answers.legal_name || answers.full_name,
+        p_taxpayer_type: answers.taxpayer_type || null,
+        p_contact_name: answers.contact_name,
+        p_contact_email: answers.contact_email,
+        p_niu: answers.niu || null,
+        // Both stay null for an individual: neither question was asked, and a
+        // blank is not a classification.
+        p_tax_centre: answers.tax_centre === "unknown" ? null : answers.tax_centre || null,
+        p_tax_regime: answers.tax_regime === "unknown" ? null : answers.tax_regime || null,
+        p_accounting_framework:
+          answers.accounting_framework === "unknown" ? null : answers.accounting_framework,
+        p_organizer: answers,
+      });
+      if (openErr || !newTaxpayerId) throw openErr ?? new Error("could not open the client file");
+      const taxpayer = { id: newTaxpayerId as string };
 
-      // Awaiting authorisation, not authorised. Opening a file is not the
-      // authorisation: that is a separate, recorded act on the engagements
-      // screen (authorizeEngagement). draftEngagement sets authorized_at to
-      // null explicitly — the column defaults to now(), so leaving it out
-      // would make the row look authorised the moment it existed.
-      const draft = draftEngagement({ taxpayerId: taxpayer.id as string });
-      if (!draft.ok) throw new Error(draft.reason);
-      const { error: engErr } = await db
-        .from("engagements")
-        .insert({ ...draft.row, organization_id: org.id });
-      if (engErr) throw engErr;
+      // The engagement is created and authorised inside open_client_file():
+      // for a brand-new client, opening the file is the authorisation (owner
+      // decision, 30 Oct). draftEngagement() still governs the engagements
+      // screen, where drafting and authorising stay two separate acts.
 
       const { error: ansErr } = await db.from("organizer_answers").insert(
         Object.entries(answers).map(([question_key, answer]) => ({

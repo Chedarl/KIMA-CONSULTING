@@ -534,22 +534,35 @@ insert through the onboarding wizard and the engagements screen had been refused
 `20261029213000` merged. `scripts/engine-check.mjs` asserted the wrong value too, which
 is why nothing caught it.
 
-**Opening a client file does not work right now** (risk R-54). The onboarding wizard is
-refused at four of its seven steps, measured as a signed-in firm partner against a
-replayed schema rather than reasoned about. Step 2 sends `insert into taxpayers …
-returning id`, and Postgres applies the SELECT policy to a row returned by `RETURNING`;
-`can_see_taxpayer(id)` needs a live engagement, which cannot exist one statement before
-the engagement is written. The error says `new row violates row-level security policy`,
-which misleads — `private.member_has('case.advance')` is true, and the same INSERT
-without `RETURNING` succeeds. Steps 4 to 7 are then refused because an engagement now
-opens as a draft and a draft grants nothing, which is the rule that stops a firm
-self-granting by drafting against another firm's client (T-74). That second half is a
-consequence of closing F-01 and is an owner decision, not a patch: either opening a file
-for a brand-new client authorises the engagement, which rule 3 already permits, or the
-firm has no access until the client accepts and no screen collects that.
-`supabase/tests/onboarding_journey_test.sql` walks all seven steps and holds the five
-refusals in pgTAP TODO blocks with their measured errors, so CI reports them without
-going red.
+**Opening a client file is one act** (migration `20261030110000`, risk R-54). The
+onboarding wizard used to perform seven statements from the browser and four of them
+were refused, so a firm could not take on a new taxpayer at all. Measured as a signed-in
+firm partner against a replayed schema rather than reasoned about: step 2 sent `insert
+into taxpayers … returning id`, and Postgres applies the SELECT policy to a row returned
+by `RETURNING`, where `can_see_taxpayer(id)` needs a live engagement that cannot exist
+one statement before the engagement is written. The error said `new row violates
+row-level security policy`, which misleads — `private.member_has('case.advance')` is
+true, and the same INSERT without `RETURNING` succeeds. Steps 4 to 7 were then refused
+because an engagement opens as a draft and a draft grants nothing, which is the rule that
+stops a firm self-granting by drafting against another firm's client (T-74).
+
+On the owner's decision of 30 Oct, opening a file for a brand-new client **authorises**
+the engagement. That grants nothing the firm could not grant itself a second later under
+rule 3 — no other firm holds a taxpayer created in that same call — and `accepted_at`
+stays null, so no client consent is claimed and only the taxpayer can ever write it.
+`draftEngagement()`'s "opening a file is not the authorisation" now describes the
+engagements screen, where drafting and authorising remain two separate acts.
+
+`public.open_client_file()` creates both rows atomically. It is **SECURITY INVOKER on
+purpose**: every policy still applies, so the caller needs `case.advance` to create the
+taxpayer and `engagement.authorize` to authorise it, and `engagements_grant_guard()`
+still refuses if another firm holds that taxpayer. The engagement is inserted as a draft
+and then authorised, because `"firm writes engagements"` deliberately refuses an insert
+that is already a grant — the F-01 fix working, not an obstacle to route around. It takes
+no taxpayer id and only ever creates one, so it cannot be used to reach an existing
+client, and T-53's one-definer-in-`public` invariant is untouched. Being atomic also
+removes the orphan risk the old sequence carried: a refused engagement used to leave a
+taxpayer nobody could read.
 
 **How this class of defect is caught now.** Three defects reached production on the
 onboarding path in one morning, every one found by reading code. The reason was the same
