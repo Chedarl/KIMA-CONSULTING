@@ -19,6 +19,10 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:journey
+      # The staff contract guard. Without this line it is decorative: a
+      # migration could drift from lib/firm-staff.ts and CI would stay green
+      # while the screen lost its actionable refusal messages.
+      - run: npm run test:staff
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
