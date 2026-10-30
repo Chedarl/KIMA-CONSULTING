@@ -27,7 +27,13 @@ grant select, insert on public.case_client_approvals to authenticated;
 create policy "client or engaged firm reads consent"
   on public.case_client_approvals for select to authenticated
   using (
-    taxpayer_id in (select private.client_taxpayer_ids())
+    exists (
+      select 1 from public.contacts contact
+      join public.contact_account_links access on access.contact_id = contact.id
+      where contact.auth_user_id = auth.uid()
+        and access.taxpayer_id = case_client_approvals.taxpayer_id
+        and access.portal_access = true
+    )
     or private.member_has('case.view', taxpayer_id)
   );
 
@@ -35,7 +41,13 @@ create policy "only linked client approves own verified case"
   on public.case_client_approvals for insert to authenticated
   with check (
     approved_by = auth.uid()
-    and taxpayer_id in (select private.client_taxpayer_ids())
+    and exists (
+      select 1 from public.contacts contact
+      join public.contact_account_links access on access.contact_id = contact.id
+      where contact.auth_user_id = auth.uid()
+        and access.taxpayer_id = case_client_approvals.taxpayer_id
+        and access.portal_access = true
+    )
     and exists (
       select 1 from public.compliance_cases c
        where c.id = case_id
