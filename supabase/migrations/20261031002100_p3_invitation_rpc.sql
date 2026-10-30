@@ -139,13 +139,13 @@ create function public.create_invitation(
   p_direction text, p_organization_id uuid, p_taxpayer_id uuid,
   p_contact_id uuid default null
 ) returns table(invitation_id uuid, expires_at timestamptz)
-language sql security invoker set search_path to '' as $
+language sql security invoker set search_path to '' as $body$
   select * from private.create_invitation_internal($1,$2,$3,$4)
-$;
+$body$;
 create function public.decide_invitation(p_invitation_id uuid, p_action text)
-returns text language sql security invoker set search_path to '' as $
+returns text language sql security invoker set search_path to '' as $body$
   select private.decide_invitation_internal($1,$2)
-$;
+$body$;
 
 revoke execute on function private.create_invitation_internal(text,uuid,uuid,uuid) from public,anon;
 revoke execute on function private.decide_invitation_internal(uuid,text) from public,anon;
