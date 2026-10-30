@@ -52,7 +52,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(17);
+select plan(18);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: one firm, one partner. A second firm's partner stands by as the
@@ -199,18 +199,47 @@ select lives_ok(
   'T-114 step 7: audit() records who onboarded the taxpayer'
 );
 
--- T-119 the F-01 regression guard on the new function. open_client_file()
--- authorises an engagement, which is the one thing F-01 exists to control, so
--- the question is whether it can be aimed at somebody else's client. It cannot
--- by construction -- it takes no taxpayer id and only ever inserts a fresh
--- one, so the engagement it authorises always names a taxpayer no firm can
--- hold -- and this asserts the consequence rather than trusting the argument:
--- having just opened a file, Firm A still reads only its own.
+-- T-119 and T-125: the F-01 regression guard on the new function.
+-- open_client_file() authorises an engagement, which is the one thing F-01
+-- exists to control, so the question is whether it can be aimed at somebody
+-- else's client.
+--
+-- T-119 alone was weak, and review said so. Being exact about why, because the
+-- obvious reason is not quite the true one: T-119 does catch a granting
+-- engagement, just indirectly. Measured -- give Firm A an authorised
+-- engagement on Firm B's client and T-119's read returns 1, not 0, because
+-- granting implies readable. So it is not blind.
+--
+-- It is weak for three other reasons. It duplicates T-115 and much of the
+-- two-firm suite, so it adds no coverage. It asserts a consequence
+-- (readability) rather than the property, so a reader cannot tell what it
+-- protects. And it detects an engagement defect only through the read path:
+-- change can_see_taxpayer() and T-119 could pass while a granting engagement
+-- sat there. T-125 states the property directly and does not depend on the
+-- read path at all.
+--
+-- T-125 is deliberately narrower than "no engagement at all". Since
+-- 20261030120000 a held NIU *does* give the second firm an engagement -- a
+-- draft, which grants nothing and is the ask-to-join path (T-120, T-122). The
+-- property that must never break is that opening a file never yields a
+-- *granting* engagement on another firm's client, and the asymmetry between
+-- draft and granting is the whole F-01 design. Asserting the literal "no
+-- engagement" would now fail on purpose-built behaviour.
 select is(
   (select count(*) from taxpayers
     where id = '00000000-0000-4000-9000-00000000000b'),
   0::bigint,
-  'T-119 opening a client file gives Firm A no reach into Firm B''s client'
+  'T-119 control: opening a client file gives Firm A no read of Firm B''s client'
+);
+
+select is(
+  (select coalesce(string_agg(e.status, ','), '(none)')
+     from engagements e
+    where e.organization_id = '00000000-0000-4000-9000-0000000000a0'
+      and e.taxpayer_id = '00000000-0000-4000-9000-00000000000b'
+      and e.status in ('accepted', 'authorized')),
+  '(none)',
+  'T-125 and never a granting engagement on Firm B''s client'
 );
 
 reset role;
