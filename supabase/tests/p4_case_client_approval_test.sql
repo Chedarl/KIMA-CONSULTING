@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(11);
+select plan(15);
 
 insert into auth.users(id,email) values
 ('00000000-0000-4000-a000-00000000f101','p4-firm-a@example.test'),
@@ -35,13 +35,21 @@ select throws_ok(
 $$ update compliance_cases set stage='client_approval' where id='00000000-0000-4000-a000-00000000f161' $$,
 '23514', null, 'P4 stage skips are rejected');
 
-select lives_ok($$
-update compliance_cases set stage='accounting' where id='00000000-0000-4000-a000-00000000f161';
-update compliance_cases set stage='preparation' where id='00000000-0000-4000-a000-00000000f161';
-update compliance_cases set stage='review' where id='00000000-0000-4000-a000-00000000f161';
-update compliance_cases set stage='filing' where id='00000000-0000-4000-a000-00000000f161';
-update compliance_cases set stage='evidence' where id='00000000-0000-4000-a000-00000000f161';
-$$, 'P4 partner may follow legal case stages');
+select lives_ok(
+$ update compliance_cases set stage='accounting' where id='00000000-0000-4000-a000-00000000f161' $,
+'P4 partner may enter accounting stage');
+select lives_ok(
+$ update compliance_cases set stage='preparation' where id='00000000-0000-4000-a000-00000000f161' $,
+'P4 partner may enter preparation stage');
+select lives_ok(
+$ update compliance_cases set stage='review' where id='00000000-0000-4000-a000-00000000f161' $,
+'P4 partner may enter review stage');
+select lives_ok(
+$ update compliance_cases set stage='filing' where id='00000000-0000-4000-a000-00000000f161' $,
+'P4 partner may enter filing stage');
+select lives_ok(
+$ update compliance_cases set stage='evidence' where id='00000000-0000-4000-a000-00000000f161' $,
+'P4 partner may enter evidence stage');
 
 select throws_ok(
 $$ update compliance_cases set stage='client_approval' where id='00000000-0000-4000-a000-00000000f161' $$,
