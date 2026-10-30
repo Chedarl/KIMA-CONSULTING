@@ -360,6 +360,35 @@ D7). Review of #6:
 `docs/agents/handoffs/2026-10-27-a-review-of-pr6.md`. auth-codes version history:
 `docs/deployment.md`.
 
+**The policy helpers are no longer API endpoints** (migration `20261030020000`,
+written but not merged). Eight `SECURITY DEFINER` functions were published by
+PostgREST at `/rest/v1/rpc/<name>` and callable without signing in, among them
+`portal_request_code()`, which issues a one-time code: an anonymous caller could
+reset a client's OTP at will. EXECUTE is revoked from `PUBLIC` as well as from
+`anon` and `authenticated`, because PUBLIC held the grant that the two roles
+inherited — revoking only the named roles would have changed nothing.
+
+The policies that call those helpers keep working, because a policy expression is
+parsed once by the table owner and EXECUTE is checked at parse time. That is a
+claim about Postgres rather than about this codebase, so
+`supabase/tests/definer_surface_test.sql` asserts both halves on every build: the
+direct calls are refused (T-51 … T-54, T-60) and the same reads still return the
+right rows for a firm member, for a client and for the anonymous demo
+(T-55 … T-59), each of which reaches a different revoked helper.
+
+`app_flags` keeps RLS on with no policy, which is deliberate: nothing reads it
+through the API, `flag_enabled()` reads it as its owner, and a permissive policy
+would publish the demo switches to the browser. The table comment says so, and
+the advisor's lint 0008 on it is expected.
+
+One exposure stays, `can_write_client_note(taxpayer_id)`, granted to
+`authenticated` only. `/api/inquiry` has to know whether the caller may write a
+client-visible note *before* it sends mail, since a write refused afterwards
+would leave a client emailed with no record of it. It answers about the caller
+alone and returns a boolean, never a row. That route no longer calls
+`member_has()` or `can_see_taxpayer()`: visibility is now a scoped read of
+`taxpayers` under the caller's own session, which is the policy itself.
+
 **P0 security and honesty fixes (27 Oct 2026, draft PR, not merged).** One forward-only
 migration (`20261027120000`) scopes storage to the taxpayer segment of the path, limits
 what a client may write (`client_may_record()` = `CLIENT_EVENT_KINDS`; no message as

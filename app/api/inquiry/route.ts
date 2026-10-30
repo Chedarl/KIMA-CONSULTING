@@ -36,11 +36,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { data: firmAllowed } = await userClient.rpc("member_has", { cap: "note.write_client" });
-  if (!firmAllowed) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
-
   let body: Body;
   try {
     body = (await request.json()) as Body;
@@ -56,8 +51,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "note_too_long" }, { status: 400 });
   }
 
-  const { data: canSee } = await userClient.rpc("can_see_taxpayer", { tp: taxpayerId });
-  if (!canSee) {
+  // Authorisation in two halves, both answered by the database rather than by
+  // this route. 20261030020000 took can_see_taxpayer() and member_has() off the
+  // API, so neither is callable from here any more.
+  //
+  // First, visibility: `taxpayers` is readable only through
+  // can_see_taxpayer(id), so a scoped read under the caller's own session IS the
+  // check, and an empty result is a refusal.
+  const { data: visible, error: visibleErr } = await userClient
+    .from("taxpayers")
+    .select("id")
+    .eq("id", taxpayerId)
+    .limit(1);
+  if (visibleErr || !visible?.length) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  // Then the capability, before anything is sent: a write refused afterwards
+  // would leave the client emailed with no record of it. This is the one
+  // SECURITY DEFINER helper still exposed, and that is why.
+  const { data: mayWrite } = await userClient.rpc("can_write_client_note", {
+    tp: taxpayerId,
+  });
+  if (!mayWrite) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
