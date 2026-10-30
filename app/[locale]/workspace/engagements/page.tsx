@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getDictionary, isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import { DemoBanner } from "@/components/ui";
