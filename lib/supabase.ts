@@ -148,8 +148,8 @@ export async function audit(entry: {
   resourceId?: string;
   before?: unknown;
   after?: unknown;
-}) {
-  await supabase()
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabase()
     .from("audit_events")
     .insert({
       taxpayer_id: entry.taxpayerId,
@@ -161,4 +161,5 @@ export async function audit(entry: {
       before: entry.before ?? null,
       after: entry.after ?? null,
     });
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
