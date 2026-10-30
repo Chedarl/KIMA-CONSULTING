@@ -461,6 +461,25 @@ try {
     assert.equal(cases.clientStatus({stage:"cancelled",filing_status:"verified"},false),"closed");
   });
 
+  check("L4-2 client sign-off is unavailable until filing has been verified", () => {
+    const current = {stage: "evidence", owner: "Case Manager", prepared_by: null};
+    const base = {to: "client_approval", by: "Case Manager", at: "2026-10-30T00:00:00Z"};
+    assert.deepEqual(
+      cases.advance(current, base),
+      {ok:false,reason:"filing_not_verified"},
+    );
+    for (const filing_status of ["not_submitted", "attempted", "awaiting_verification", "correction_required"]) {
+      assert.deepEqual(cases.advance(current, {
+        ...base, filing: {filing_status, payment_evidence_status:"unknown"},
+      }), {ok:false,reason:"filing_not_verified"}, filing_status);
+    }
+    const approved = cases.advance(current, {
+      ...base, filing:{filing_status:"verified",payment_evidence_status:"unknown"},
+    });
+    assert.equal(approved.ok,true);
+    assert.equal(approved.patch.stage,"client_approval");
+  });
+
   check("L4-1 cannot deliver without verified filing AND client approval", () => {
     const current = {stage: "client_approval", owner: "Case Manager", prepared_by: null};
     const verified = {filing_status: "verified", payment_evidence_status: "unknown"};
