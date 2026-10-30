@@ -1098,6 +1098,8 @@ Only for an independently isolated staging Supabase project (not `vhrnrbnjhmxryg
 
 Public individual/business intake in this review branch asks the applicant to choose a receiving accounting firm from `firm_directory()`, showing KIMA's registration-number check status but making no professional-credential claim. If the directory is empty or inaccessible the form does not silently pick a firm or submit an orphan application. Coordinate deployment with the organization-scoped registrations RLS in #42 and ensure at least one real firm is available before making this version public.
 
+General KIMA contact submissions now use `contact_inquiries` rather than unassigned `registrations` records. The dedicated schema in #51 **must** be released before this UI change; normal individual/business onboarding remains firm-choice-only and must not silently route to an unrelated practice.
+
 ### Contact inquiries versus firm-scoped applications (Phase 2)
 
 A general public contact request goes to `public.contact_inquiries`, an append-only, non-tenant inbox readable only by an active authenticated KIMA administrator. This is **not** a `registrations` row and creates no organization, client, or firm authorization. An ordinary onboarding application instead requires an explicitly selected receiving accounting firm, and its row is visible only to that firm under #42. The contact page UI is a separate Agent B change; deploy the table before the UI in the owner-approved release.
