@@ -41,6 +41,7 @@ export default function FirmLayout({
     { href: `${base}/vault`, label: w.firm.nav.vault, icon: "archive", ready: true },
     { href: `${base}/billing`, label: w.firm.nav.billing, icon: "card", ready: true },
     { href: `${base}/reports`, label: w.firm.nav.reports, icon: "chart", ready: false },
+    { href: `${base}/staff`, label: w.firm.nav.staff, icon: "people", ready: true },
     { href: `${base}/admin`, label: w.firm.nav.admin, icon: "cog", ready: false },
   ];
 

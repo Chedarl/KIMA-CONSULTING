@@ -485,10 +485,21 @@ the count, every colliding address and the remedy, rather than letting `create
 unique index` fail naming one of them. Production was re-checked before release:
 3 member rows, 3 with an email, 3 distinct, 0 duplicate groups.
 
-**Still outstanding:** the staff screens themselves. The function and its rules
-exist and are tested; there is no interface for a partner to use them yet, so
-staff management is reachable only through the RPC. That UI is Agent B's, and
-phase 2 is not done without it.
+The screen is `/[locale]/workspace/staff`, and a partner is the only caller who
+sees its controls — anyone else gets the list and a line saying why they cannot
+change it, rather than buttons that fail. Two things the screen states outright
+instead of leaving to a refusal message:
+
+- **Inviting sends no email.** The function sends nothing, so the partner has to
+  tell the person; they then sign in with that address and a one-time code.
+- **Partner and KIMA administrator are not assignable**, because a partner
+  minting another partner is what the function refuses.
+
+`npm run test:staff` parses the migration and fails if `manage_firm_staff()`
+raises a message `lib/firm-staff.ts` has no words for, or carries words for one
+it no longer raises — the same shape of guard as T-22 over
+`engagements_status_known`. It also asserts FR/EN parity on the screen's labels
+and that the screen writes `firm_members` through nothing but the RPC.
 
 ## Where the work stands
 
