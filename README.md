@@ -320,6 +320,12 @@ waiting period before `disputed`; no next action or prototype string shows a
 number of days). Each check counts its own assertions and fails if none ran.
 CI runs it on every push (`.github/workflows/ci.yml`, Agent A's).
 
+**Suspension is enforced across all firm identity helpers (R-57).** Alongside
+the original tenant-scoped access checks, the older `firm_member_has()`,
+`current_member_id()` and `current_member_label()` now deny access for
+a suspended firm. A firm's own access returns only after authorized
+unsuspension; its clients remain able to view their own files.
+
 ### Two synthetic tenants
 
 Isolation cannot be asserted against one tenant, so there is a seed that creates
