@@ -534,6 +534,39 @@ exist and are tested; there is no interface for a partner to use them yet, so
 staff management is reachable only through the RPC. That UI is Agent B's, and
 phase 2 is not done without it.
 
+### Approving an application (Phase 2)
+
+An accountant approves an application through one database function,
+`public.approve_registration()`, and it writes the whole client file or none of
+it: the taxpayer, its engagement, the contact, the account link that is the
+client's own route in, a portal account, the decision on the `registrations`
+row and the audit entry — one transaction, inside the approver's own firm.
+
+`SECURITY INVOKER`, so every policy still applies to every statement; every
+table it touches already had an INSERT policy a firm member can satisfy, so it
+added no policy and no new definer surface.
+
+Three outcomes:
+
+| Outcome | |
+|---|---|
+| `approved` | the client file exists and the application is decided |
+| `already_registered` | the declared NIU is already a client of KIMA, so a draft engagement is recorded for that client to accept and **nothing is approved** — one NIU is one client |
+| `already_approved` | returns the existing file rather than raising, so a double click is not an error and never a second taxpayer |
+
+**Approval does not give the taxpayer portal access.** The portal account is
+created `pending`, and `portal_request_code()` refuses a non-active account, so
+no sign-in code can be issued against it. Activating sign-in is a statement that
+this person holds this identifier; a firm clicking approve is not that, and
+phase 3's invitations are where activation belongs. T-250 asserts the refusal
+from the product's side, so changing `pending` to `active` fails a test rather
+than quietly handing out access.
+
+An application with **no declared NIU** gets no portal account at all, and the
+audit entry says so. `portal_accounts.identifier` *is* the NIU, `NOT NULL` and
+`UNIQUE` — a blank would collide with the next one and an invented one would sit
+in the table looking like an account.
+
 ## Where the work stands
 
 **Status, 29 October 2026: not client-ready.** The QA and adoption plan in
