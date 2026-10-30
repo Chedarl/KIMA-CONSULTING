@@ -40,9 +40,9 @@ end $$;
 create function public.create_invitation_for_contact(
   p_engagement_id uuid, p_email text
 ) returns table(invitation_id uuid, expires_at timestamptz)
-language sql security invoker set search_path to '' as $
+language sql security invoker set search_path to '' as $body$
   select * from private.create_invitation_for_contact_internal($1,$2)
-$;
+$body$;
 revoke execute on function private.create_invitation_for_contact_internal(uuid,text)
   from public, anon;
 grant execute on function private.create_invitation_for_contact_internal(uuid,text)
