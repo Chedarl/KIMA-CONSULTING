@@ -982,3 +982,5 @@ structurally-valid value.
 - `demo_taxpayer_id()` remains executable; the anon branch that uses it is off
   unless the `allow_demo_anon` row in `app_flags` is true, and that row is false
   on production since 30 Oct 2026
+
+KIMA administrator safeguard (review branch): `admin_review_firm(firm_uuid, 'verify'|'suspend'|'unsuspend', reason)` is an audited privileged RPC limited to an active Auth-bound `kima_admin` of a `kind='kima'` organization. It changes only accounting firms, requires a documented reason, and never certifies professional qualifications. No public organization UPDATE permission is granted; operator provisioning and live activation require explicit owner approval. Synthetic pgTAP covers denied callers and the two-firm signup isolation path.
