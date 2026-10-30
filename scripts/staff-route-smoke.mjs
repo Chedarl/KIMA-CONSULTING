@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-const root = new URL("..", import.meta.url);
 const page = readFileSync(fileURLToPath(new URL("../app/[locale]/workspace/staff/page.tsx", import.meta.url)), "utf8");
 const layout = readFileSync(fileURLToPath(new URL("../app/[locale]/workspace/layout.tsx", import.meta.url)), "utf8");
 assert.ok(page.includes("StaffWorkspace"), "staff route must render the guarded component");
