@@ -6,13 +6,26 @@ name: Supabase migrations
 # deploys every push (main -> production, any other branch -> preview). Adding a
 # Vercel step to this workflow would deploy twice.
 
+# Run only after EVERY required check for a push to main has passed -- both the
+# application CI and the migration replay. workflow_dispatch is intentionally
+# absent: it must not bypass those gates.
+#
+# Waiting on `CI` alone was not enough, and the gap was wider than it looked:
+# `Verify migrations` ran on pull_request only, so on a push to main it did not
+# run at all. A migration that cannot replay therefore had nothing standing
+# between it and the production database -- the PR's own verify run is against
+# the merge preview, not against the commit that lands, and a direct push or an
+# admin merge skips it entirely. That workflow now runs on main too, and the
+# gate below requires it.
+#
+# Listing both workflows here means this fires twice per commit, once as each
+# finishes. The first firing finds the other still running and does nothing; the
+# second finds both green and applies. The gate step is what makes that safe.
 on:
-  push:
+  workflow_run:
+    workflows: [CI, Verify migrations]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'supabase/**'
-      - '.github/workflows/supabase-migrations.yml'
-  workflow_dispatch:
 
 # Never cancel a migration mid-flight: a half-applied migration is worse than a
 # queued one.
@@ -22,6 +35,8 @@ concurrency:
 
 permissions:
   contents: read
+  # To read the conclusions of the other required workflow on this commit.
+  actions: read
 
 env:
   # Not a secret - this ref appears in every project URL.
@@ -30,6 +45,13 @@ env:
 jobs:
   apply:
     name: Apply migrations to production (eu-west-3)
+    # The triggering run must itself have passed; the gate step below then
+    # checks the OTHER required workflow on the same commit.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
 
     # The approval gate lives in GitHub settings, not in this file. With no
@@ -39,9 +61,74 @@ jobs:
     environment: production
 
     steps:
+      # workflow_run normally checks out the latest default branch, not the
+      # commit that passed CI. Always use the verified exact SHA.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # EVERY required workflow must have succeeded on this exact commit, not
+      # just the one that triggered this firing.
+      #
+      # A workflow still running is not a failure: this job exits without
+      # applying, and that workflow's own completion fires this one again. A
+      # workflow that FAILED is also not a failure of this job -- it would turn
+      # every later push red for a reason that is not this job's -- so it warns
+      # and applies nothing. Either way nothing reaches the database until both
+      # are green on the commit being deployed.
+      - name: Require every gate to have passed this commit
+        id: gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          ready=true
+          for wf in "CI" "Verify migrations"; do
+            # The newest push-triggered run of that workflow on this commit.
+            # Re-runs keep the run id, so run_number ordering picks the latest.
+            conclusion=$(gh api \
+              "repos/$REPO/actions/runs?head_sha=$VERIFIED_SHA&event=push&per_page=100" \
+              --jq "[.workflow_runs[] | select(.name == \"$wf\")]
+                    | sort_by(.run_number) | last | .conclusion // \"pending\"")
+            case "$conclusion" in
+              success)
+                echo "$wf: success"
+                ;;
+              pending|null|"")
+                echo "::notice::$wf has not finished on $VERIFIED_SHA; applying nothing."
+                ready=false
+                ;;
+              *)
+                echo "::warning::$wf concluded '$conclusion' on $VERIFIED_SHA; \
+          refusing to apply migrations."
+                ready=false
+                ;;
+            esac
+          done
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+
+      # If main has advanced since this CI run, the later push's CI will
+      # trigger its own migration job. Never deploy an obsolete revision.
+      #
+      # Skipped when the gates are not green, which leaves
+      # steps.head.outputs.current empty and so skips every step below.
+      - name: Confirm verified commit is still main
+        if: steps.gates.outputs.ready == 'true'
+        id: head
+        env:
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git fetch origin main --depth=1
+          if [ "$(git rev-parse FETCH_HEAD)" = "$VERIFIED_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping obsolete CI commit; main has advanced."
+          fi
 
       - name: Check for migrations to apply
+        if: steps.head.outputs.current == 'true'
         id: check
         run: |
           if [ -z "$(find supabase/migrations -name '*.sql' -print -quit 2>/dev/null)" ]; then
@@ -54,7 +141,7 @@ jobs:
           fi
 
       - name: Verify required secrets are present
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
@@ -75,33 +162,41 @@ jobs:
           fi
 
       - uses: supabase/setup-cli@v1
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         with:
           version: latest
 
       - name: Link project
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Show pending migrations
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: supabase migration list --linked
 
       - name: Apply migrations
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: supabase db push
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # Refuse a stale run even if main advanced during setup/linking.
+          git fetch origin main --depth=1
+          if [ "$(git rev-parse FETCH_HEAD)" != "$VERIFIED_SHA" ]; then
+            echo "::error::main advanced after CI; refusing migration deployment."
+            exit 1
+          fi
+          supabase db push
 
       - name: Confirm applied state
-        if: steps.check.outputs.present == 'true'
+        if: steps.head.outputs.current == 'true' && steps.check.outputs.present == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
