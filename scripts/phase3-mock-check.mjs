@@ -42,4 +42,8 @@ const b = {
 };
 assert.equal(preview(b, demoPartners[1], now).ok, true);
 assert.equal(preview(b, demoPartners[0], now).code, "forbidden");
+// An authorized member of the correct firm is NOT necessarily the invitee.
+assert.equal(preview(b, { ...demoPartners[1], email: "colleague@example.test" }, now).code, "wrong_recipient");
+assert.equal(preview({ ...b, recipient_email: "other@example.test" }, demoPartners[1], now).code, "wrong_recipient");
+assert.equal(preview({ ...b, recipient_email: "B@EXAMPLE.TEST" }, demoPartners[1], now).ok, true);
 console.log("ok Q-2: synthetic, company-scoped invitations and negative identity cases");
