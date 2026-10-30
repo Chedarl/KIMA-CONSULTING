@@ -12,6 +12,7 @@
     "test": "node scripts/engine-check.mjs",
     "test:journey": "node scripts/journey-check.mjs",
     "test:staff:contract": "node scripts/staff-contract-smoke.mjs",
+    "test:staff:screen": "node scripts/staff-screen-smoke.mjs",
     "seed:storage": "node scripts/seed-storage.mjs"
   },
   "dependencies": {
