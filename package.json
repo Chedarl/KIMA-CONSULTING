@@ -13,6 +13,8 @@
     "test:journey": "node scripts/journey-check.mjs",
     "test:staff:contract": "node scripts/staff-contract-smoke.mjs",
     "test:staff:screen": "node scripts/staff-screen-smoke.mjs",
+    "test:staff:route": "node scripts/staff-route-smoke.mjs",
+    "test:staff": "node scripts/firm-staff-check.mjs",
     "seed:storage": "node scripts/seed-storage.mjs"
   },
   "dependencies": {
