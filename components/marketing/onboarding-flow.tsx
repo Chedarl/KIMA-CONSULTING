@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { ServiceIcon, type ServiceIconName } from "@/components/marketing/icons";
 import { KimaWordmark } from "@/components/marketing/wordmark";
 import { insertRegistration, insertWorkspaceInvite } from "@/lib/insert-registration";
+import { supabase } from "@/lib/supabase";
 import type { getPublicCopy } from "@/lib/i18n-public";
 import {
   displayName,
@@ -24,6 +25,7 @@ import {
 } from "@/lib/public-onboarding";
 
 type Copy = ReturnType<typeof getPublicCopy>;
+type FirmChoice = { id: string; name: string; verification_status: "unverified" | "verified" };
 
 const KINDS: readonly WorkspaceKind[] = OPEN_WORKSPACE_KINDS;
 const KIND_ICON: Record<WorkspaceKind, ServiceIconName> = {
@@ -45,6 +47,8 @@ export function OnboardingFlow({
   initialKind?: string;
 }) {
   const t = copy.onboard;
+  const [firms, setFirms] = useState<FirmChoice[]>([]);
+  const [firmState, setFirmState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [draft, setDraft] = useState<OnboardingDraft>({
     ...EMPTY_ONBOARDING,
     language: locale,
@@ -62,6 +66,27 @@ export function OnboardingFlow({
   const [saveFailed, setSaveFailed] = useState(false);
   const [channelHint, setChannelHint] = useState<"whatsapp" | "callback" | "office" | null>(null);
 
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const { data, error } = await supabase().rpc("firm_directory");
+        if (error) throw error;
+        if (!active) return;
+        const choices = ((data ?? []) as Array<Partial<FirmChoice>>).filter(
+          (firm): firm is FirmChoice =>
+            typeof firm.id === "string" && typeof firm.name === "string" &&
+            (firm.verification_status === "unverified" || firm.verification_status === "verified"),
+        );
+        setFirms(choices);
+        setFirmState("ready");
+      } catch {
+        if (active) setFirmState("unavailable");
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
   const other: "fr" | "en" = locale === "fr" ? "en" : "fr";
   const name = displayName(draft) || draft.name.trim();
 
@@ -71,7 +96,7 @@ export function OnboardingFlow({
   }
 
   function go(next: OnboardingStep) {
-    const found = issuesFor(step, draft);
+    const found = issuesFor(step, draft, true);
     const forward = step === "type" || sidebarIndex(next) > sidebarIndex(step);
     if (found.length > 0 && forward) {
       setIssues(found);
@@ -83,7 +108,7 @@ export function OnboardingFlow({
   }
 
   async function finish() {
-    const found = issuesFor("verify", draft);
+    const found = issuesFor("verify", draft, true);
     setIssues(found);
     setSaveFailed(false);
     if (found.length > 0 || !draft.kind) return;
@@ -295,9 +320,10 @@ export function OnboardingFlow({
                     <ContactsStep t={t} draft={draft} patch={patch} issues={issues} />
                   )}
                   {step === "services" && (
-                    <ServicesStep t={t} draft={draft} patch={patch} issues={issues} />
+                    <ServicesStep t={t} draft={draft} patch={patch} issues={issues}
+                       firms={firms} firmState={firmState} />
                   )}
-                  {step === "verify" && <VerifyStep t={t} draft={draft} />}
+                  {step === "verify" && <VerifyStep t={t} draft={draft} firmName={firms.find((firm) => firm.id === draft.firmId)?.name} />}
                   {step === "ready" && (
                     <ReadyStep
                       locale={locale}
@@ -544,11 +570,15 @@ function ServicesStep({
   draft,
   patch,
   issues,
+  firms,
+  firmState,
 }: {
   t: Copy["onboard"];
   draft: OnboardingDraft;
   patch: (p: Partial<OnboardingDraft>) => void;
   issues: OnboardingIssue[];
+  firms: FirmChoice[];
+  firmState: "loading" | "ready" | "unavailable";
 }) {
   const icons: ServiceIconName[] = ["tax", "dsf", "accounting", "calendar", "expert"];
   function toggle(key: OnboardingService) {
@@ -586,15 +616,39 @@ function ServicesStep({
           );
         })}
       </ul>
+      <fieldset className="mt-6 border-t border-border pt-5">
+        <legend className="text-sm font-semibold text-fg">{t.firmSelect}</legend>
+        <p className="mt-1 text-sm text-fg-muted">{t.firmHelp}</p>
+        {firmState === "loading" && <p role="status" className="mt-3 text-sm">{t.firmLoading}</p>}
+        {(firmState === "unavailable" || (firmState === "ready" && firms.length === 0)) &&
+          <p role="alert" className="mt-3 text-sm text-danger-text">{t.firmNone}</p>}
+        <div className="mt-3 grid gap-2">
+          {firms.map((firm) => (
+            <label key={firm.id} className="flex min-h-[52px] cursor-pointer items-center gap-3 rounded-lg border border-border p-3 has-[:checked]:border-teal">
+              <input type="radio" name="receiving-firm" value={firm.id}
+                checked={draft.firmId === firm.id} onChange={() => patch({ firmId: firm.id })}
+                className="h-5 w-5 accent-teal" />
+              <span className="text-sm text-fg">
+                <span className="block font-semibold">{firm.name}</span>
+                <span className="block text-xs text-fg-muted">
+                  {firm.verification_status === "verified" ? t.firmVerified : t.firmUnverified}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {issues.includes("firm") && <p role="alert" className="mt-2 text-xs text-danger-text">{t.errors.firm}</p>}
+      </fieldset>
     </div>
   );
 }
 
-function VerifyStep({ t, draft }: { t: Copy["onboard"]; draft: OnboardingDraft }) {
+function VerifyStep({ t, draft, firmName }: { t: Copy["onboard"]; draft: OnboardingDraft; firmName?: string }) {
   const kindLabel = draft.kind ? t.cards[draft.kind].title : t.notProvided;
   const services = useServiceLabels(t, draft.services);
   const rows = [
     [t.summary.kind, kindLabel],
+    [t.firmSelect, firmName ?? t.notProvided],
     [t.summary.name, draft.name.trim() || t.notProvided],
     [t.summary.contact, [draft.email, draft.phone].filter(Boolean).join(" · ") || t.notProvided],
     [t.summary.legal, draft.legalName.trim() || t.notProvided],
