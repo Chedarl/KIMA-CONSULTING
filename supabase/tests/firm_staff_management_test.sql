@@ -23,14 +23,14 @@ select is((select count(*) from pg_indexes where schemaname='public'
  'A login email cannot identify two different staff records');
 
 set local role anon;
-select throws_ok($$$select manage_firm_staff('invite',null,'new@staff.test',
+select throws_ok($$select manage_firm_staff('invite',null,'new@staff.test',
  'New Worker','firm_staff')$$,'42501',null,'Anonymous cannot invite');
 reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a003","role":"authenticated"}',true);
-select throws_ok($$$select manage_firm_staff('invite',null,'new@staff.test',
+select throws_ok($$select manage_firm_staff('invite',null,'new@staff.test',
  'New Worker','firm_staff')$$,'42501',null,'Staff cannot invite');
 reset role;
 
@@ -50,7 +50,7 @@ select is((select organization_id from firm_members
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a002","role":"authenticated"}',true);
-select throws_ok($$$select manage_firm_staff('role',
+select throws_ok($$select manage_firm_staff('role',
  current_setting('test.staff_member')::uuid,null,null,'firm_staff')$$,
  '42501',null,'Other firm cannot change member role');
 reset role;
@@ -58,7 +58,7 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a001","role":"authenticated"}',true);
-select throws_ok($$$select manage_firm_staff('role',
+select throws_ok($$select manage_firm_staff('role',
  current_setting('test.staff_member')::uuid,null,null,'firm_partner')$$,
  '22023',null,'Staff cannot be promoted to partner through staff API');
 select throws_ok($$select manage_firm_staff('invite',null,'NEW@STAFF.TEST',
@@ -67,7 +67,7 @@ select throws_ok($$select manage_firm_staff('invite',null,'NEW@STAFF.TEST',
 select lives_ok($$select manage_firm_staff('role',
  current_setting('test.staff_member')::uuid,null,null,'firm_staff')$$,
  'Partner can switch reviewer to staff');
-select lives_ok($$$select manage_firm_staff('revoke',
+select lives_ok($$select manage_firm_staff('revoke',
  current_setting('test.staff_member')::uuid,null,null,null)$$,
  'Partner can revoke staff access');
 reset role;
