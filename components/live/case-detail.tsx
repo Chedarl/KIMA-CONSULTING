@@ -200,7 +200,7 @@ export function CaseDetail({
   const signInHref = `/${locale}/firm-login`;
   const [row, setRow] = useState<ComplianceCase | null>(null);
   const [taxpayer, setTaxpayer] = useState<Taxpayer | null>(null);
-  const [engagement, setEngagement] = useState<Engagement | null>(null);
+  const [engagement, setEngagement] = useState<(Engagement & { organization_id: string }) | null>(null);
   const [assignments, setAssignments] = useState<
     { taxpayer_id: string; assigned_to: string | null }[]
   >([]);
@@ -277,7 +277,7 @@ export function CaseDetail({
       ]);
 
       setTaxpayer((tp.data ?? null) as Taxpayer | null);
-      setEngagement((eng.data ?? null) as Engagement | null);
+      setEngagement((eng.data ?? null) as (Engagement & { organization_id: string }) | null);
       setAssignments((assigned.data ?? []) as { taxpayer_id: string; assigned_to: string | null }[]);
       setRequests((reqs.data ?? []) as CaseRequest[]);
       setTasks((tsk.data ?? []) as CaseTask[]);
@@ -525,8 +525,15 @@ export function CaseDetail({
     setRefusedBy(null);
     try {
       const db = supabase();
-      const { data: org } = await db.from("organizations").select("id").limit(1).maybeSingle();
-      if (!org?.id) throw new Error("no organization");
+      // The case's RLS-visible, active engagement is the only valid firm.
+      // An arbitrary organization lookup can select an unrelated tenant.
+      const orgId = engagement?.organization_id;
+      if (!orgId || engagement.id !== row.engagement_id ||
+          engagement.taxpayer_id !== row.taxpayer_id || engagement.revoked_at ||
+          !["authorized", "accepted"].includes(engagement.status) ||
+          !(engagement.authorized_at || engagement.accepted_at)) {
+        throw new Error("No active engagement for this case");
+      }
       const due =
         askDue ||
         (() => {
@@ -536,7 +543,7 @@ export function CaseDetail({
         })();
       const { error } = await db.from("document_requests").insert({
         taxpayer_id: row.taxpayer_id,
-        organization_id: org.id,
+        organization_id: orgId,
         case_id: row.id,
         label_fr: askFr.trim(),
         label_en: askEn.trim(),
