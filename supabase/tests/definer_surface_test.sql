@@ -72,10 +72,17 @@ select is(
   'T-52 every moved helper is in private, and nothing else is'
 );
 
--- T-53 the invariant that keeps this closed: exactly one SECURITY DEFINER
--- function in the exposed schema may be executed by anon or authenticated, and
--- it is the one justified in writing. A new definer helper added to `public`
--- fails this.
+-- T-53 the invariant that keeps this closed: a SECURITY DEFINER function in the
+-- exposed schema may be executed by anon or authenticated only if it is named
+-- here, with its justification in the migration that added it. The census is
+-- the control, not the count: a definer helper that appears in `public` without
+-- being added to this list fails, which is the whole point.
+--
+-- firm_directory() joined it with 20261030130000 (R-55). The owner decided a
+-- firm's name stays public while the record does not, and column grants cannot
+-- express that -- they are table-wide, so narrowing to (id, name) for a visitor
+-- would narrow it for the firm's own members too. It is as narrow as the first
+-- entry: no arguments, no writes, two columns out, nothing a caller can steer.
 select is(
   (select coalesce(string_agg(p.proname, ', ' order by p.proname), '(none)')
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -83,8 +90,8 @@ select is(
       and p.prosecdef
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
-  'can_write_client_note',
-  'T-53 one definer function stays callable in public, and only that one'
+  'can_write_client_note, firm_directory',
+  'T-53 only the definer functions named here stay callable in public'
 );
 
 -- ---------------------------------------------------------------------------
