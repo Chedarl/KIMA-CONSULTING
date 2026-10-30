@@ -142,6 +142,8 @@ export function MessageThread({
   const [error, setError] = useState(false);
   const [threadId, setThreadId] = useState("general");
   const bottom = useRef<HTMLDivElement>(null);
+  const currentTaxpayer = useRef(taxpayerId);
+  currentTaxpayer.current = taxpayerId;
 
   const load = useCallback(async () => {
     if (!taxpayerId) return;
@@ -161,6 +163,7 @@ export function MessageThread({
           .is("revoked_at", null),
         db.rpc("firm_directory"),
       ]);
+      if (taxpayerId !== currentTaxpayer.current) return;
       if (grantError || messagesError || requestsError) {
         throw grantError ?? messagesError ?? requestsError;
       }
@@ -185,6 +188,10 @@ export function MessageThread({
   }, [taxpayerId, labels.firmName]);
 
   useEffect(() => {
+    setOrgId(null);
+    setFirms([]);
+    setMsgs(null);
+    setRequests([]);
     void load();
   }, [load]);
 
@@ -335,6 +342,7 @@ export function MessageThread({
     </label>
   ) : null;
   const needsFirm = !orgId;
+  const activeFirmLabel = firms.find((firm) => firm.id === orgId)?.name ?? labels.firmName;
   const chooseHint = locale === "fr"
     ? "Sélectionnez un cabinet autorisé pour ce dossier avant d’envoyer un message."
     : "Select an authorized firm for this company before sending a message.";
@@ -385,7 +393,7 @@ export function MessageThread({
                   >
                     <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${g.unread ? "bg-amber" : "bg-transparent"}`} />
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-fg">{labels.firmName}</span>
+                      <span className="block text-sm font-semibold text-fg">{activeFirmLabel}</span>
                       <span className="block truncate text-xs text-fg-muted">{g.title}</span>
                     </span>
                   </button>
@@ -395,7 +403,7 @@ export function MessageThread({
           </aside>
           <div className="flex min-h-[24rem] flex-col">
             <div className="border-b border-border px-4 py-3">
-              <p className="text-sm font-semibold text-fg">{labels.firmName}</p>
+              <p className="text-sm font-semibold text-fg">{activeFirmLabel}</p>
               <p className="text-xs text-fg-muted">{activeTitle}</p>
             </div>
             <ol className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4" aria-live="polite">
