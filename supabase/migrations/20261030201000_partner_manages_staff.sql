@@ -19,8 +19,8 @@
 -- check below refuses first, with the count, every address, and the remedy:
 --
 --   ERROR:  firm_members holds 1 duplicate email address(es), so a unique index
---   cannot be created: shared@firm.test. Resolve each one (deactivate the stale
---   member or correct the address) and re-run this migration. firm_issue_code()
+--   cannot be created: shared@firm.test. Correct or clear stale emails;
+--   deactivation alone does not resolve the index conflict. firm_issue_code()
 --   selects a member by email, so these must be unique before staff management
 --   ships.
 --
