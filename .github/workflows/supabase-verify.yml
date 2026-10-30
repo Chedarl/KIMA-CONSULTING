@@ -82,6 +82,10 @@ jobs:
           fi
           bash scripts/test-two-session-first-grant.sh
 
+      - name: Two-session approval versus direct-client-opening NIU race
+        if: steps.check.outputs.present == 'true'
+        run: bash scripts/test-cross-entrypoint-niu-race.sh
+
       - name: Check for schema drift against committed migrations
         if: steps.check.outputs.present == 'true'
         run: |
