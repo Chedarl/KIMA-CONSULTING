@@ -481,8 +481,9 @@ Every invite, role change and revocation appends an audit event.
 **A staff email is globally unique**, because `firm_issue_code()` selects a
 member by email — two rows sharing one address would make sign-in ambiguous. The
 migration checks for duplicates before it creates that index and refuses with
-the count, every colliding address and the remedy, rather than letting `create
-unique index` fail naming one of them. Production was re-checked before release:
+the count and every colliding address. Correct or clear a stale email
+while retaining the membership record; deactivation alone does not satisfy the
+index predicate. Never silently rewrite another member's address. Production was re-checked before release:
 3 member rows, 3 with an email, 3 distinct, 0 duplicate groups.
 
 **Still outstanding:** the staff screens themselves. The function and its rules
