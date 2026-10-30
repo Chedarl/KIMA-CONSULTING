@@ -70,20 +70,21 @@ export function ClientMessageThread({
   heading?: string;
 }) {
   const [tid, setTid] = useState<string | null>(null);
+  const [resolved, setResolved] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const { sessionTaxpayerId } = await import("@/lib/supabase");
       const id = await sessionTaxpayerId();
-      if (!cancelled) setTid(id);
+      if (!cancelled) { setTid(id); setResolved(true); }
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!tid) {
+  if (!resolved) {
     return (
       <div className="flex flex-col gap-2" aria-busy="true">
         {[0, 1, 2].map((i) => (
@@ -92,6 +93,7 @@ export function ClientMessageThread({
       </div>
     );
   }
+  if (!tid) return <p role="status" className="text-sm text-fg-muted">{labels.signInRequired ?? labels.offline}</p>;
   return (
     <MessageThread
       locale={locale}
@@ -220,7 +222,7 @@ export function MessageThread({
     bottom.current?.scrollIntoView({ block: "nearest" });
   }, [msgs?.length]);
 
-  async function send() {
+  async function send(requestId = about) {
     const body = draft.trim();
     if (!body || !taxpayerId || !orgId || sendBlocked || busy) return;
     if (side === "firm" && !firmActor) return;
@@ -231,13 +233,13 @@ export function MessageThread({
 
     // Stale or revoked grants must never be used even if the picker has not refreshed.
     const chosenOrg = orgId;
-    if (about && !requests.some((r) => r.id === about && r.organization_id === chosenOrg)) return;
+    if (requestId && !requests.some((r) => r.id === requestId && r.organization_id === chosenOrg)) return;
     const id = crypto.randomUUID();
     const optimistic: Msg = {
       id,
       taxpayer_id: taxpayerId,
       organization_id: orgId,
-      request_id: about || null,
+      request_id: requestId || null,
       sender: side,
       sender_name: senderName,
       body,
@@ -281,7 +283,7 @@ export function MessageThread({
         action: "message.sent",
         resourceType: "message",
         resourceId: id,
-        after: { length: body.length, request_id: about || null },
+        after: { length: body.length, request_id: requestId || null },
       });
       toast(labels.sent);
     } catch {
@@ -418,8 +420,7 @@ export function MessageThread({
               className="flex items-center gap-2 border-t border-border p-3"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (activeId !== "general") setAbout(activeId);
-                void send();
+                void send(activeId === "general" ? "" : activeId);
               }}
             >
               <label htmlFor="portal-msg" className="sr-only">{labels.placeholder}</label>
