@@ -12,7 +12,8 @@
     "test": "node scripts/engine-check.mjs",
     "test:journey": "node scripts/journey-check.mjs",
     "seed:storage": "node scripts/seed-storage.mjs",
-    "test:staff": "node scripts/firm-staff-check.mjs"
+    "test:staff": "node scripts/firm-staff-check.mjs",
+    "fonts": "node scripts/fetch-fonts.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
