@@ -3,20 +3,27 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(15);
+select plan(16);
 
 insert into auth.users (id, email, email_confirmed_at) values
  ('00000000-0000-4000-d000-00000000a101','founder-a@signup.test',now()),
  ('00000000-0000-4000-d000-00000000a102','unconfirmed@signup.test',null),
  ('00000000-0000-4000-d000-00000000a103','founder-b@signup.test',now()),
  ('00000000-0000-4000-d000-00000000a104','client@signup.test',now()),
- ('00000000-0000-4000-d000-00000000a105','bad-number@signup.test',now());
+ ('00000000-0000-4000-d000-00000000a105','bad-number@signup.test',now()),
+ ('00000000-0000-4000-d000-00000000a106','unbound@signup.test',now());
 
 insert into organizations (id,name,kind)
 values ('00000000-0000-4000-d000-00000000a110','Signup Client Holder','kima');
 insert into contacts (organization_id,full_name,email,auth_user_id)
 values ('00000000-0000-4000-d000-00000000a110',
         'Existing Client','client@signup.test','00000000-0000-4000-d000-00000000a104');
+
+insert into organizations (id,name,kind,registration_number)
+values ('00000000-0000-4000-d000-00000000a111','Unbound Member Firm','firm','INV-001');
+insert into firm_members (organization_id,person_label,email,role)
+values ('00000000-0000-4000-d000-00000000a111','Invited Staff',
+        'unbound@signup.test','firm_staff');
 
 insert into app_flags(key,enabled,note)
 values ('allow_firm_signup',false,'D2 synthetic gate')
@@ -138,6 +145,15 @@ reset role;
 -- T-210
 select is((select count(*) from organizations where name='Bad Number Firm'),
  0::bigint,'T-210 invalid input leaves no partial firm');
+
+-- T-212: legacy/invited member email cannot become a second firm login.
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-d000-00000000a106","role":"authenticated"}',true);
+select throws_ok(
+ $$select sign_up_firm('Fresh Firm','FR-001','Invite Founder')$$,
+ '42501',null,'T-212 an unbound existing staff email cannot sign up a new firm');
+reset role;
 
 select * from finish();
 rollback;
