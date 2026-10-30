@@ -57,11 +57,12 @@ insert into taxpayers (id, legal_name) values
   ('00000000-0000-4000-a000-00000000b002', 'Taxpayer of Firm B'),
   ('00000000-0000-4000-a000-00000000a008', 'Prospect of Firm A');
 
--- The authorised grant, one per firm. This is what carries access. status
--- defaults to 'authorized'.
-insert into engagements (organization_id, taxpayer_id) values
-  ('00000000-0000-4000-a000-00000000a001', '00000000-0000-4000-a000-00000000a002'),
-  ('00000000-0000-4000-a000-00000000b001', '00000000-0000-4000-a000-00000000b002');
+-- The authorised grant, one per firm. This is what carries access, and it is
+-- stated: since 20261030070000 the status default is 'draft', because a row
+-- that merely exists must not be a grant.
+insert into engagements (organization_id, taxpayer_id, status, authorized_at) values
+  ('00000000-0000-4000-a000-00000000a001', '00000000-0000-4000-a000-00000000a002', 'authorized', now()),
+  ('00000000-0000-4000-a000-00000000b001', '00000000-0000-4000-a000-00000000b002', 'authorized', now());
 
 -- A grant Firm A has drafted and nobody has accepted. The row exists, so the
 -- firm can work on it; it carries no access to the prospect's records. See

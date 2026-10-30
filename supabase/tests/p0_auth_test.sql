@@ -27,8 +27,8 @@ insert into organizations (id, name) values ('00000000-0000-4000-a000-0000000000
 insert into taxpayers (id, legal_name) values ('00000000-0000-4000-a000-00000000000a', 'Taxpayer A');
 -- The firm's authorised grant. Required since 20261029213000: a firm reaches a
 -- taxpayer only through its own engagement.
-insert into engagements (organization_id, taxpayer_id) values
-  ('00000000-0000-4000-a000-0000000000f0', '00000000-0000-4000-a000-00000000000a');
+insert into engagements (organization_id, taxpayer_id, status, authorized_at) values
+  ('00000000-0000-4000-a000-0000000000f0', '00000000-0000-4000-a000-00000000000a', 'authorized', now());
 insert into contacts (id, organization_id, full_name, email) values
   ('00000000-0000-4000-a000-0000000000ca', '00000000-0000-4000-a000-0000000000f0', 'Client A', 'client-a@example.test');
 insert into portal_accounts (id, taxpayer_id, contact_id, identifier, display_name, status) values

@@ -266,7 +266,7 @@ engagement. The figures in this document hold.
 - [x] Set `app_flags.allow_demo_anon` and `app_flags.demo_otp_reveal` to false in any environment that will hold real data (R-32/R-36). — Both `false` on production 30 Oct 02:13 UTC, verified after the change.
 - [x] Set `SUPABASE_SERVICE_ROLE_KEY` in the Vercel environment through the dashboard, never in the repo. Then remove the fallback to the `auth-codes` Edge Function where it's no longer needed. — The key has been set for every environment since 23 Oct. **Removing the fallback is still open** and is the one half of this item not done.
 - [ ] Enable leaked-password protection in Supabase Auth. — **Blocked:** Pro-plan feature, refused on the current plan. Justified in writing as R-50: no account in this product has a password, so neither a leaked one nor a short one is reachable today. Both become live the moment any password flow is enabled.
-- [x] Write a pgTAP and route test suite for two firms: Firm A can't read Firm B's clients, documents, invoices, tasks or storage objects. — 31 pgTAP checks in `supabase/tests/two_firm_isolation_test.sql`, both directions, reads and writes. **The route half is not written**; the suite is SQL only.
+- [x] Write a pgTAP and route test suite for two firms: Firm A can't read Firm B's clients, documents, invoices, tasks or storage objects. — 37 pgTAP checks in `supabase/tests/two_firm_isolation_test.sql` and 17 more in `supabase/tests/engagement_grant_test.sql`, both directions, reads and writes. **The route half is not written**; the suite is SQL only.
 
 **Exit:** the security advisor is clear, or each remaining item is justified in writing; the two-firm test is green; an anonymous visitor sees no taxpayer data.
 **Depends on:** phase 0.
@@ -276,20 +276,32 @@ engagement. The figures in this document hold.
 All three exit conditions hold: the security advisor is down from 17 findings to 3, and
 each of the 3 is justified in writing (`can_write_client_note` — the one deliberate
 exposure, T-53; `app_flags` RLS with no policy — the table comment; leaked-password
-protection — R-50). The two-firm suite is green at 31 checks. An anonymous visitor reads
-no taxpayer: `allow_demo_anon` is false and T-57 pins the behaviour.
+protection — R-50). The two-firm suite is green at 37 checks, with 17 more on the
+engagement grant itself. An anonymous visitor reads no taxpayer: `allow_demo_anon` is
+false and T-57 pins the behaviour.
 
-Two items not on the list surfaced while doing it, and **neither is closed**:
+Two items not on the list surfaced while doing it. **The first is now closed and the
+second is not** (30 Oct, after the owner's "proceed"):
 
-- **A firm can grant itself access.** The `engagements` INSERT policy asks only for
+- **A firm can grant itself access.** ~~The `engagements` INSERT policy asks only for
   `engagement.create` in the row's own organisation, and `status` defaults to
   `'authorized'`, so any firm can insert an authorised engagement against any taxpayer
-  and read that taxpayer immediately. The taxpayer never consents. Per-firm isolation
-  holds — a firm cannot read what it has no engagement for — but a firm can give itself
-  one. The invitation flow in phase 3 is the real answer; a narrower interim fix is to
-  refuse an INSERT that is not `draft` or `invited`, since neither grants access, which
-  also matches what phase 2 says the onboarding transaction should create. That needs an
-  owner decision, because it changes who may start work with a taxpayer.
+  and read that taxpayer immediately.~~ **Fixed 30 Oct by `20261030070000`** (risk R-51),
+  on the owner's "proceed" of the fix plan. The finding was verified first rather than
+  taken on trust, and reproduced: on a replayed database without the migration the
+  self-grant INSERT raised nothing and Firm A then read Firm B's taxpayer (`have: 1,
+  want: 0`). The interim rule this section proposed is what was built, plus the three
+  things it did not mention and the hole needed: an engagement **opens** as a draft (the
+  `status` default is now `'draft'` and `authorized_at` has no default, so the two-step
+  draft-then-authorise route is closed too), only the taxpayer writes `accepted_at`, and
+  a firm may authorise alone only for a taxpayer **no other firm currently holds** —
+  which is what keeps the onboarding path working, since a firm that has just created a
+  taxpayer is the only firm engaged with them. 17 pgTAP checks in
+  `supabase/tests/engagement_grant_test.sql`, ten of which fail without the migration.
+  **Residual:** a firm can still authorise an engagement against a taxpayer no firm
+  holds, without consent. It cannot find such a taxpayer through the API — it would have
+  to guess a UUID — but the phase 3 invitation flow is what actually closes it. Carried
+  as R-51.
 - **A public application is not routed to a chosen firm.** An unassigned application is
   readable by any firm member who works client files, and the first firm with
   `engagement.create` to act on it claims it. That was the deliberate fix for the review
@@ -298,6 +310,15 @@ Two items not on the list surfaced while doing it, and **neither is closed**:
 
 Two further open items carried from the list: the `auth-codes` fallback removal, and the
 route-level half of the two-firm suite.
+
+**A live break found with F-01 and fixed with it.** `engagements_status_known`, the CHECK
+added by `20261029213000`, names six states and `'pending'` is not among them —
+but `draftEngagement()` in `lib/engagements.ts` wrote exactly that. Every engagement
+insert through the onboarding wizard and the engagements screen had therefore been
+refused since that migration merged on 30 Oct 02:42 UTC. `20261030070000` and its commit
+set it to `'draft'`, and `scripts/engine-check.mjs` asserted the wrong value too, so
+nothing caught it. A value-matching rule over free text is exactly what that migration's
+own header warned about.
 
 ### Phase 2: Firm self-sign-up and onboarding (blocks launch)
 

@@ -8,7 +8,9 @@ import {
   authorizeEngagement,
   draftEngagement,
   ENGAGEMENT_REFUSAL_LABELS,
+  ENGAGEMENT_WRITE_REFUSAL_LABELS,
   engagementPosture,
+  engagementWriteRefusal,
   postureLabel,
   revokeEngagement,
   type EngagementEvent,
@@ -182,6 +184,20 @@ export function EngagementsWorkspace({
     return false;
   }
 
+  /**
+   * The wording for a write the database refused.
+   *
+   * `private.engagements_grant_guard()` refuses some authorisations on grounds
+   * the screen cannot see -- whether another firm holds this taxpayer, above
+   * all -- so the only honest message is the one the database sent back.
+   */
+  function writeFailureText(detail: string | undefined): string {
+    const refusal = engagementWriteRefusal(detail);
+    if (!refusal) return labels.failed;
+    const text = ENGAGEMENT_WRITE_REFUSAL_LABELS[refusal];
+    return locale === "fr" ? text.fr : text.en;
+  }
+
   async function authorise(row: Row) {
     if (!session) {
       toast(labels.signIn, "error");
@@ -198,7 +214,7 @@ export function EngagementsWorkspace({
     const written = await updateById("engagements", row.id, result.patch);
     if (!written.ok) {
       setBusy(null);
-      toast(labels.failed, "error");
+      toast(writeFailureText(written.reason === "error" ? written.detail : undefined), "error");
       return;
     }
     setRows((prev) => prev?.map((r) => (r.id === row.id ? { ...r, ...result.patch } : r)) ?? prev);
@@ -226,7 +242,7 @@ export function EngagementsWorkspace({
     const written = await updateById("engagements", row.id, result.patch);
     if (!written.ok) {
       setBusy(null);
-      toast(labels.failed, "error");
+      toast(writeFailureText(written.reason === "error" ? written.detail : undefined), "error");
       return;
     }
     setRows((prev) => prev?.map((r) => (r.id === row.id ? { ...r, ...result.patch } : r)) ?? prev);
