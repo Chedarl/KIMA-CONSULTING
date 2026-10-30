@@ -29,14 +29,12 @@ insert into app_flags(key,enabled,note)
 values ('allow_firm_signup',false,'D2 synthetic gate')
 on conflict(key) do update set enabled=false;
 
--- T-197
 select has_function('public','sign_up_firm',array['text','text','text'],
   'T-197 signup is a single callable database function');
 
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a101","role":"authenticated"}',true);
--- T-198
 select throws_ok(
  $$select sign_up_firm('Cabinet Étoile SARL','AB-12/34','Aline Founder')$$,
  '42501',null,'T-198 feature flag is off by default');
@@ -45,7 +43,6 @@ reset role;
 update app_flags set enabled=true where key='allow_firm_signup';
 select set_config('request.jwt.claims','',true);
 set local role anon;
--- T-199
 select throws_ok(
  $$select sign_up_firm('Anonymous Firm','AN-1234','Anonymous')$$,
  '42501',null,'T-199 anonymous users cannot create firms');
@@ -54,7 +51,6 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a102","role":"authenticated"}',true);
--- T-200
 select throws_ok(
  $$select sign_up_firm('Unconfirmed Firm','UN-1234','Unconfirmed')$$,
  '42501',null,'T-200 unconfirmed email cannot create a firm');
@@ -63,21 +59,18 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a101","role":"authenticated"}',true);
--- T-201
 select lives_ok(
  $$select set_config('test.new_firm',
      sign_up_firm('Cabinet Étoile & Associés SARL',' ab-12 / 34 ','Aline Founder')::text,true)$$,
  'T-201 verified email atomically creates firm and owner');
 reset role;
 
--- T-202
 select is(
  (select kind||'/'||verification_status||'/'||registration_number
     from organizations where id=current_setting('test.new_firm')::uuid),
  'firm/unverified/AB-12/34',
  'T-202 the new firm is unverified and its registration number normalized');
 
--- T-203
 select is(
  (select role::text||'/'||email from firm_members
     where organization_id=current_setting('test.new_firm')::uuid
@@ -85,7 +78,6 @@ select is(
  'firm_partner/founder-a@signup.test',
  'T-203 owner identity and email come from the verified Auth account');
 
--- T-204
 select is(
  (select count(*) from audit_events
     where organization_id=current_setting('test.new_firm')::uuid
@@ -95,7 +87,6 @@ select is(
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a101","role":"authenticated"}',true);
--- T-205
 select throws_ok(
  $$select sign_up_firm('Another Firm','ZZ-1234','Aline Founder')$$,
  '42501',null,'T-205 a founder cannot open a second firm');
@@ -104,13 +95,11 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a103","role":"authenticated"}',true);
--- T-206
 select throws_ok(
  $$select sign_up_firm('ÉTOILE, S.A.R.L.','OTHER-001','Other Founder')$$,
  '23505',null,'T-206 a look-alike firm name is refused');
 reset role;
 
--- T-211: whitespace in the registration number cannot bypass uniqueness.
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a103","role":"authenticated"}',true);
@@ -119,7 +108,6 @@ select throws_ok(
  '23505',null,'T-211 registration-number spacing cannot bypass uniqueness');
 reset role;
 
--- T-207
 select is((select count(*) from firm_members
            where auth_user_id='00000000-0000-4000-d000-00000000a103'),
  0::bigint,'T-207 rejected signup creates no orphaned owner');
@@ -127,7 +115,6 @@ select is((select count(*) from firm_members
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a104","role":"authenticated"}',true);
--- T-208
 select throws_ok(
  $$select sign_up_firm('Client Impersonator','CI-1234','Existing Client')$$,
  '42501',null,'T-208 a client identity cannot become a firm member');
@@ -136,17 +123,14 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a105","role":"authenticated"}',true);
--- T-209
 select throws_ok(
  $$select sign_up_firm('Bad Number Firm','!!','Bad Number')$$,
  '22023',null,'T-209 invalid registration hygiene is refused');
 reset role;
 
--- T-210
 select is((select count(*) from organizations where name='Bad Number Firm'),
  0::bigint,'T-210 invalid input leaves no partial firm');
 
--- T-212: legacy/invited member email cannot become a second firm login.
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a106","role":"authenticated"}',true);
@@ -155,25 +139,8 @@ select throws_ok(
  '42501',null,'T-212 an unbound existing staff email cannot sign up a new firm');
 reset role;
 
--- ---------------------------------------------------------------------------
--- T-213 .. T-215: one login, one firm -- including two sign-ups at once.
---
--- The checks inside sign_up_firm() cannot see an uncommitted row, so two
--- concurrent calls from the same login both pass them. What stops the second
--- firm existing is firm_members_auth_user_id_key: the losing insert raises
--- unique_violation and its organisation rolls back with it. Measured with two
--- concurrent sessions against a replayed schema -- 1 organisation, 1
--- membership, with distinct names and numbers throughout, so nothing but the
--- login collided.
---
--- That constraint predates this function and was asserted only in a comment in
--- 20261030080000 ("auth_user_id is UNIQUE, so the limit is a formality").
--- Nothing failed if it were dropped. T-213 is that missing pin: the whole
--- concurrent case rests on it, and a single pgTAP transaction cannot reach the
--- race itself, so the catalog fact is the honest thing to assert.
--- ---------------------------------------------------------------------------
 
--- T-213
+-- One login/firm race is enforced by a unique constraint; assert it exists.
 select is(
  (select coalesce(string_agg(pg_get_constraintdef(oid), '; ' order by conname), '(none)')
     from pg_constraint
@@ -186,14 +153,11 @@ set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-d000-00000000a101","role":"authenticated"}',true);
 
--- T-214 the sequential case, which the pre-check catches first. The message is
--- about the caller's own identity, not a name or number nobody else holds.
 select throws_ok(
  $$select sign_up_firm('Second Firm Same Login','SL-002','Founder A Again')$$,
  '42501',null,'T-214 a login that already has a firm cannot create another');
 reset role;
 
--- T-215 and nothing is left behind by the refusal.
 select is(
  (select count(*) from organizations where name='Second Firm Same Login'),
  0::bigint,'T-215 and the refused attempt leaves no organisation');
