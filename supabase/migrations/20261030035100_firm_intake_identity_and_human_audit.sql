@@ -52,3 +52,64 @@ with check (
     )
   )
 );
+
+-- Keep the live firm queue current even when an existing document is copied
+-- into a request without changing that request's status. A document carries
+-- no organization_id; the request does. Only its organization's filtered
+-- request event is delivered to subscribed staff.
+create or replace function private.signal_firm_intake_document_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  linked_request uuid;
+  linked_taxpayer uuid;
+begin
+  if tg_op in ('INSERT', 'UPDATE') and new.request_id is not null then
+    -- Reject a cross-taxpayer link instead of signalling another client's work.
+    if not exists (
+      select 1 from public.document_requests r
+      where r.id = new.request_id and r.taxpayer_id = new.taxpayer_id
+    ) then
+      raise exception 'Document and request must belong to the same taxpayer'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  if tg_op in ('UPDATE', 'DELETE') then
+    linked_request := old.request_id;
+    linked_taxpayer := old.taxpayer_id;
+    if linked_request is not null then
+      update public.document_requests
+      set updated_at = clock_timestamp()
+      where id = linked_request and taxpayer_id = linked_taxpayer;
+    end if;
+  end if;
+
+  if tg_op in ('INSERT', 'UPDATE') then
+    linked_request := new.request_id;
+    linked_taxpayer := new.taxpayer_id;
+    if linked_request is not null then
+      update public.document_requests
+      set updated_at = clock_timestamp()
+      where id = linked_request and taxpayer_id = linked_taxpayer;
+    end if;
+  end if;
+
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end
+$$;
+
+revoke execute on function private.signal_firm_intake_document_change()
+  from public, anon, authenticated;
+
+drop trigger if exists documents_notify_firm_intake on public.documents;
+create trigger documents_notify_firm_intake
+after insert or update or delete on public.documents
+for each row execute function private.signal_firm_intake_document_change();
+
+comment on function private.signal_firm_intake_document_change() is
+  'Touches only the owning request after document changes, generating an organization-filterable Realtime event without broadcasting raw documents to other firms.';
