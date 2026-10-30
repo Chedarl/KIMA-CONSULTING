@@ -69,7 +69,11 @@ begin
   -- The row, read under the caller's own policy: a firm that cannot see this
   -- application gets no row and the same message as one that does not exist, so
   -- this cannot be used to discover another firm's queue.
-  select * into r from registrations where id = p_registration_id;
+  -- Serialize retries for one application: after a concurrent approver commits,
+  -- the waiting caller rereads the updated status and returns already_approved.
+  select * into r from registrations
+   where id = p_registration_id
+   for update;
   if r.id is null then
     raise exception 'no such application' using errcode = '42501';
   end if;
@@ -114,6 +118,11 @@ begin
   -- read. The firm is told to contact them, which is the same answer the
   -- onboarding wizard gives.
   if v_niu is not null then
+    -- Two different registration rows may declare the same NIU. The unique
+    -- taxpayer index blocks duplicates but used to fail the second request.
+    -- Lock the canonical NIU first, then re-check its owner after the wait.
+    perform pg_advisory_xact_lock(hashtextextended(
+      'kima:approval:niu:' || upper(btrim(v_niu)), 0));
     v_existing := taxpayer_id_for_niu(v_niu);
   end if;
 
