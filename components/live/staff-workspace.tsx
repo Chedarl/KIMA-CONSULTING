@@ -21,6 +21,7 @@ export type StaffLabels = {
   signIn: string;
   notPartner: string;
   empty: string;
+  loading: string;
   colPerson: string;
   colRole: string;
   colState: string;
@@ -71,20 +72,38 @@ export function StaffWorkspace({ labels }: { labels: StaffLabels }) {
   const [role, setRole] = useState<AssignableStaffRole>("firm_staff");
   useEffect(() => subscribeFirmSession(setSession), []);
   const load = useCallback(async () => {
+    // A saved UI session is not an authorization boundary. Resolve the signed-in
+    // member under RLS, then explicitly scope the roster to that member's firm.
+    setRows(null);
     setFailed(false);
-    const { data, error } = await supabase()
+    if (!session?.memberId) return;
+    const client = supabase();
+    const { data: self, error: selfError } = await client
+      .from("firm_members")
+      .select("organization_id")
+      .eq("id", session.memberId)
+      .maybeSingle();
+    if (selfError || !self?.organization_id) {
+      setFailed(true);
+      return;
+    }
+    const { data, error } = await client
       .from("firm_members")
       .select("id, person_label, role, active, deactivated_at")
+      .eq("organization_id", self.organization_id)
       .order("person_label");
     if (error) {
       setFailed(true);
       return;
     }
     setRows((data ?? []) as StaffMember[]);
-  }, []);
+  }, [session?.memberId]);
   useEffect(() => {
     void load();
   }, [load]);
+  // Null means not loaded, not an empty firm. Never display the empty-state
+  // until a scoped query succeeds.
+  const rosterLoading = !!session && rows === null && !failed;
   const isPartner = session?.role === "firm_partner";
   function roleLabel(value: FirmRole): string {
     if (value === "firm_staff") return labels.roleFirmStaff;
@@ -229,7 +248,9 @@ export function StaffWorkspace({ labels }: { labels: StaffLabels }) {
       )}
       <Card>
         <CardHeader title={labels.colPerson} />
-        {rows && rows.length === 0 ? (
+        {rosterLoading ? (
+          <p role="status" aria-busy="true" className="p-4 text-sm text-fg-muted">{labels.loading}</p>
+        ) : rows && rows.length === 0 ? (
           <p className="p-4 text-sm text-fg-muted">{labels.empty}</p>
         ) : (
           <ul className="divide-y divide-border">
