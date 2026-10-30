@@ -509,8 +509,20 @@ are about a transition rather than a row:
    taxpayer's acceptance it may authorise regardless, which is how a second firm joins.
 4. An engagement **never moves** between firms or taxpayers, and a revocation is final.
 
-`supabase/tests/engagement_grant_test.sql` holds 17 checks; ten fail without the
-migration. **The residual gap, stated rather than implied:** a firm can still open and
+A client's acceptance is narrow, and a firm cannot stand in for it
+(`20261030100000`, both found in review of #30 and both reproduced first). The
+`"client accepts engagements"` policy checked only that the new status was `accepted`,
+so one UPDATE could accept the engagement *and* rewrite `fee_xaf`, `assigned_to` or
+`authorized_at` — a client could reprice their own engagement and authorise it. The
+guard now allows a client to change `status` and `accepted_at` and nothing else. And a
+firm could write `status = 'accepted'` with `accepted_at` left null, so the record
+claimed a consent that never happened; `engagements_accepted_needs_a_date` is a CHECK
+rather than guard logic, so it binds the service role and migrations too. `'authorized'`
+carries no such requirement, and that asymmetry is deliberate: a firm may authorise
+alone for a taxpayer no other firm holds.
+
+`supabase/tests/engagement_grant_test.sql` holds 22 checks; ten fail without
+`20261030070000` and four more without `20261030100000`. **The residual gap, stated rather than implied:** a firm can still open and
 authorise an engagement against a taxpayer that *no* firm holds, without consent. It
 cannot learn such a taxpayer's id through the API — it reads no taxpayer it has no
 engagement for — so it would have to guess a UUID, but the gap is real and only the phase
