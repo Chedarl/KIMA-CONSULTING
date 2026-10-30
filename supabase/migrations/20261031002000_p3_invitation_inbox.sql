@@ -1,5 +1,9 @@
 -- Phase 3 draft: authenticated, company-scoped invitation inbox.
 -- UUID identifies the invitation, but never authorizes acceptance by itself.
+-- Draft/invited engagements have not yet been authorised. The original
+-- 20261021031500 schema made this timestamp NOT NULL; remove that legacy
+-- restriction explicitly so a draft cannot acquire a fabricated authorisation.
+alter table public.engagements alter column authorized_at drop not null;
 create table public.engagement_invitations (
   id uuid primary key default gen_random_uuid(),
   direction text not null check (direction in ('firm_to_taxpayer','taxpayer_to_firm')),
