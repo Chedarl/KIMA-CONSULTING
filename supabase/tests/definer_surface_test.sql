@@ -67,7 +67,7 @@ select is(
   'create_invitation_for_contact_internal, create_invitation_internal, '
   'current_firm_role, current_member_id, current_member_label, '
   'current_member_org, decide_invitation_internal, demo_taxpayer_id, engagements_grant_guard, '
-  'firm_member_has, flag_enabled, member_has, '
+  'firm_member_has, flag_enabled, guard_client_invite_authorization, member_has, '
   'member_has_in_org, portal_request_code, signal_firm_intake_document_change, '
   'taxpayer_held_by_another_firm, taxpayer_id_for_niu',
   'T-52 every moved helper is in private, and nothing else is'
