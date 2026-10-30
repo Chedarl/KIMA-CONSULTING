@@ -134,6 +134,15 @@ $$;
 -- it here, which is the whole of what that risk left open. A suspended firm
 -- leaves the directory: it cannot work, so offering it as a choice would be a
 -- dead end rather than a disclosure.
+--
+-- AND `kind = 'firm'`, which R-55 should have had and did not. Production's one
+-- organisation is KIMA's own tenant, `kind = 'kima'`, so the lookup as shipped
+-- offered the vendor to visitors as an accounting firm they could engage. Not a
+-- disclosure -- the name is on the front page -- but wrong, and wrong in a way
+-- that only shows up against real rows: nothing in the app reads `kind`, which
+-- is why reading the code did not catch it. `kind` itself is unconstrained free
+-- text with two values in use; a CHECK over it is a separate change and not one
+-- to invent here, since some path may write a third.
 -- Dropped and re-created rather than replaced: CREATE OR REPLACE cannot change
 -- a function's return type, and this one gains a column.
 drop function if exists public.firm_directory();
@@ -148,13 +157,16 @@ as $$
   select o.id, o.name, o.verification_status
     from organizations o
    where o.suspended_at is null
+     and o.kind = 'firm'
    order by o.name
 $$;
 
 comment on function public.firm_directory() is
-  'Every working firm''s id, name and verification label, and nothing else, to '
-  'anyone -- the one public route to a firm''s name now that the whole record '
-  'is readable only inside the firm. Suspended firms are absent. SECURITY '
+  'Every working accounting firm''s id, name and verification label, and '
+  'nothing else, to anyone -- the one public route to a firm''s name now that '
+  'the whole record is readable only inside the firm. Suspended firms are '
+  'absent, and so is any organisation that is not kind ''firm'': KIMA''s own '
+  'tenant is not a firm a client may engage. SECURITY '
   'DEFINER because the table''s policies deliberately refuse anon; narrow by '
   'construction: no arguments, no writes, three columns. R-55, R-57.';
 

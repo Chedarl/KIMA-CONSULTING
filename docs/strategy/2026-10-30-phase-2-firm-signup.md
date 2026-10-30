@@ -114,11 +114,14 @@ a qualified expert-comptable". The wording is Agent B's and needs both locales.
    `member_has_in_org()`. T-145 .. T-152; four of them fail with the columns present and the
    helpers unwired, which is the trap this step existed to avoid.
 3. The sign-up code path, once (1) above is decided.
-4. `sign_up_firm()` — one function, `SECURITY INVOKER`, atomic, requires the number,
-   writes the audit entry. **Blocked on two owner rules**, both with a cost to guessing:
-   what the registration number's **format** is (it cannot be invented — `CLAUDE.md` requires
-   a legal source, and no ONECCA numbering is on file), and what counts as a **look-alike
-   firm name** (a normalised exact match is deterministic and explainable; a similarity
-   threshold refuses real firms).
+4. `sign_up_firm()` — one function, atomic, requires the number, writes the audit entry.
+   **The owner's two rules, 30 Oct, so this is unblocked:** the registration number gets a
+   **hygiene check only** (required, normalised, unique, non-blank, sane length and character
+   set), labelled as hygiene rather than an ONECCA rule, with the real format to follow once
+   sourced; and a **look-alike name is a normalised exact match with legal forms stripped** —
+   case, accents, punctuation and spacing folded, then SARL, SA, Cabinet, & Associés and
+   similar removed, so "Cabinet Atangana SARL" collides with "Atangana SA". The accepted cost
+   is that two real firms sharing a family name will be refused, so the refusal must point the
+   person to KIMA rather than just say no.
 5. The application form becomes the sign-up form, behind the flag.
 6. The flag flips last, and only after the end-to-end check passes.

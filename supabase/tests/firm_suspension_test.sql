@@ -1,4 +1,4 @@
--- T-145 .. T-152: a suspended firm stops working (R-57).
+-- T-145 .. T-153: a suspended firm stops working (R-57).
 --
 -- `suspended_at` on `organizations` changes nothing by itself. Every
 -- tenant-scoped policy in the product asks `private.member_has()`,
@@ -13,7 +13,8 @@
 -- four helpers, each read through the product's own path rather than called
 -- directly. T-150 is the client's side, which must be untouched: suspending a
 -- firm is a sanction on the firm, not on the taxpayer's access to their own
--- file. T-151 is the other firm, unaffected. T-152 is the public directory.
+-- file. T-151 is the other firm, unaffected. T-152 and T-153 are the public
+-- directory.
 --
 -- Run with `supabase test db` (pgTAP). Synthetic data only; rolled back.
 
@@ -21,7 +22,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(8);
+select plan(9);
 
 -- Two firms, each with a partner and an engaged client. Firm J is then
 -- suspended and Firm K is not, so every assertion has its own control.
@@ -33,6 +34,12 @@ insert into auth.users (id, email) values
 insert into organizations (id, name, registration_number) values
   ('00000000-0000-4000-c000-00000000a010', 'Firm J', 'ONECCA-J-1'),
   ('00000000-0000-4000-c000-00000000a011', 'Firm K', 'ONECCA-K-1');
+
+-- KIMA's own tenant, which is what production actually holds: one organisation,
+-- kind 'kima'. T-153 is here because the directory as R-55 shipped it offered
+-- this row to visitors as a firm they could engage.
+insert into organizations (id, name, kind) values
+  ('00000000-0000-4000-c000-00000000a012', 'Kima Consulting Test', 'kima');
 
 insert into taxpayers (id, legal_name) values
   ('00000000-0000-4000-c000-00000000a020', 'Client of Firm J'),
@@ -171,6 +178,16 @@ select is(
      from public.firm_directory()),
   'Firm K=unverified',
   'T-152 the directory shows working firms with their label, and drops suspended ones'
+);
+
+-- T-153 and the vendor's own tenant is not a firm a client may engage. Nothing
+-- in the app reads `kind`, which is why reading the code did not catch this and
+-- looking at the one real row did.
+select is(
+  (select count(*) from public.firm_directory()
+    where id = '00000000-0000-4000-c000-00000000a012'),
+  0::bigint,
+  'T-153 an organisation that is not kind ''firm'' is not in the directory'
 );
 reset role;
 
