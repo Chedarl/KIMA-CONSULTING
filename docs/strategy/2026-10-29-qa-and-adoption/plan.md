@@ -234,12 +234,28 @@ Order: 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7. Track B runs in parallel onc
 **Depends on:** nothing.
 **Out of scope:** any feature work.
 
-**Phase 0 done 29 Oct 2026** (branch `agent-a/phase-0-truth-reset`), with two caveats:
-the seed **has not been reviewed yet** — it is written and schema-checked but never run,
-because `supabase/seed/synthetic.sql` refuses to run without an explicit session flag and
-no local database was available; and the Supabase MCP server was unreachable this session
-(DNS), so the "docs match the database" half of the exit rests on this document's own
-29 Oct figures rather than a fresh query. Backlog IDs PH0-1…PH0-6.
+**Phase 0 done 29 Oct 2026** (branch `agent-a/phase-0-truth-reset`). Backlog IDs
+PH0-1…PH0-6.
+
+**Seed reviewed 30 Oct 2026**, which was the one exit criterion still open, and it
+found three defects, now fixed:
+
+- Storage paths were shaped `taxpayers/<id>/...`. `storage_path_taxpayer(name)` reads
+  the *first* segment and returns null for anything that is not a bare UUID, so
+  `can_see_taxpayer(null)` is null and the file would have been unreadable by the client
+  who uploaded it and by their own firm. The path now starts with the taxpayer id.
+- No member or contact was bound to an `auth.users` row. `member_has()` and
+  `can_see_taxpayer()` answer for `auth.uid()`, so the two firms existed and nobody
+  could act as them, which is most of what the seed is for. All six now have sign-ins.
+- The document rows had no files behind them. Object bytes live in the storage service,
+  not in Postgres, so a SQL seed cannot put them there; `npm run seed:storage`
+  (`scripts/seed-storage.mjs`) uploads a generated one-page PDF per seeded document and
+  writes the real `byte_size` and `sha256` back onto the row.
+
+The database half of the exit was re-checked against the live project on 30 Oct through
+the Supabase MCP server, which was unreachable on 29 Oct: 1 organisation, 3 firm members
+all with `organization_id` null, 1 registration with no organisation, 1 authorized
+engagement. The figures in this document hold.
 
 ### Phase 1: Security and per-firm isolation (blocks launch)
 

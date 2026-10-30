@@ -237,6 +237,41 @@ waiting period before `disputed`; no next action or prototype string shows a
 number of days). Each check counts its own assertions and fails if none ran.
 CI runs it on every push (`.github/workflows/ci.yml`, Agent A's).
 
+### Two synthetic tenants
+
+Isolation cannot be asserted against one tenant, so there is a seed that creates
+two. It is **not** a migration and must never be moved into
+`supabase/migrations/`, because CI applies that directory to production on every
+push to `main`. It refuses to run without an explicit session setting, and every
+name, NIU and amount in it is invented.
+
+```bash
+psql "$LOCAL_DATABASE_URL" \
+  -c "set kima.allow_synthetic_seed = 'yes'" \
+  -f supabase/seed/synthetic.sql
+
+KIMA_ALLOW_SYNTHETIC_SEED=yes npm run seed:storage
+```
+
+Two firms, two taxpayers, an engagement each and no cross link; cases, requests,
+one uploaded document, messages and the `case_events` history behind them. Every
+member and contact is bound to an `auth.users` row, because `member_has()` and
+`can_see_taxpayer()` answer for `auth.uid()`: without that binding the firms
+exist and nobody can act as them. The addresses are `@example.invalid`, which
+cannot receive mail, so signing in through the browser needs a local stack with
+`KIMA_DEMO_OTP_REVEAL=1` or a real address put in place of one of them.
+
+The second command is separate because object bytes live in the storage service,
+not in Postgres: `scripts/seed-storage.mjs` uploads a generated one-page PDF per
+seeded document and writes the real `byte_size` and `sha256` back onto the row.
+Storage paths start with the taxpayer id and have to —
+`storage_path_taxpayer(name)` reads the first segment, and anything else makes
+the file unreadable to the client who uploaded it and to their own firm.
+
+None of this proves the upload loop. No client has yet put a file there through
+the UI; that is phase 5 of
+`docs/strategy/2026-10-29-qa-and-adoption/plan.md`.
+
 ### Verifying UI
 
 `tsc` and `next build` green, then check both locales at 375 / 768 / 1024 /

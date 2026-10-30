@@ -17,15 +17,29 @@
 -- No real taxpayer, firm or person is represented. Plan safety rule 1: no real
 -- taxpayer data until phases 1, 2 and 7 are complete and the owner approves.
 --
--- It does NOT create storage objects. The rows in `documents` carry a
--- storage_path that points at nothing, so this seed does not and cannot prove
--- the upload loop works — that is phase 5 (PH5-1/PH5-2), and the loop is still
--- unverified end to end.
+-- SIGN-INS. Every member and contact is bound to an `auth.users` row, because
+-- `member_has()` and `can_see_taxpayer()` answer for `auth.uid()`: without the
+-- binding the seeded firms exist but nobody can act as them, and the isolation
+-- rules cannot be exercised from a session at all. The addresses are
+-- `@example.invalid`, a reserved domain that cannot receive mail, so a sign-in
+-- through the browser needs either a local stack with `demo_otp_reveal` on or a
+-- real address put in place of one of these. The binding below is what a
+-- successful `/api/firm/verify-code` would have written.
+--
+-- STORAGE. This file creates no storage object: object bytes live in the
+-- storage service, not in Postgres, and a `storage.objects` row with nothing
+-- behind it is a worse lie than an empty bucket. `npm run seed:storage` uploads
+-- a real (tiny, generated) PDF for every seeded document path and lets the
+-- storage service create its own row. Until that is run, `documents.storage_path`
+-- points at nothing. Either way the upload loop itself is still unproven: the
+-- client has never put a file there through the UI, which is phase 5
+-- (PH5-1/PH5-2).
 --
 -- USAGE
 --   psql "$LOCAL_DATABASE_URL" \
 --     -c "set kima.allow_synthetic_seed = 'yes'" \
 --     -f supabase/seed/synthetic.sql
+--   npm run seed:storage        # real files behind the document rows
 --
 -- Idempotent: fixed UUIDs and `on conflict do nothing` throughout, so running
 -- it twice changes nothing.
@@ -43,6 +57,41 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- Sign-ins. Inserted directly, which only a local or preview stack tolerates:
+-- on a hosted project this is the service role writing into `auth`, and the
+-- seed's guard above is the only thing standing between that and production.
+--
+-- `email_confirmed_at` is set because the real flow confirms on creation
+-- (`mintAuthSession` passes `email_confirm: true`), and an unconfirmed user
+-- cannot exchange a magic link. Firm members and contacts get separate users
+-- on purpose: `auth_identity_is_single` refuses one sign-in that is both.
+-- ---------------------------------------------------------------------------
+
+insert into auth.users
+  (instance_id, id, aud, role, email, email_confirmed_at,
+   raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values
+  ('00000000-0000-0000-0000-000000000000', '5e5d0000-0000-4000-8000-00000000af10',
+   'authenticated', 'authenticated', 'partner.a@example.invalid',  now(),
+   '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '5e5d0000-0000-4000-8000-00000000af11',
+   'authenticated', 'authenticated', 'staff.a@example.invalid',    now(),
+   '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '5e5d0000-0000-4000-8000-00000000bf10',
+   'authenticated', 'authenticated', 'partner.b@example.invalid',  now(),
+   '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '5e5d0000-0000-4000-8000-00000000bf11',
+   'authenticated', 'authenticated', 'reviewer.b@example.invalid', now(),
+   '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '5e5d0000-0000-4000-8000-00000000af30',
+   'authenticated', 'authenticated', 'marie@example.invalid',      now(),
+   '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '5e5d0000-0000-4000-8000-00000000bf30',
+   'authenticated', 'authenticated', 'joseph@example.invalid',     now(),
+   '{"provider":"email","providers":["email"]}', '{}', now(), now())
+on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- Two firms. The whole point of the seed: isolation is not testable with one.
 -- ---------------------------------------------------------------------------
 
@@ -51,16 +100,21 @@ insert into organizations (id, name, kind, country) values
   ('5e5d0000-0000-4000-8000-00000000b001', 'Fiduciaire du Wouri (SYNTHETIC)',          'firm', 'CM')
 on conflict (id) do nothing;
 
--- Members. `person_label` is the join until auth is wired (see firm_members).
-insert into firm_members (id, organization_id, person_label, email, role, active) values
+-- Members, each bound to its sign-in. `auth_user_id` is the column every
+-- permission check reads through; `person_label` is only what a screen prints.
+insert into firm_members (id, organization_id, person_label, email, role, active, auth_user_id) values
   ('5e5d0000-0000-4000-8000-00000000a010', '5e5d0000-0000-4000-8000-00000000a001',
-   'SYNTH A — Partner Atangana',  'partner.a@example.invalid',  'firm_partner',  true),
+   'SYNTH A — Partner Atangana',  'partner.a@example.invalid',  'firm_partner',  true,
+   '5e5d0000-0000-4000-8000-00000000af10'),
   ('5e5d0000-0000-4000-8000-00000000a011', '5e5d0000-0000-4000-8000-00000000a001',
-   'SYNTH A — Staff Ngono',       'staff.a@example.invalid',    'firm_staff',    true),
+   'SYNTH A — Staff Ngono',       'staff.a@example.invalid',    'firm_staff',    true,
+   '5e5d0000-0000-4000-8000-00000000af11'),
   ('5e5d0000-0000-4000-8000-00000000b010', '5e5d0000-0000-4000-8000-00000000b001',
-   'SYNTH B — Partner Dikongue',  'partner.b@example.invalid',  'firm_partner',  true),
+   'SYNTH B — Partner Dikongue',  'partner.b@example.invalid',  'firm_partner',  true,
+   '5e5d0000-0000-4000-8000-00000000bf10'),
   ('5e5d0000-0000-4000-8000-00000000b011', '5e5d0000-0000-4000-8000-00000000b001',
-   'SYNTH B — Reviewer Essomba',  'reviewer.b@example.invalid', 'firm_reviewer', true)
+   'SYNTH B — Reviewer Essomba',  'reviewer.b@example.invalid', 'firm_reviewer', true,
+   '5e5d0000-0000-4000-8000-00000000bf11')
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -85,11 +139,13 @@ insert into engagements (id, organization_id, taxpayer_id, status) values
 on conflict (organization_id, taxpayer_id) do nothing;
 
 -- Contacts, their link to the file, and the portal account that signs in.
-insert into contacts (id, organization_id, full_name, email, phone) values
+insert into contacts (id, organization_id, full_name, email, phone, auth_user_id) values
   ('5e5d0000-0000-4000-8000-00000000a300', '5e5d0000-0000-4000-8000-00000000a001',
-   'SYNTH Belinga Marie', 'marie@example.invalid', '+237600000001'),
+   'SYNTH Belinga Marie', 'marie@example.invalid', '+237600000001',
+   '5e5d0000-0000-4000-8000-00000000af30'),
   ('5e5d0000-0000-4000-8000-00000000b300', '5e5d0000-0000-4000-8000-00000000b001',
-   'SYNTH Mboa Joseph',   'joseph@example.invalid', '+237600000002')
+   'SYNTH Mboa Joseph',   'joseph@example.invalid', '+237600000002',
+   '5e5d0000-0000-4000-8000-00000000bf30')
 on conflict (id) do nothing;
 
 insert into contact_account_links (id, contact_id, taxpayer_id, relationship, portal_access, notifications) values
@@ -152,14 +208,21 @@ insert into document_requests (id, taxpayer_id, organization_id, label_fr, label
    'requested', 'taxpayer', date '2026-10-06')
 on conflict (id) do nothing;
 
--- review_status stays 'pending'. storage_path points at NOTHING: no storage
--- object is created here (see the header). Phase 5 proves the real loop.
+-- review_status stays 'pending': received is not accepted (plan rule 3).
+--
+-- The path's first segment is the taxpayer id, and it has to be. Storage reads
+-- go through `storage_path_taxpayer(name)`, which reads segment 1 and returns
+-- null for anything that is not a bare UUID; `can_see_taxpayer(null)` is null,
+-- so a path shaped `taxpayers/<id>/...` would be unreadable by the client who
+-- uploaded it and by their own firm. The earlier draft of this seed had that
+-- shape. `byte_size` is what `npm run seed:storage` actually uploads, so the
+-- row and the file agree.
 insert into documents (id, request_id, taxpayer_id, file_name, storage_path, byte_size, mime_type, uploaded_by, arrived_via, review_status) values
   ('5e5d0000-0000-4000-8000-00000000a700', '5e5d0000-0000-4000-8000-00000000a600',
    '5e5d0000-0000-4000-8000-00000000a100',
    'releve-septembre-2026.pdf',
-   'taxpayers/5e5d0000-0000-4000-8000-00000000a100/releve-septembre-2026.pdf',
-   184320, 'application/pdf', 'taxpayer', 'upload', 'pending')
+   '5e5d0000-0000-4000-8000-00000000a100/releve-septembre-2026.pdf',
+   null, 'application/pdf', 'taxpayer', 'upload', 'pending')
 on conflict (id) do nothing;
 
 insert into messages (id, taxpayer_id, organization_id, request_id, sender, sender_name, body) values
@@ -213,7 +276,9 @@ commit;
 
 -- What this seed deliberately does NOT contain, so nobody reads its presence
 -- as proof the feature works:
---   * no storage object           — phase 5 (PH5-1, PH5-2)
+--   * no storage object from SQL  — `npm run seed:storage` puts real bytes
+--                                   behind the document row; the upload loop
+--                                   itself is still phase 5 (PH5-1, PH5-2)
 --   * no invitation row           — phase 3 (PH3-1); workspace_invites stays empty
 --   * no incident row             — phase 6 (P1-2); the tables do not exist yet
 --   * no second member in one org — phase 2 (PH2-2) adds team invitations
