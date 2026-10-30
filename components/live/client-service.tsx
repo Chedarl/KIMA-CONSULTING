@@ -58,6 +58,7 @@ export function ClientService({
   const [failed, setFailed] = useState<string | null>(null);
   const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
   const [name, setName] = useState("");
+  const [clientApproved, setClientApproved] = useState(false);
   const copy = usePortalCopy();
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<string | null>(null);
@@ -87,7 +88,7 @@ export function ClientService({
         return;
       }
       const kase = data as ComplianceCase;
-      const [rq, ev, tp] = await Promise.all([
+      const [rq, ev, tp, consent] = await Promise.all([
         db
           .from("document_requests")
           .select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count")
@@ -101,8 +102,13 @@ export function ClientService({
           .eq("case_id", caseId)
           .order("occurred_at", { ascending: false }),
         db.from("taxpayers").select("legal_name").eq("id", kase.taxpayer_id).maybeSingle(),
+        db.from("case_client_approvals").select("case_id")
+          .eq("case_id", caseId).eq("approval_round", kase.approval_round)
+          .maybeSingle(),
       ]);
+      if (consent.error) throw consent.error;
       setRow(kase);
+      setClientApproved(Boolean(consent.data));
       setRequests((rq.data ?? []) as CaseRequest[]);
       setEvents((ev.data ?? []) as CaseEvent[]);
       setName((tp.data as { legal_name?: string } | null)?.legal_name ?? "");
@@ -160,6 +166,29 @@ export function ClientService({
     }
     setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: "submitted" } : r)));
     void load();
+  }
+
+  async function approveCase() {
+    if (!row || !ids || row.stage !== "client_approval" || clientApproved) return;
+    setBusy("client-approval");
+    setFailed(null);
+    const db = supabase();
+    try {
+      const { data: auth, error: authError } = await db.auth.getUser();
+      if (authError || !auth.user) throw new Error("Sign-in required");
+      const { error } = await db.from("case_client_approvals").insert({
+        case_id: row.id, approval_round: row.approval_round,
+        taxpayer_id: ids.taxpayerId, filing_evidence_ref: row.filing_evidence_ref,
+        approved_by: auth.user.id,
+      });
+      if (error) throw error;
+      setClientApproved(true);
+      await load();
+    } catch {
+      setFailed("client-approval");
+    } finally {
+      setBusy(null);
+    }
   }
 
   if (row === undefined) {
@@ -236,6 +265,29 @@ export function ClientService({
           <p className="mt-2 text-xs leading-snug text-fg-subtle">{t.notAFiling}</p>
         </div>
       </section>
+
+      {row.stage === "client_approval" && (
+        <section className="rounded-card border border-border bg-surface px-4 py-4">
+          <h3 className="font-display text-base font-semibold">
+            {locale === "fr" ? "Validation du client" : "Client approval"}
+          </h3>
+          <p className="mt-2 text-sm text-fg-muted">
+            {clientApproved
+              ? (locale === "fr" ? "Validation enregistrée pour ce dépôt." : "Approval recorded for this filing.")
+              : (locale === "fr"
+                ? "Vérifiez la preuve de dépôt ci-dessus avant de confirmer."
+                : "Review the filing evidence above before confirming.")}
+          </p>
+          {!clientApproved && <div className="mt-3">
+            <PrimaryButton onClick={() => void approveCase()} disabled={busy === "client-approval"}>
+              {locale === "fr" ? "Confirmer la validation" : "Confirm approval"}
+            </PrimaryButton>
+          </div>}
+          {failed === "client-approval" && <p role="alert" className="mt-2 text-sm text-danger-text">
+            {locale === "fr" ? "Validation refusée. Vérifiez votre session et réessayez." : "Approval refused. Check your session and try again."}
+          </p>}
+        </section>
+      )}
 
       <section className="rounded-card border border-border bg-surface">
         <h3 className="border-b border-border px-4 py-3 font-display text-base font-semibold">{t.requests}</h3>
