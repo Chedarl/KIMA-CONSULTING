@@ -1,16 +1,4 @@
--- T-240 .. T-252: approving an application is one act (phase 2, item 3).
---
--- `approve_registration()` writes six things in one transaction -- the
--- taxpayer, its authorised engagement, the contact, the account link, a
--- pending portal account and the decision on the registration row -- plus the
--- audit entry. The assertions come in four groups:
---
---   T-240 .. T-243  who may approve, and who may not
---   T-244 .. T-248  what one approval produced, row by row
---   T-249 .. T-250  what it deliberately did NOT produce: portal ACCESS
---   T-251 .. T-254  the two outcomes that are not an approval
---   T-255 .. T-256  an application with no NIU, which gets no portal row
---
+-- Phase 2 registration approval: 17 synthetic tenant and security assertions.
 -- Run with `supabase test db` (pgTAP). Synthetic data only; rolled back.
 
 begin;
@@ -19,9 +7,7 @@ set search_path = public, extensions;
 
 select plan(17);
 
--- Two firms, each with a partner. Firm P has three applications: a plain one, a
--- second whose declared NIU is already registered elsewhere, and one with no
--- NIU at all.
+-- Two independent firms; all fixtures roll back.
 insert into auth.users (id, email) values
   ('00000000-0000-4000-9100-00000000a001', 'partner-p@approve.test'),
   ('00000000-0000-4000-9100-00000000a002', 'partner-q@approve.test');
@@ -38,7 +24,6 @@ insert into firm_members (id, organization_id, person_label, email, role, auth_u
    'Partner Q', 'partner-q@approve.test', 'firm_partner',
    '00000000-0000-4000-9100-00000000a002');
 
--- A client Firm Q already holds, with a NIU. T-251 applies to Firm P with it.
 insert into taxpayers (id, legal_name, niu) values
   ('00000000-0000-4000-9100-00000000a030', 'Already With Q', 'P0AAAAAAAAAAA1');
 insert into engagements (organization_id, taxpayer_id, status, authorized_at) values
@@ -61,9 +46,7 @@ values
    'No Niu Applicant', 'noniu@applicant.test', null,
    'individual', null, null, null, null, 'en', '{}'::jsonb);
 
--- ---------------------------------------------------------------------------
--- Who may approve.
--- ---------------------------------------------------------------------------
+-- Deny anonymous approval and cross-firm access before accepting a valid owner.
 select set_config('request.jwt.claims', '', true);
 set local role anon;
 
@@ -79,16 +62,14 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-9100-00000000a002","role":"authenticated"}', true);
 
--- T-241 the other firm's partner. The row is unreadable to them, so they get
--- the same answer as for an application that does not exist -- the message must
--- not confirm that somebody else has one.
+-- T-241
 select throws_ok(
   $$ select * from approve_registration('00000000-0000-4000-9100-00000000a040') $$,
   '42501', 'no such application',
   'T-241 another firm cannot approve, and is not told the application exists'
 );
 
--- T-242 and nothing was created by the attempt.
+-- T-242
 select is(
   (select count(*) from taxpayers where legal_name = 'Boulangerie Awa SARL'),
   0::bigint,
@@ -96,9 +77,6 @@ select is(
 );
 reset role;
 
--- ---------------------------------------------------------------------------
--- One approval, by the firm that owns the application.
--- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-9100-00000000a001","role":"authenticated"}', true);
@@ -111,8 +89,7 @@ select is(
   'T-243 the firm that owns the application approves it'
 );
 
--- T-244 the taxpayer, carrying what the application declared -- and never
--- profile_verified, which is a reviewer's finding and not a form field.
+-- T-244
 select is(
   (select t.legal_name || ' / ' || t.niu || ' / ' || t.tax_regime || ' / ' ||
           t.profile_verified::text
@@ -123,8 +100,7 @@ select is(
   'T-244 the client file carries the declared details, unverified'
 );
 
--- T-245 the engagement: authorised, in the approver's own firm, no consent
--- claimed. accepted_at stays null -- only the taxpayer writes that.
+-- T-245
 select is(
   (select e.organization_id::text || ' / ' || e.status || ' / ' ||
           case when e.accepted_at is null then 'unaccepted' else 'ACCEPTED' end
@@ -135,8 +111,7 @@ select is(
   'T-245 with an authorised engagement in the approver''s firm, no consent claimed'
 );
 
--- T-246 the contact and the link, which together are the client's own route in:
--- private.client_taxpayer_ids() walks exactly this pair.
+-- T-246
 select is(
   (select c.full_name || ' / ' || c.email || ' / ' || l.relationship || ' / ' ||
           l.portal_access::text
@@ -148,8 +123,7 @@ select is(
   'T-246 and the contact and account link that give the client their route in'
 );
 
--- T-247 the decision on the registration row. approval_has_a_file and
--- decision_is_recorded both bind here, so a missing field would have raised.
+-- T-247
 select is(
   (select g.status::text || ' / ' || g.decided_by || ' / ' ||
           (g.decided_at is not null)::text || ' / ' || g.decision_note
@@ -158,24 +132,20 @@ select is(
   'T-247 and the decision recorded against the application'
 );
 
--- T-248 and the audit entry, in the same transaction.
+-- T-248
 select is(
   (select a.action || ' / ' || (a.after ->> 'portal_account')
      from audit_events a
      join registrations g on g.taxpayer_id = a.taxpayer_id
     where g.id = '00000000-0000-4000-9100-00000000a040'
       and a.action = 'registration.approved'),
+-- Audit records a pending account, not an activated client portal login.
   'registration.approved / pending',
   'T-248 and one audit entry naming what the portal account is'
 );
 
--- ---------------------------------------------------------------------------
--- What approval deliberately does not do.
--- ---------------------------------------------------------------------------
 
--- T-249 the portal account exists and is PENDING. Activating sign-in asserts
--- that this person holds this identifier, and a firm clicking approve is not
--- that. Phase 3 owns invitations.
+-- T-249
 select is(
   (select p.status || ' / ' || p.identifier
      from portal_accounts p
@@ -186,9 +156,7 @@ select is(
 );
 reset role;
 
--- T-250 and so no code can be issued against it. This is the assertion that
--- would catch "pending" being quietly changed to "active": the product refuses
--- the account, so approval grants no access.
+-- T-250
 select set_config('request.jwt.claims', '', true);
 select is(
   (select ok from private.portal_request_code('Awa Nkeng', 'P0BBBBBBBBBBB2')),
@@ -196,27 +164,18 @@ select is(
   'T-250 and the portal refuses it, so approval grants no access'
 );
 
--- ---------------------------------------------------------------------------
--- The two outcomes that are not an approval.
--- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-9100-00000000a001","role":"authenticated"}', true);
 
--- T-251 a declared NIU another firm already holds. Messier spelling on purpose,
--- so the normalisation is under test too.
---
--- Three statements, not one. A scalar subquery alongside a data-modifying
--- function reads the snapshot taken when the statement began, so folding these
--- together reported the row as it was BEFORE the call -- the first draft of this
--- test failed for exactly that reason and the function was right.
+-- T-251
 select is(
   (select outcome from approve_registration('00000000-0000-4000-9100-00000000a041')),
   'already_registered',
   'T-251 a known NIU is routed to ask, not approved'
 );
 
--- T-252 and the application is left open, with a note, rather than decided.
+-- T-252
 select is(
   (select g.status::text || ' / ' ||
           (g.decision_note is not null)::text || ' / ' ||
@@ -227,10 +186,7 @@ select is(
 );
 reset role;
 
--- T-253 and one NIU is still one client. Read as the table owner rather than as
--- Firm P: Firm P cannot see Firm Q's taxpayer at all, so asking this under RLS
--- would answer 0 whether a duplicate existed or not -- which is how the first
--- draft of this test managed to look like a pass waiting to happen.
+-- T-253
 select is(
   (select count(*) from taxpayers where upper(btrim(niu)) = 'P0AAAAAAAAAAA1'),
   1::bigint,
@@ -241,8 +197,7 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-9100-00000000a001","role":"authenticated"}', true);
 
--- T-252 approving twice returns the same file rather than raising, so a double
--- click is not an error and never a second taxpayer.
+-- T-252
 select is(
   (select outcome || ' / ' || (taxpayer_id = (
      select g.taxpayer_id from registrations g
@@ -252,23 +207,16 @@ select is(
   'T-254 approving twice returns the same client file'
 );
 
--- ---------------------------------------------------------------------------
--- An application with no declared NIU.
--- ---------------------------------------------------------------------------
--- portal_accounts.identifier IS the NIU, NOT NULL and UNIQUE, and an
--- application may legitimately arrive without one. No row rather than a
--- placeholder: a blank or invented identifier would either collide with the
--- next one or sit in the table looking like an account.
 
 -- T-255
 select is(
   (select outcome from approve_registration('00000000-0000-4000-9100-00000000a042')),
   'approved',
+-- An application without NIU cannot invent a portal identifier.
   'T-255 an application with no NIU is still approved'
 );
 
--- T-256 with the client file and its engagement, but no portal account, and the
--- audit entry says which rather than leaving it to be inferred.
+-- T-256
 select is(
   (select (select count(*) from portal_accounts p
             where p.taxpayer_id = g.taxpayer_id)::text || ' portal rows / ' ||
