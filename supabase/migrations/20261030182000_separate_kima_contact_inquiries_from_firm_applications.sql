@@ -48,7 +48,7 @@ create policy "only KIMA administrators view general inquiries"
   using (exists (
     select 1 from public.firm_members fm
     join public.organizations o on o.id = fm.organization_id
-    where fm.auth_user_id = (select auth.uid())
+    where fm.id = (select private.current_member_id())
       and fm.role = 'kima_admin'::public.firm_role
       and fm.active and o.kind = 'kima' and o.suspended_at is null
   ));
