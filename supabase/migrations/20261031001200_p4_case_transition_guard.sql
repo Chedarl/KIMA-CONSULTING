@@ -48,6 +48,11 @@ begin
       raise exception 'illegal case stage transition' using errcode = '23514';
     end if;
 
+    if new.stage = 'client_approval' then
+      -- Each return/re-review creates a fresh consent requirement.
+      new.approval_round := old.approval_round + 1;
+    end if;
+
     if new.stage = 'client_approval' and (
       new.filing_status <> 'verified'
       or nullif(btrim(new.filing_evidence_ref), '') is null
@@ -60,10 +65,17 @@ begin
     if new.stage = 'delivered' and not exists (
       select 1 from public.case_client_approvals a
        where a.case_id = old.id and a.taxpayer_id = old.taxpayer_id
+         and a.approval_round = old.approval_round
+         and a.filing_evidence_ref = new.filing_evidence_ref
     ) then
       raise exception 'authenticated client consent required before delivery'
         using errcode = '23514';
     end if;
+  end if;
+
+  -- A caller cannot create or rewind approval rounds through direct UPDATE.
+  if not (new.stage = 'client_approval' and old.stage <> 'client_approval') then
+    new.approval_round := old.approval_round;
   end if;
 
   -- Enforce verified filing even on same-stage updates or direct SQL writes.
