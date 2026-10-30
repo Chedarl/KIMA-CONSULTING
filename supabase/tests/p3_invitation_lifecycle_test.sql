@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path=public,extensions;
-select plan(13);
+select plan(14);
 
 insert into auth.users(id,email) values
  ('00000000-0000-4000-a000-00000000e901','p3-firm-a@example.test'),
@@ -99,11 +99,20 @@ select is(
  (select status from engagements where organization_id='00000000-0000-4000-a000-00000000e912'
  and taxpayer_id='00000000-0000-4000-a000-00000000e921'),
  'invited','P3 taxpayer invitation does not yet authorize firm B');
+-- Admin-level direct updates still cannot bypass the invitation's decision.
+-- auth.uid remains the recipient firm for the invoker grant guard.
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-a000-00000000e902","role":"authenticated"}',true);
+select throws_ok(
+ $sql$ update engagements set status='authorized', authorized_at=now()
+ where organization_id='00000000-0000-4000-a000-00000000e912'
+   and taxpayer_id='00000000-0000-4000-a000-00000000e921' $sql$,
+ '42501',null,'P3 pending client invitation cannot be converted to a grant');
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e902","role":"authenticated"}',true);
 select lives_ok(
- $$ select decide_invitation(
+ $ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e912' limit 1),
  'accepted') $$,'P3 recipient firm may accept mandate');
