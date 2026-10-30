@@ -208,9 +208,11 @@ const fr = {
       required: "Champ obligatoire",
       created: "Dossier ouvert",
       // Ne nomme pas le cabinet qui suit déjà ce client : les cabinets restent
-      // privés les uns des autres (R-56).
+      // privés les uns des autres (R-56). Et ne promet pas une acceptation
+      // impossible : aucun écran ne permet encore au client d'accepter, donc le
+      // message le dit et oriente vers un contact direct.
       alreadyRegistered:
-        "Ce contribuable est déjà enregistré sur KIMA. Votre demande a été transmise : il doit l'accepter avant que vous puissiez ouvrir son dossier.",
+        "Ce contribuable travaille déjà avec un cabinet sur KIMA. Votre demande est enregistrée, mais aucun écran ne lui permet encore de l'accepter : contactez-le directement.",
       failed: "Création interrompue. Une partie du dossier a pu être enregistrée : vérifiez la liste des clients avant de recommencer.",
       nothingYet: "Répondez aux questions pour voir la liste se construire.",
       listTitle: "Clients",
@@ -1138,9 +1140,11 @@ const en: WorkspaceDictionary = {
       required: "Required field",
       created: "File opened",
       // Does not name the firm that already holds this client: firms stay
-      // private from each other (R-56).
+      // private from each other (R-56). And does not promise an acceptance
+      // nobody can perform: no screen lets the client accept yet, so the
+      // message says so and points to direct contact.
       alreadyRegistered:
-        "This taxpayer is already registered on KIMA. Your request has been sent: they must accept it before you can open their file.",
+        "This taxpayer already works with a firm on KIMA. Your request is recorded, but there is no screen yet for them to accept it — contact them directly.",
       failed: "Creation stopped. Part of the file may have been saved: check the client list before trying again.",
       nothingYet: "Answer the questions to watch the list build itself.",
       listTitle: "Clients",

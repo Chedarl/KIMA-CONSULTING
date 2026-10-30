@@ -52,7 +52,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(15);
+select plan(17);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: one firm, one partner. A second firm's partner stands by as the
@@ -74,6 +74,14 @@ insert into firm_members
   ('00000000-0000-4000-9000-0000000000b2', '00000000-0000-4000-9000-0000000000b0',
    'Onb Partner B', 'partner-b@onb.test', 'firm_partner',
    '00000000-0000-4000-9000-0000000000b1');
+
+-- A client Firm B already holds. T-119 uses it to check that the new function
+-- cannot become a way around F-01.
+insert into taxpayers (id, legal_name, profile_verified) values
+  ('00000000-0000-4000-9000-00000000000b', 'Client of Onboarding Firm B', false);
+insert into engagements (organization_id, taxpayer_id, status, authorized_at) values
+  ('00000000-0000-4000-9000-0000000000b0', '00000000-0000-4000-9000-00000000000b',
+   'authorized', now());
 
 -- ---------------------------------------------------------------------------
 -- As Partner A, signed in. Everything below runs under RLS as `authenticated`.
@@ -191,6 +199,20 @@ select lives_ok(
   'T-114 step 7: audit() records who onboarded the taxpayer'
 );
 
+-- T-119 the F-01 regression guard on the new function. open_client_file()
+-- authorises an engagement, which is the one thing F-01 exists to control, so
+-- the question is whether it can be aimed at somebody else's client. It cannot
+-- by construction -- it takes no taxpayer id and only ever inserts a fresh
+-- one, so the engagement it authorises always names a taxpayer no firm can
+-- hold -- and this asserts the consequence rather than trusting the argument:
+-- having just opened a file, Firm A still reads only its own.
+select is(
+  (select count(*) from taxpayers
+    where id = '00000000-0000-4000-9000-00000000000b'),
+  0::bigint,
+  'T-119 opening a client file gives Firm A no reach into Firm B''s client'
+);
+
 reset role;
 
 -- ---------------------------------------------------------------------------
@@ -236,12 +258,12 @@ select set_config('request.jwt.claims',
 
 -- T-120 messier spelling of the same NIU, so normalisation is under test too.
 select is(
-  (select outcome || ' / taxpayer ' ||
-          case when taxpayer_id is null then 'withheld' else 'DISCLOSED' end
+  (select outcome || ' / returns ' ||
+          case when taxpayer_id is null then 'null' else 'an id' end
      from open_client_file(p_legal_name => 'Second Client again',
                            p_niu => '  p099999999999a  ')),
-  'already_registered / taxpayer withheld',
-  'T-120 a second firm entering a held NIU is routed to ask, and told no id'
+  'already_registered / returns null',
+  'T-120 a second firm entering a held NIU is routed to ask, not given a file'
 );
 
 -- T-121 and still reads nothing of that client.
@@ -257,6 +279,21 @@ select is(
     where e.organization_id = '00000000-0000-4000-9000-0000000000b0'),
   'draft',
   'T-122 what the second firm gets is a draft for the client to accept'
+);
+
+-- T-124 what the null does and does not mean. The function returns no id, but
+-- the draft engagement is this firm's own row and "scoped read" lets a firm
+-- read its engagements at any status -- so the taxpayer's id IS reachable. An
+-- earlier version of this file called that "withheld", which was wrong, and
+-- review caught it. Pinned here so the null is not read as secrecy: the id
+-- names nobody and opens nothing (T-121), and hiding it too would mean not
+-- creating the engagement until acceptance, which is phase 3.
+select is(
+  (select (e.taxpayer_id = f.taxpayer_id)
+     from engagements e join onb_file f on f.taxpayer_id = e.taxpayer_id
+    where e.organization_id = '00000000-0000-4000-9000-0000000000b0'),
+  true,
+  'T-124 the taxpayer''s id is reachable from the second firm''s own draft row'
 );
 
 reset role;

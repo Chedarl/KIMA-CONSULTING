@@ -18,11 +18,31 @@
 -- against a taxpayer no firm holds -- except that a NIU makes it reachable
 -- without guessing a UUID.
 --
--- WHAT THE SECOND FIRM IS AND IS NOT TOLD. On a match it gets a drafted
--- engagement and the words "already registered". It does not get the taxpayer's
--- id, name, or the holding firm: `taxpayer_id` comes back null, and a draft
--- grants no read (T-74). It necessarily learns that the NIU is known to KIMA,
--- which is inherent to deduplicating at all and is the whole disclosure.
+-- WHAT THE SECOND FIRM IS AND IS NOT TOLD. Stated precisely, because a first
+-- draft of this header claimed more than the code delivers and review caught it.
+--
+--   Not disclosed: the taxpayer's name, their record, which firm holds them,
+--   and any read access at all. Every policy still asks can_see_taxpayer(),
+--   and a draft grants nothing (T-74).
+--
+--   Disclosed: that the NIU is known to KIMA, and the taxpayer's internal id.
+--   The id is NOT withheld. `taxpayer_id` comes back null from this function,
+--   but the draft engagement is the firm's own row and "scoped read"
+--   (20261029213000) lets a firm read its engagements at any status -- so
+--   selecting taxpayer_id off that row returns it. Measured:
+--     B got back taxpayer_id = NULL
+--     B reads taxpayer_id off its OWN engagement row: d904105b-...
+--
+-- So the null return is control flow, not secrecy: it stops the wizard writing
+-- answers and requests against a file it cannot see. The id on its own opens
+-- nothing, and it names nobody. What the owner asked for -- that firms stay
+-- private from each other -- holds: the second firm learns neither the client's
+-- name nor who acts for them. T-124 pins the reachability so the next reader is
+-- not misled by the null.
+--
+-- Hiding the id as well means not creating the engagement until the client
+-- accepts, which needs a request record that carries no taxpayer_id. That is
+-- the phase 3 invitation flow, not this migration.
 --
 -- Production checked before writing this: 1 taxpayer, 1 NIU, 0 blank, 0
 -- duplicate groups, so the index below applies cleanly.
@@ -142,8 +162,9 @@ begin
         (v_engagement, v_org, v_existing, 'draft', null, null, null);
     end if;
 
-    -- taxpayer_id stays null on purpose: the caller learns that the NIU is
-    -- known, and nothing about whose client it is.
+    -- Null so the caller stops here rather than writing against a file it
+    -- cannot read. Not a secret: the id is on the draft row above, which is
+    -- the firm's own. See the header.
     return query select 'already_registered'::text, null::uuid, v_engagement;
     return;
   end if;
@@ -182,8 +203,10 @@ comment on function public.open_client_file(text, text, text, text, text, text, 
   'still applying (SECURITY INVOKER). Two outcomes: ''opened'' creates the '
   'taxpayer and its authorised engagement; ''already_registered'' means the NIU '
   'is held already, so it drafts an engagement for the client to accept and '
-  'returns a null taxpayer_id -- the caller learns the NIU is known and nothing '
-  'about whose client it is. R-54, R-56.';
+  'returns a null taxpayer_id, which stops the caller writing against a file it '
+  'cannot read. The caller learns the NIU is known and the taxpayer''s id -- '
+  'readable off its own draft row -- but not the name, the record, or who acts '
+  'for them. R-54, R-56.';
 
 revoke execute on function public.open_client_file(text, text, text, text, text, text, text, text, jsonb) from public, anon;
 grant execute on function public.open_client_file(text, text, text, text, text, text, text, text, jsonb) to authenticated;
