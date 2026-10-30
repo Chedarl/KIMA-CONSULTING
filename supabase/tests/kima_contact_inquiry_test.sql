@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(10);
+select plan(11);
 
 insert into auth.users (id,email) values
  ('00000000-0000-4000-d000-00000000d001','contact-kima-admin@example.test'),
@@ -21,10 +21,17 @@ select has_table('public','contact_inquiries',
   'T-225 KIMA general-contact inbox exists separately');
 select set_config('request.jwt.claims','',true);
 set local role anon;
-select lives_ok($$insert into contact_inquiries
+select throws_ok($insert into contact_inquiries
  (contact_name,contact_email,inquiry_kind,preferred_language,note)
- values ('Public Visitor','visitor@example.test','business','en','General question')$$,
- 'T-226 a general KIMA contact reaches the inbox without a selected firm');
+ values ('Public Visitor','visitor@example.test','business','en','General question')$,
+ '42501',null,'T-226 direct Data API contact inserts fail closed before abuse controls');
+reset role;
+update app_flags set enabled=true where key='allow_public_contact_inquiries';
+set local role anon;
+select lives_ok($insert into contact_inquiries
+ (contact_name,contact_email,inquiry_kind,preferred_language,note)
+ values ('Public Visitor','visitor@example.test','business','en','General question')$,
+ 'T-226a synthetic gate-enabled contact reaches the inbox without a firm');
 select throws_ok($$select count(*) from contact_inquiries$$,
  '42501',null,'T-227 anonymous visitor cannot read the inbox');
 select throws_ok($$insert into contact_inquiries
@@ -32,6 +39,7 @@ select throws_ok($$insert into contact_inquiries
  values ('Invalid','','business','en')$$,
  '23514',null,'T-228 a blank contact route is rejected');
 reset role;
+update app_flags set enabled=false where key='allow_public_contact_inquiries';
 
 set local role authenticated;
 select set_config('request.jwt.claims',
