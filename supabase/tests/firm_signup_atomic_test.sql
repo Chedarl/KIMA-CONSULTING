@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(14);
+select plan(15);
 
 insert into auth.users (id, email, email_confirmed_at) values
  ('00000000-0000-4000-d000-00000000a101','founder-a@signup.test',now()),
@@ -67,7 +67,7 @@ reset role;
 select is(
  (select kind||'/'||verification_status||'/'||registration_number
     from organizations where id=current_setting('test.new_firm')::uuid),
- 'firm/unverified/AB-12 / 34',
+ 'firm/unverified/AB-12/34',
  'T-202 the new firm is unverified and its registration number normalized');
 
 -- T-203
@@ -101,6 +101,15 @@ select set_config('request.jwt.claims',
 select throws_ok(
  $$select sign_up_firm('ÉTOILE, S.A.R.L.','OTHER-001','Other Founder')$$,
  '23505',null,'T-206 a look-alike firm name is refused');
+reset role;
+
+-- T-211: whitespace in the registration number cannot bypass uniqueness.
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-d000-00000000a103","role":"authenticated"}',true);
+select throws_ok(
+ $select sign_up_firm('Different Firm',' AB-12 / 34 ','Other Founder')$,
+ '23505',null,'T-211 registration-number spacing cannot bypass uniqueness');
 reset role;
 
 -- T-207
