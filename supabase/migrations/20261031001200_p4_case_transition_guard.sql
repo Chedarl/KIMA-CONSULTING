@@ -44,6 +44,11 @@ begin
   end if;
 
   if new.stage is distinct from old.stage then
+    -- Reject illegal delivery before checking actor authority. This keeps the
+    -- database's universal outcome guard effective for all writing roles.
+    if new.stage = 'delivered' and old.stage <> 'client_approval' then
+      raise exception 'illegal case stage transition' using errcode='23514';
+    end if;
     -- Firm may advance only a taxpayer under an active, scoped engagement.
     -- Service-role writes are reserved for migrations, not ordinary users.
     if not (auth.uid() is null and current_user in
