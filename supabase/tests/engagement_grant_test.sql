@@ -33,7 +33,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(17);
+select plan(22);
 
 -- ---------------------------------------------------------------------------
 -- Fixture. Two firms, each holding one taxpayer. A prospect no firm holds.
@@ -52,7 +52,9 @@ insert into organizations (id, name) values
 insert into taxpayers (id, legal_name) values
   ('00000000-0000-4000-c000-00000000000a', 'Taxpayer of Grant Firm A'),
   ('00000000-0000-4000-c000-00000000000b', 'Taxpayer of Grant Firm B'),
-  ('00000000-0000-4000-c000-00000000000d', 'Prospect no firm holds');
+  ('00000000-0000-4000-c000-00000000000d', 'Prospect no firm holds'),
+  -- A second prospect, kept untouched for T-106 and T-107.
+  ('00000000-0000-4000-c000-00000000000e', 'Second prospect no firm holds');
 
 insert into engagements (id, organization_id, taxpayer_id, status, authorized_at) values
   ('00000000-0000-4000-c000-0000000000e1', '00000000-0000-4000-c000-0000000000a0',
@@ -81,7 +83,9 @@ insert into contact_account_links (contact_id, taxpayer_id, portal_access) value
 -- column default is what made every other route possible.
 insert into engagements (id, organization_id, taxpayer_id) values
   ('00000000-0000-4000-c000-0000000000e3', '00000000-0000-4000-c000-0000000000a0',
-   '00000000-0000-4000-c000-00000000000d');
+   '00000000-0000-4000-c000-00000000000d'),
+  ('00000000-0000-4000-c000-0000000000e5', '00000000-0000-4000-c000-0000000000a0',
+   '00000000-0000-4000-c000-00000000000e');
 
 select is(
   (select status || ' / ' || coalesce(authorized_at::text, 'no timestamp')
@@ -208,7 +212,36 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-c000-0000000000c1","role":"authenticated"}', true);
 
--- T-82 the consent path. This is the one act that brings a second firm in.
+-- T-102 .. T-104: accepting is not a renegotiation. Each of these is the
+-- acceptance of T-82 with one extra column, and each must be refused -- so the
+-- client cannot reprice the engagement, reassign it, or authorise it. These
+-- run before T-82 because once accepted_at is set, a second attempt is caught
+-- by the "already recorded" rule instead and would prove nothing.
+select throws_ok(
+  $$ update engagements set status = 'accepted', accepted_at = now(), fee_xaf = 1
+      where id = '00000000-0000-4000-c000-0000000000e4' $$,
+  '42501', null,
+  'T-102 a client cannot change the fee while accepting'
+);
+
+select throws_ok(
+  $$ update engagements
+        set status = 'accepted', accepted_at = now(), authorized_at = now()
+      where id = '00000000-0000-4000-c000-0000000000e4' $$,
+  '42501', null,
+  'T-103 a client cannot authorise their own engagement while accepting'
+);
+
+select throws_ok(
+  $$ update engagements
+        set status = 'accepted', accepted_at = now(), assigned_to = 'Whoever I like'
+      where id = '00000000-0000-4000-c000-0000000000e4' $$,
+  '42501', null,
+  'T-104 a client cannot reassign the engagement while accepting'
+);
+
+-- T-82 the consent path, unchanged and still allowed: the restriction above is
+-- about the other columns, not about accepting.
 select lives_ok(
   $$ update engagements set status = 'accepted', accepted_at = now()
       where id = '00000000-0000-4000-c000-0000000000e4' $$,
@@ -238,6 +271,27 @@ select lives_ok(
   $$ update engagements set status = 'authorized', authorized_at = now()
       where id = '00000000-0000-4000-c000-0000000000e4' $$,
   'T-83 with the taxpayer''s acceptance, Firm A authorises the same engagement'
+);
+
+-- T-106 the firm cannot say the client agreed. 23514, not 42501: this is the
+-- CHECK constraint, which binds every writer rather than only the ones a
+-- policy sees. The firm could already authorise this engagement alone (T-107),
+-- so nothing is gained by the claim -- which is the point. It is the record
+-- being false, not the access being wider.
+select throws_ok(
+  $$ update engagements set status = 'accepted'
+      where id = '00000000-0000-4000-c000-0000000000e5' $$,
+  '23514', null,
+  'T-106 a firm cannot mark its own engagement accepted with no acceptance on file'
+);
+
+-- T-107 control: and authorising the same row alone is still allowed, because
+-- no other firm holds that prospect. 'authorized' carries no acceptance
+-- requirement, and that asymmetry is deliberate.
+select lives_ok(
+  $$ update engagements set status = 'authorized', authorized_at = now()
+      where id = '00000000-0000-4000-c000-0000000000e5' $$,
+  'T-107 control: the firm still authorises a prospect no other firm holds'
 );
 
 -- T-75 and only now does the file open. Two firms hold this taxpayer, which is
