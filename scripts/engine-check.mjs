@@ -293,6 +293,54 @@ try {
     assert.equal(engagements.authorizeEngagement({ ...row, ...revoked.patch }).reason, "already_revoked");
   });
 
+  // The defect this exists to prevent actually shipped. draftEngagement() wrote
+  // status 'pending', which engagements_status_known has never allowed, so every
+  // engagement insert through the onboarding wizard and the engagements screen
+  // was refused from the moment 20261029213000 landed until 20261030070000 --
+  // and the assertion above said "pending" too, so nothing caught it. A status
+  // this module writes must be a status the database accepts; that is a
+  // contract, and it is now checked rather than assumed.
+  check("T-22 every engagement status lib/engagements.ts writes is one the database allows", () => {
+    const dir = join(root, "supabase", "migrations");
+    const sql = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => readFileSync(join(dir, f), "utf8").replace(/\r\n/g, "\n"))
+      .join("\n");
+    // The last definition wins, as with client_may_record() in T-16.
+    const matches = [
+      ...sql.matchAll(
+        /constraint\s+engagements_status_known\s*\n?\s*check\s*\(\s*status\s+in\s*\(([^)]*)\)/gi,
+      ),
+    ];
+    assert.ok(matches.length > 0, "engagements_status_known not found in migrations");
+    const allowed = [...matches[matches.length - 1][1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    assert.ok(allowed.length >= 2, `parsed too few statuses: ${allowed.join(", ")}`);
+
+    const draft = engagements.draftEngagement({ taxpayerId: "tp" });
+    assert.equal(draft.ok, true);
+    const written = [
+      draft.row.status,
+      engagements.authorizeEngagement(draft.row).patch.status,
+      engagements.revokeEngagement(draft.row, "reason").patch.status,
+    ];
+    for (const status of written) {
+      assert.ok(
+        allowed.includes(status),
+        `lib/engagements.ts writes status '${status}', which engagements_status_known does not allow (${allowed.join(", ")})`,
+      );
+    }
+
+    // And the one the acceptance constraint pairs with it: a row may not claim
+    // the client accepted without carrying when (20261030100000).
+    assert.ok(
+      /constraint\s+engagements_accepted_needs_a_date\s*\n?\s*check\s*\(\s*status\s*<>\s*'accepted'\s+or\s+accepted_at\s+is\s+not\s+null\s*\)/i.test(
+        sql,
+      ),
+      "engagements_accepted_needs_a_date must require an acceptance date for 'accepted'",
+    );
+  });
+
   check("vault keeps accepted evidence and verified filings apart from the inbox", () => {
     assert.equal(vault.acceptedIntoVault({ review_status: "accepted" }), true);
     assert.equal(vault.acceptedIntoVault({ review_status: "pending" }), false);
