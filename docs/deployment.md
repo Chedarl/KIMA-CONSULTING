@@ -120,8 +120,12 @@ that commit and skips
 an obsolete commit if `main` has advanced. It rechecks the SHA immediately
 before `supabase db push`. Migrations are serialized and never cancelled
 mid-flight. There is no manual `workflow_dispatch` button: to retry a failed
-migration, rerun both `main` workflows for the same commit and verify the
-migration result.
+migration, **re-run the existing `main` runs** for that commit — both `CI` and
+`Verify migrations` — and verify the migration result. Re-running a run keeps
+its original `push` event, which is what the gate looks for. Starting a fresh
+`Verify migrations` via `workflow_dispatch` will **not** satisfy the gate: that
+run carries the `workflow_dispatch` event and is deliberately ignored, so that a
+manual dispatch cannot stand in for the check on the commit being deployed.
 The Supabase CLI remains on `latest` pending a separately reviewed version pin.
 
 Both skip cleanly while `supabase/migrations/` holds no `.sql` files, so a
