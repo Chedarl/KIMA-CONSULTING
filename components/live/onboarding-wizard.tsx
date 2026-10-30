@@ -135,36 +135,23 @@ export function OnboardingWizard({
     setBusy(true);
     try {
       const db = supabase();
-      // Opening a client file is one call, not seven statements.
-      // open_client_file() creates the taxpayer and the authorised engagement
-      // that holds it, in the caller's own firm, atomically (migration
-      // 20261030110000, risk R-54).
+      // Opening a client file is one call. open_client_file() writes the
+      // taxpayer, the authorised engagement that holds it, the organizer
+      // answers, the derived document requests, the client-visible note and the
+      // audit entry, in one transaction in the caller's own firm (migrations
+      // 20261030110000 and 20261030140000, risks R-54 and R-58). Both those
+      // headers carry the history: why the insert-with-RETURNING this replaced
+      // could not work, and why four trailing writes could leave a client file
+      // that existed, was authorised and was empty.
       //
-      // What it replaced did not work on production. The taxpayer insert ended
-      // in `.select("id").single()`, and Postgres applies the SELECT policy to
-      // a row returned by RETURNING: can_see_taxpayer(id) needs a live
-      // engagement, which cannot exist one statement before the engagement is
-      // written. Everything after it was refused too, because an engagement
-      // opens as a draft and a draft grants no access to the taxpayer it names.
-      //
-      // The function is SECURITY INVOKER, so this is still the signed-in
-      // member's own write under every policy: it needs case.advance to create
-      // the taxpayer, engagement.authorize to authorise it, and the grant guard
-      // still refuses if another firm holds that taxpayer.
-      //
-      // The organisation is still resolved separately, because the document
-      // requests, the case event and the audit entry below all name it. Through
-      // the RPC rather than a query on firm_members: the query this replaced
-      // filtered on `auth_user_id`, which `authenticated` holds no SELECT on
-      // (20261022163452 grants seven columns and that is not one), and Postgres
-      // needs the privilege for a column in WHERE and not only in the select
-      // list. It had been failing since #13 introduced it. Never
-      // `organizations … limit(1)` either: with a second firm that attached
-      // every new taxpayer to whichever organisation happened to sort first.
-      const { data: identities, error: memErr } = await db.rpc("current_firm_intake_identity");
-      const member = (identities as Array<{ organization_id: string }> | null)?.[0];
-      if (memErr || !member?.organization_id) throw memErr ?? new Error("no organization");
-      const org = { id: member.organization_id };
+      // SECURITY INVOKER, so this is still the signed-in member's own write
+      // under every policy. No organisation lookup either -- the function
+      // resolves the firm itself through current_member_org(). The requests and
+      // the note are still built here, because deriveRequests() owns those
+      // rules and SQL should not own them twice.
+      const due = new Date();
+      due.setDate(due.getDate() + 14);
+      const dueOn = due.toISOString().slice(0, 10);
 
       const { data: opened, error: openErr } = await db.rpc("open_client_file", {
         p_legal_name: answers.legal_name || answers.full_name,
@@ -179,6 +166,21 @@ export function OnboardingWizard({
         p_accounting_framework:
           answers.accounting_framework === "unknown" ? null : answers.accounting_framework,
         p_organizer: answers,
+        // Fourteen days is a working default the accountant can change, not a
+        // statutory date. Statutory dates come only from verified rules.
+        p_requests: derived.map((d) => ({
+          key: d.key,
+          label_fr: d.fr,
+          label_en: d.en,
+          reason_fr: d.reasonFr,
+          reason_en: d.reasonEn,
+          // The work still exists and is still tracked -- but a document we
+          // retrieve from Harmony 2 ourselves is the firm's responsibility, not
+          // the client's. The client is told it is being handled, not asked.
+          responsible: d.retrievedBy === "firm" ? "firm" : "taxpayer",
+          due_on: dueOn,
+        })),
+        p_note: `Dossier ouvert pour ${displayName}. ${asked.length} pièces demandées / File opened for ${displayName}. ${asked.length} documents requested.`,
       });
       const result = (opened as Array<{
         outcome: "opened" | "already_registered";
@@ -196,64 +198,15 @@ export function OnboardingWizard({
         setBusy(false);
         return;
       }
-      const taxpayer = { id: result.taxpayer_id };
-
-      // The engagement is created and authorised inside open_client_file():
-      // for a brand-new client, opening the file is the authorisation (owner
-      // decision, 30 Oct). draftEngagement() still governs the engagements
-      // screen, where drafting and authorising stay two separate acts.
-
-      const { error: ansErr } = await db.from("organizer_answers").insert(
-        Object.entries(answers).map(([question_key, answer]) => ({
-          taxpayer_id: taxpayer.id,
-          question_key,
-          answer,
-        })),
-      );
-      if (ansErr) throw ansErr;
-
-      // Fourteen days is a working default the accountant can change, not a
-      // statutory date. Statutory dates come only from verified rules.
-      const due = new Date();
-      due.setDate(due.getDate() + 14);
-      const dueOn = due.toISOString().slice(0, 10);
-
-      const { error: reqErr } = await db.from("document_requests").insert(
-        derived.map((d) => ({
-          taxpayer_id: taxpayer.id,
-          organization_id: org.id,
-          label_fr: d.fr,
-          label_en: d.en,
-          reason_fr: d.reasonFr,
-          reason_en: d.reasonEn,
-          status: "requested",
-          // The work still exists and is still tracked — but a document we
-          // retrieve from Harmony 2 ourselves is the firm's responsibility, not
-          // the client's. The client is told it is being handled, not asked.
-          responsible: d.retrievedBy === "firm" ? "firm" : "taxpayer",
-          due_on: dueOn,
-        })),
-      );
-      if (reqErr) throw reqErr;
-
-      const { recordCaseEvent } = await import("@/lib/record-event");
-      await recordCaseEvent({
-        taxpayerId: taxpayer.id,
-        organizationId: org.id,
-        actor: { role: "firm_partner", label: "Firm" },
-        kind: "note_added",
-        reason: `Dossier ouvert pour ${displayName}. ${asked.length} pièces demandées / File opened for ${displayName}. ${asked.length} documents requested.`,
-      });
-
-      await audit({
-        taxpayerId: taxpayer.id,
-        organizationId: org.id,
-        actor: "firm",
-        action: "taxpayer.onboarded",
-        resourceType: "taxpayer",
-        resourceId: taxpayer.id,
-        after: { answers, derived: derived.map((d) => d.key) },
-      });
+      // Everything else -- the organizer answers, the document requests, the
+      // client-visible note and the audit entry -- was written inside the same
+      // transaction as the taxpayer and its engagement. There is nothing left to
+      // save, and nothing left that can half-save.
+      //
+      // The engagement is created and authorised in there too: for a brand-new
+      // client, opening the file is the authorisation (owner decision, 30 Oct).
+      // draftEngagement() still governs the engagements screen, where drafting
+      // and authorising stay two separate acts.
 
       toast(`${labels.created} — ${displayName}`);
       reset();
