@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { demoIds, supabase } from "@/lib/supabase";
+import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { todayInDouala } from "@/lib/dates";
 import { submitRequestFile } from "@/lib/submit-request";
 import {
@@ -35,7 +35,7 @@ type Dash = ReturnType<typeof getWorkspaceDictionary>["clientDash"];
 
 
 const CASE_COLUMNS =
-  "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, approval_round, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
+  "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, approval_round, organization_id, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
 
 export function ClientService({
   caseId,
@@ -67,32 +67,39 @@ export function ClientService({
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      const resolved = await demoIds();
-      setIds(resolved);
-      if (!resolved) {
-        setRow(null);
-        setRequests([]);
-        setEvents([]);
-        setOffline(true);
-        return;
-      }
+      const taxpayerId = await sessionTaxpayerId();
+      if (!taxpayerId) throw new Error("Authenticated taxpayer required");
       const { data, error } = await db
         .from("compliance_cases")
         .select(CASE_COLUMNS)
         .eq("id", caseId)
-        .eq("taxpayer_id", resolved.taxpayerId)
+        .eq("taxpayer_id", taxpayerId)
         .maybeSingle();
       if (error) throw error;
       if (!data) {
         setRow(null);
         return;
       }
-      const kase = data as ComplianceCase;
+      const kase = data as ComplianceCase & { organization_id: string | null };
+      if (!kase.engagement_id || !kase.organization_id) throw new Error("Missing case engagement");
+      const { data: grant, error: grantError } = await db.from("engagements")
+        .select("organization_id,taxpayer_id,status,accepted_at,authorized_at,revoked_at")
+        .eq("id", kase.engagement_id)
+        .eq("taxpayer_id", taxpayerId)
+        .maybeSingle();
+      if (grantError || !grant || grant.organization_id !== kase.organization_id ||
+          grant.revoked_at || !["accepted","authorized"].includes(grant.status) ||
+          !(grant.accepted_at || grant.authorized_at)) {
+        throw new Error("Case engagement not active");
+      }
+      setIds({ taxpayerId, organizationId: grant.organization_id });
       const [rq, ev, tp, consent] = await Promise.all([
         db
           .from("document_requests")
           .select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count")
           .eq("case_id", caseId)
+          .eq("taxpayer_id", taxpayerId)
+          .eq("organization_id", grant.organization_id)
           .order("due_on"),
         db
           .from("case_events")
