@@ -84,62 +84,37 @@ export type ActivityRow = {
 };
 
 /**
- * Resolve the active taxpayer / organisation for client surfaces.
+ * Resolve the portal taxpayer and its one unambiguous authorized firm.
  *
- * Prefer the portal session's taxpayer. Fall back to the oldest seeded row only
- * when the demo anon branch is still enabled — never invent a cross-tenant bind.
+ * An absent or invalid Auth session must never be replaced with a seeded
+ * identity. If several firms are engaged, the UI must ask which firm to
+ * contact rather than arbitrarily selecting one.
  */
 export async function demoIds(): Promise<{ taxpayerId: string; organizationId: string } | null> {
-  const db = supabase();
+  const taxpayerId = await sessionTaxpayerId();
+  if (!taxpayerId) return null;
 
-  let sessionTaxpayerId: string | null = null;
-  try {
-    const raw = sessionStorage.getItem("kima.portal.session");
-    if (raw) {
-      const parsed = JSON.parse(raw) as { taxpayerId?: string };
-      sessionTaxpayerId = parsed.taxpayerId ?? null;
-    }
-  } catch {
-    sessionTaxpayerId = null;
-  }
+  const { data, error } = await supabase()
+    .from("engagements")
+    .select("organization_id")
+    .eq("taxpayer_id", taxpayerId)
+    .in("status", ["accepted", "authorized"])
+    .is("revoked_at", null);
+  if (error || !data) return null;
 
-  const orgQuery = db
-    .from("organizations")
-    .select("id")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (sessionTaxpayerId) {
-    const [{ data: tp }, { data: org }] = await Promise.all([
-      db.from("taxpayers").select("id").eq("id", sessionTaxpayerId).maybeSingle(),
-      orgQuery,
-    ]);
-    if (tp?.id && org?.id) {
-      return { taxpayerId: tp.id as string, organizationId: org.id as string };
-    }
-  }
-
-  const [{ data: tp }, { data: org }] = await Promise.all([
-    db.from("taxpayers").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle(),
-    orgQuery,
-  ]);
-  if (!tp?.id || !org?.id) return null;
-  return { taxpayerId: tp.id as string, organizationId: org.id as string };
+  const organizationIds = [...new Set(
+    data.map((engagement) => engagement.organization_id as string | null).filter(
+      (id): id is string => Boolean(id),
+    ),
+  )];
+  if (organizationIds.length !== 1) return null;
+  return { taxpayerId, organizationId: organizationIds[0] };
 }
 
 /**
- * The taxpayer a client WRITE may name: the portal session's own, and only
- * while a Supabase Auth session exists. Never a guess.
- *
- * `demoIds()` above falls back to the oldest taxpayer and the oldest
- * organisation, which is tolerable for a synthetic read and wrong for a write:
- * a document or a profile change would be filed against somebody else's file.
- * Write paths use this instead and get null rather than a fallback. The
- * organisation for a write comes from the row being answered (a request's own
- * `organization_id`), never from "the first organisation".
- *
- * Callers: components/client-portal/profile-board.tsx and requests-board.tsx.
+ * A portal write or read may use only the taxpayer from a current authenticated
+ * session whose record is visible through database row-level security.
+ * Session storage alone is never evidence of authorization.
  */
 export async function sessionTaxpayerId(): Promise<string | null> {
   let taxpayerId: string | null = null;
@@ -147,11 +122,20 @@ export async function sessionTaxpayerId(): Promise<string | null> {
     const raw = sessionStorage.getItem("kima.portal.session");
     if (raw) taxpayerId = (JSON.parse(raw) as { taxpayerId?: string }).taxpayerId ?? null;
   } catch {
-    taxpayerId = null;
+    return null;
   }
   if (!taxpayerId) return null;
-  const { data } = await supabase().auth.getSession();
-  return data.session ? taxpayerId : null;
+
+  const db = supabase();
+  const { data: auth, error: authError } = await db.auth.getUser();
+  if (authError || !auth.user) return null;
+
+  const { data: taxpayer, error } = await db
+    .from("taxpayers")
+    .select("id")
+    .eq("id", taxpayerId)
+    .maybeSingle();
+  return !error && taxpayer?.id === taxpayerId ? taxpayerId : null;
 }
 
 /** Append-only. Written on every state change a user can see. */
