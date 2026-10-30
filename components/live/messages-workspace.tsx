@@ -203,7 +203,7 @@ export function MessagesWorkspace({
             senderName={session?.personLabel ?? labels.firmName}
             labels={labels}
             firmActor={
-              session ? { role: session.role, label: session.personLabel } : null
+              session ? { role: session.role, label: session.personLabel, memberId: session.memberId } : null
             }
             sendBlocked={sendBlocked}
           />
