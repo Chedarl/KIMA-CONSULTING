@@ -423,7 +423,7 @@ select throws_ok(
 -- T-159 .. T-165: Codex P1 -- status alone must not grant access;
 -- a recorded authorization timestamp must never be erased or rewritten.
 select lives_ok(
-  $ insert into engagements (id, organization_id, taxpayer_id)
+  $$ insert into engagements (id, organization_id, taxpayer_id)
      values ('00000000-0000-4000-c000-0000000000eb',
              '00000000-0000-4000-c000-0000000000b0',
              '00000000-0000-4000-c000-0000000000cc') $,
@@ -431,34 +431,34 @@ select lives_ok(
 );
 
 select throws_ok(
-  $ update engagements set status = 'authorized'
+  $$ update engagements set status = 'authorized'
       where id = '00000000-0000-4000-c000-0000000000eb' $,
   '23514', null,
   'T-160 authorized status alone without a date never grants access'
 );
 
 select lives_ok(
-  $ update engagements set status = 'authorized', authorized_at = now()
+  $$ update engagements set status = 'authorized', authorized_at = now()
       where id = '00000000-0000-4000-c000-0000000000eb' $,
   'T-161 control: a dated authorization for a free prospect works'
 );
 
 select throws_ok(
-  $ update engagements set authorized_at = null
+  $$ update engagements set authorized_at = null
       where id = '00000000-0000-4000-c000-0000000000eb' $,
   '42501', null,
   'T-162 a firm cannot clear an authorization date to hide a prior grant'
 );
 
 select throws_ok(
-  $ update engagements set authorized_at = now() + interval '1 day'
+  $$ update engagements set authorized_at = now() + interval '1 day'
       where id = '00000000-0000-4000-c000-0000000000eb' $,
   '42501', null,
   'T-163 a firm cannot rewrite the recorded authorization date'
 );
 
 select lives_ok(
-  $ update engagements set status = 'expired'
+  $$ update engagements set status = 'expired'
       where id = '00000000-0000-4000-c000-0000000000eb' $,
   'T-164 expiry may change status without deleting the prior grant'
 );
