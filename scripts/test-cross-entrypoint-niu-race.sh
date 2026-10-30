@@ -116,6 +116,28 @@ for variant in direct approve_first; do
     cat "$tmp/$second.log" >&2
     wait "$first_pid" || true; wait "$second_pid" || true; exit 1
   fi
+  # A live psql process alone is insufficient evidence of lock contention.
+  # Observe the PostgreSQL backend actually waiting on an advisory lock.
+  observed=0
+  for _ in $(seq 1 25); do
+    advisory_waiters="$(psql "$db" -X -qAt -v ON_ERROR_STOP=1 <<'SQL'
+select count(*) from pg_stat_activity
+ where datname = current_database()
+   and pid <> pg_backend_pid()
+   and wait_event_type = 'Lock'
+   and wait_event = 'advisory'
+   and query ~ '(approve_registration|open_client_file)';
+SQL
+)"
+    if [ "$advisory_waiters" -ge 1 ]; then observed=1; break; fi
+    if ! kill -0 "$second_pid" 2>/dev/null; then break; fi
+    sleep 0.1
+  done
+  if [ "$observed" -ne 1 ]; then
+    echo "No advisory-lock wait observed in pg_stat_activity ($variant)" >&2
+    cat "$tmp/$second.log" >&2
+    wait "$first_pid" || true; wait "$second_pid" || true; exit 1
+  fi
   wait "$first_pid"
   wait "$second_pid"
   grep -qx "$want_first" "$tmp/$first.log" || {
@@ -138,4 +160,5 @@ SQL
   echo "Expected one taxpayer per NIU and one pending portal account; got $state" >&2
   exit 1
 }
+echo "ADVISORY_LOCK_WAIT_OBSERVED=2"
 echo "Two sessions, both orderings: waited, one taxpayer per NIU, already_registered."
