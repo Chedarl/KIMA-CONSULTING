@@ -41,7 +41,7 @@ to avoid a silent mis-mapping.
 
 | Owner's instruction | What it means here |
 |---|---|
-| Step 2, firm names | Visitors see a firm's **name and its verification label, and nothing else**. R-55's `using (true)` exposes the whole record and goes. |
+| Step 2, firm names | Visitors see a firm's **name and its verification label, and nothing else**. **Done, 30 Oct, in `20261030130000`:** the open rule is gone, the record is readable only inside the firm, and `public.firm_directory()` is the one public route to a name. The label is the half that is still missing — it needs the column step 1 below adds. |
 | Step 3, sign-up | After confirming their email, the person runs **one database function** that creates the firm and makes them its owner in a single step, and **requires the registration number**. |
 | Step 4, application form | The public application form **becomes the firm sign-up form**, still behind `OPEN_WORKSPACE_KINDS` until the end-to-end check passes. |
 | Payment | Out of phase 2, unchanged. |
@@ -107,7 +107,9 @@ a qualified expert-comptable". The wording is Agent B's and needs both locales.
 ## Build order
 
 1. `organizations` gains `registration_number` (unique, non-blank), `verification_status`
-   and `suspended_at`; R-55's read policy narrows to name plus label for visitors.
+   and `suspended_at`. R-55 is already closed, so this step no longer narrows the read:
+   it adds `verification_status` to `public.firm_directory()`'s two columns, which is the
+   only change the lookup needs.
 2. Suspension wired into the access helpers, with the negative test.
 3. The sign-up code path, once (1) above is decided.
 4. `sign_up_firm()` — one function, `SECURITY INVOKER`, atomic, requires the number,
