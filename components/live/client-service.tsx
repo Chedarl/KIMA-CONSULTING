@@ -51,6 +51,8 @@ export function ClientService({
   backHref: string;
 }) {
   const [row, setRow] = useState<ComplianceCase | null | undefined>(undefined);
+  // A reused route component must never render the previous case while loading a new caseId.
+  const [loadedCaseId, setLoadedCaseId] = useState<string | null>(null);
   const [requests, setRequests] = useState<CaseRequest[]>([]);
   const [events, setEvents] = useState<CaseEvent[]>([]);
   const [offline, setOffline] = useState(false);
@@ -88,6 +90,7 @@ export function ClientService({
         setEvents([]);
         setName("");
         setClientApproved(false);
+        setLoadedCaseId(caseId);
         setOffline(false);
         return;
       }
@@ -134,6 +137,7 @@ export function ClientService({
       setRequests((rq.data ?? []) as CaseRequest[]);
       setEvents((ev.data ?? []) as CaseEvent[]);
       setName((tp.data as { legal_name?: string } | null)?.legal_name ?? "");
+      setLoadedCaseId(caseId);
       setOffline(false);
     } catch {
       if (epoch !== loadEpoch.current) return;
@@ -145,6 +149,7 @@ export function ClientService({
       setEvents([]);
       setName("");
       setClientApproved(false);
+      setLoadedCaseId(caseId);
     }
   }, [caseId]);
 
@@ -156,6 +161,7 @@ export function ClientService({
       ++authEpoch.current;
       ++loadEpoch.current;
       // Clear the previous identity's approval and case before reloading.
+      setLoadedCaseId(null);
       setRow(undefined);
       setIds(null);
       setRequests([]);
@@ -252,7 +258,9 @@ export function ClientService({
     }
   }
 
-  if (row === undefined) {
+  // React can reuse this component for a different caseId before effects run.
+  // Do not show the previous case or its approval action during that render.
+  if (row === undefined || loadedCaseId !== caseId) {
     return (
       <div className="flex flex-col gap-2" aria-busy="true">
         {[0, 1].map((i) => (
