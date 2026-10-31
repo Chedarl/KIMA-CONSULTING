@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 
 type Invitation = {
@@ -27,18 +27,27 @@ export function InvitationsPanel({ locale, side }: {
   const [recipientEmail, setRecipientEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const loadEpoch = useRef(0);
+  const authEpoch = useRef(0);
 
   const load = useCallback(async () => {
+    const epoch = ++loadEpoch.current;
+    // Never retain a previous account's invitations during a session refresh.
+    setInvites([]);
+    setDrafts([]);
+    setFirms([]);
     const db = supabase();
     const { data: auth, error: authError } = await db.auth.getUser();
+    if (epoch !== loadEpoch.current) return;
     if (authError || !auth.user) {
       setUserId(null);
-      setInvites([]);
+      setTaxpayerId(null);
       setError(fr ? "Connexion requise." : "Sign-in required.");
       return;
     }
     setUserId(auth.user.id);
     const tp = side === "taxpayer" ? await sessionTaxpayerId() : null;
+    if (epoch !== loadEpoch.current) return;
     setTaxpayerId(tp);
     if (side === "taxpayer" && !tp) {
       setError(fr ? "Compte client requis." : "A client account is required.");
@@ -53,6 +62,7 @@ export function InvitationsPanel({ locale, side }: {
         .select("id,taxpayer_id").in("status", ["draft", "invited"])
         .is("revoked_at", null) : Promise.resolve({ data: [] }),
     ]);
+    if (epoch !== loadEpoch.current) return;
     if (rows.error || (side === "taxpayer" && "error" in directory && directory.error)) {
       setError(fr ? "Invitations indisponibles." : "Invitations unavailable.");
       return;
@@ -63,42 +73,92 @@ export function InvitationsPanel({ locale, side }: {
     setError("");
   }, [fr, side]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event) => {
+      if (event === "INITIAL_SESSION") return;
+      ++authEpoch.current; // Invalidate mutation completions from the old identity.
+      ++loadEpoch.current; // Invalidate requests issued under the old identity.
+      setUserId(null);
+      setTaxpayerId(null);
+      setInvites([]);
+      setDrafts([]);
+      setFirms([]);
+      setFirm("");
+      setEngagement("");
+      setRecipientEmail("");
+      setBusy(false);
+      setError("");
+      if (timer) clearTimeout(timer);
+      // Defer getUser: do not await Supabase calls inside the auth callback.
+      timer = setTimeout(() => { void load(); }, 0);
+    });
+    return () => {
+      ++authEpoch.current;
+      ++loadEpoch.current;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
+    };
+  }, [load]);
 
   async function decide(id: string, action: "accepted" | "declined" | "revoked") {
     if (!userId || busy) return;
+    // A stale button, expired invitation, or another account's invitation
+    // must never initiate an RPC. The database remains the authority.
+    const invitation = invites.find((item) => item.id === id);
+    if (!invitation || invitation.status !== "pending" ||
+        (side === "taxpayer" && invitation.taxpayer_id !== taxpayerId) ||
+        !Number.isFinite(new Date(invitation.expires_at).getTime()) ||
+        new Date(invitation.expires_at).getTime() <= Date.now() ||
+        (action === "revoked"
+          ? invitation.initiated_by !== userId
+          : invitation.recipient_user_id !== userId)) return;
+    const epoch = authEpoch.current;
     setBusy(true);
     setError("");
     const { error: failure } = await supabase().rpc("decide_invitation", {
       p_invitation_id: id, p_action: action,
     });
+    if (epoch !== authEpoch.current) return;
     await load();
+    if (epoch !== authEpoch.current) return;
     if (failure) setError(fr ? "Action refusée ou invitation expirée." : "Action refused or invitation expired.");
     setBusy(false);
   }
 
   async function requestFirm() {
-    if (!taxpayerId || !firm || busy) return;
+    // A previously selected firm must still be present in the current directory.
+    if (side !== "taxpayer" || !userId || !taxpayerId || !firm || busy ||
+        !firms.some((candidate) => candidate.id === firm)) return;
+    const epoch = authEpoch.current;
     setBusy(true);
     setError("");
     const { error: failure } = await supabase().rpc("create_invitation", {
       p_direction: "taxpayer_to_firm", p_organization_id: firm,
       p_taxpayer_id: taxpayerId, p_contact_id: null,
     });
+    if (epoch !== authEpoch.current) return;
     await load();
+    if (epoch !== authEpoch.current) return;
     if (failure) setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
     setBusy(false);
   }
 
   async function inviteContact() {
-    if (!engagement || !recipientEmail.trim() || busy) return;
+    // A stale engagement selection must not initiate an invitation for another firm.
+    if (side !== "firm" || !userId || !engagement || !recipientEmail.trim() || busy ||
+        !drafts.some((candidate) => candidate.id === engagement)) return;
+    const epoch = authEpoch.current;
     setBusy(true);
     setError("");
     const { error: failure } = await supabase().rpc("create_invitation_for_contact", {
       p_engagement_id: engagement, p_email: recipientEmail.trim(),
     });
+    if (epoch !== authEpoch.current) return;
     if (!failure) setRecipientEmail("");
     await load();
+    if (epoch !== authEpoch.current) return;
     if (failure) setError(fr
       ? "Destinataire indisponible. Vérifiez le compte client et l'adresse."
       : "Recipient unavailable. Check the client account and email.");
@@ -120,7 +180,7 @@ export function InvitationsPanel({ locale, side }: {
               {firms.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </label>
-          <button type="button" disabled={busy || !firm} onClick={() => void requestFirm()}
+          <button type="button" disabled={busy || !firm || !firms.some((candidate) => candidate.id === firm)} onClick={() => void requestFirm()}
             className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-white disabled:opacity-50">
             {fr ? "Envoyer la demande" : "Send request"}
           </button>
@@ -144,7 +204,7 @@ export function InvitationsPanel({ locale, side }: {
               onChange={(e) => setRecipientEmail(e.target.value)}
               className="min-h-[44px] rounded-lg border border-border p-2" />
           </label>
-          <button type="button" disabled={busy || !engagement || !recipientEmail.trim()}
+          <button type="button" disabled={busy || !engagement || !recipientEmail.trim() || !drafts.some((candidate) => candidate.id === engagement)}
             onClick={() => void inviteContact()}
             className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-white disabled:opacity-50">
             {fr ? "Inviter le client" : "Invite client"}
@@ -181,9 +241,9 @@ export function InvitationsPanel({ locale, side }: {
                   <button disabled={busy} onClick={() => void decide(i.id,"declined")} className="min-h-[44px] rounded-lg border border-border px-4 text-sm">
                     {fr ? "Refuser" : "Decline"}
                   </button>
-                </> : <button disabled={busy} onClick={() => void decide(i.id,"revoked")} className="min-h-[44px] rounded-lg border border-border px-4 text-sm">
+                </> : i.initiated_by === userId ? <button disabled={busy} onClick={() => void decide(i.id,"revoked")} className="min-h-[44px] rounded-lg border border-border px-4 text-sm">
                   {fr ? "Annuler l'invitation" : "Revoke invitation"}
-                </button>}
+                </button> : null}
               </div>}
             </li>;
           })}

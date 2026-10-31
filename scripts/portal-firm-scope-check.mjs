@@ -68,4 +68,86 @@ assert.match(detail.src, /engagement\.id !== row\.engagement_id/);
 assert.match(detail.src, /engagement\.taxpayer_id !== row\.taxpayer_id/);
 assert.match(detail.src, /engagement\.revoked_at/);
 assert.match(detail.src, /organization_id: orgId/);
+// Session isolation: stale invitation rows must never survive an account switch.
+// This is a source-contract guard, not a substitute for browser acceptance.
+const invitations = inspect("components/live/invitations-panel.tsx");
+assert.match(invitations.src, /auth\.onAuthStateChange\(/);
+assert.match(invitations.src, /const epoch = \+\+loadEpoch\.current;/);
+assert.equal((invitations.src.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length, 3,
+  "guard every asynchronous invitation load boundary");
+const authChange = invitations.src.split("auth.onAuthStateChange((event) => {")[1]?.split("\n    });")[0];
+assert.ok(authChange, "auth state changes must invalidate prior session state");
+for (const state of ["setUserId(null)", "setTaxpayerId(null)", "setInvites([])",
+  "setDrafts([])", "setFirms([])", 'setFirm("")', 'setEngagement("")',
+  'setRecipientEmail("")']) {
+  assert.ok(authChange.includes(state), "auth change must clear " + state);
+}
+assert.match(invitations.src, /subscription\.unsubscribe\(\)/);
+assert.match(invitations.src, /timer = setTimeout\(\(\) => \{ void load\(\); \}, 0\)/);
+// Mutation responses are also asynchronous: a prior account must not update the new account's UI.
+assert.match(invitations.src, /const authEpoch = useRef\(0\);/);
+assert.ok(authChange.includes("++authEpoch.current"), "auth switch must invalidate mutations");
+for (const action of ["decide", "requestFirm", "inviteContact"]) {
+  const body = invitations.src.split("  async function " + action + "(")[1]?.split("\n  }")[0];
+  assert.ok(body, action + " must exist");
+  assert.ok(body.includes("const epoch = authEpoch.current;"), action + " must capture auth identity");
+  assert.equal((body.match(/if \(epoch !== authEpoch\.current\) return;/g) ?? []).length, 2,
+    action + " must ignore stale RPC results and stale reload completions");
+  const rpcIndex = body.indexOf("await supabase().rpc(");
+  const firstGuard = body.indexOf("if (epoch !== authEpoch.current) return;");
+  const reload = body.indexOf("await load();");
+  const secondGuard = body.lastIndexOf("if (epoch !== authEpoch.current) return;");
+  assert.ok(rpcIndex >= 0 && rpcIndex < firstGuard && firstGuard < reload && reload < secondGuard,
+    action + " must guard both asynchronous boundaries in order");
+}
+assert.ok((invitations.src.match(/\+\+authEpoch\.current;/g) ?? []).length >= 2,
+  "auth epoch must invalidate on account change and unmount");
+
+// Invitation decision controls must fail closed before issuing an RPC.
+// The database remains the ultimate recipient and replay authority.
+const invitationPanel = inspect("components/live/invitations-panel.tsx");
+const invitationDecision = invitationPanel.src.split("async function decide(")[1]?.split("\n  async function requestFirm(")[0] ?? "";
+for (const guard of [
+  "invites.find((item) => item.id === id)",
+  'invitation.status !== "pending"',
+  "new Date(invitation.expires_at).getTime() <= Date.now()",
+  "invitation.initiated_by !== userId",
+  "invitation.recipient_user_id !== userId",
+]) {
+  assert.ok(invitationDecision.includes(guard), "invitation action guard missing: " + guard);
+}
+assert.ok(invitationDecision.indexOf('invitation.status !== "pending"') <
+  invitationDecision.indexOf('.rpc("decide_invitation"'),
+  "check invitation eligibility before the decision RPC");
+assert.ok(invitationPanel.src.includes(
+  'i.initiated_by === userId ? <button disabled={busy} onClick={() => void decide(i.id,"revoked")}'
+), "only the invitation initiator should see the revoke action");
+
+
+/* Invitation actions must fail closed when the displayed selection belongs
+ * to a different taxpayer or has disappeared from the current session's
+ * authorized directory. Source assertions complement hosted negative tests. */
+assert.match(invitationDecision, /invitation\.taxpayer_id !== taxpayerId/);
+assert.match(invitationDecision, /!Number\.isFinite\(new Date\(invitation\.expires_at\)\.getTime\(\)\)/);
+assert.ok(invitationDecision.indexOf("invitation.taxpayer_id !== taxpayerId") <
+  invitationDecision.indexOf('.rpc("decide_invitation"'),
+  "taxpayer scope must be verified before deciding an invitation");
+const requestFirmAction = invitations.src.split("async function requestFirm(")[1]?.split("\n  async function inviteContact(")[0] ?? "";
+const inviteContactAction = invitations.src.split("async function inviteContact(")[1]?.split("\n  return (")[0] ?? "";
+for (const [name, body, required] of [
+  ["requestFirm", requestFirmAction, ['side !== "taxpayer"', "!userId", "firms.some((candidate) => candidate.id === firm)"]],
+  ["inviteContact", inviteContactAction, ['side !== "firm"', "!userId", "drafts.some((candidate) => candidate.id === engagement)"]],
+]) {
+  const rpc = body.indexOf("await supabase().rpc(");
+  assert.ok(rpc > 0, name + ": invitation RPC must exist");
+  for (const guard of required) {
+    assert.ok(body.indexOf(guard) >= 0 && body.indexOf(guard) < rpc,
+      name + ": " + guard + " must be checked before the RPC");
+  }
+}
+assert.match(invitations.src,
+  /disabled=\{busy \|\| !firm \|\| !firms\.some\(\(candidate\) => candidate\.id === firm\)\}/);
+assert.match(invitations.src,
+  /disabled=\{busy \|\| !engagement \|\| !recipientEmail\.trim\(\) \|\| !drafts\.some\(\(candidate\) => candidate\.id === engagement\)\}/);
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
