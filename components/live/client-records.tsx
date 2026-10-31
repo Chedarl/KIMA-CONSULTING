@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { Card, CardHeader, Timeline } from "@/components/ui";
@@ -66,11 +66,14 @@ const CASE_COLUMNS =
 function useClientRecords() {
   const [records, setRecords] = useState<Records | null>(null);
   const [offline, setOffline] = useState(false);
+  const loadEpoch = useRef(0);
 
   const load = useCallback(async () => {
+    const epoch = ++loadEpoch.current;
     try {
       const db = supabase();
       const taxpayerId = await sessionTaxpayerId();
+      if (epoch !== loadEpoch.current) return;
       if (!taxpayerId) throw new Error("Authenticated client context required");
       const [tp, cs, rq, ev] = await Promise.all([
         db
@@ -94,7 +97,8 @@ function useClientRecords() {
           .order("occurred_at", { ascending: false })
           .limit(50),
       ]);
-      if (cs.error) throw cs.error;
+      if (epoch !== loadEpoch.current) return;
+      if (tp.error || cs.error || rq.error || ev.error) throw tp.error ?? cs.error ?? rq.error ?? ev.error;
       setRecords({
         taxpayer: (tp.data as TaxpayerRow | null) ?? null,
         cases: (cs.data ?? []) as ComplianceCase[],
@@ -103,6 +107,7 @@ function useClientRecords() {
       });
       setOffline(false);
     } catch {
+      if (epoch !== loadEpoch.current) return;
       setOffline(true);
       setRecords({ taxpayer: null, cases: [], requests: [], events: [] });
     }
@@ -110,6 +115,22 @@ function useClientRecords() {
 
   useEffect(() => {
     void load();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event) => {
+      if (event === "INITIAL_SESSION") return;
+      // Clear prior-account records before any asynchronous re-query.
+      ++loadEpoch.current;
+      setRecords(null);
+      setOffline(false);
+      if (timer) clearTimeout(timer);
+      // Supabase auth callbacks must not await another Supabase operation.
+      timer = setTimeout(() => { void load(); }, 0);
+    });
+    return () => {
+      ++loadEpoch.current;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, [load]);
 
   useEffect(() => {
