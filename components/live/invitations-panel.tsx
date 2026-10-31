@@ -237,7 +237,7 @@ export function InvitationsPanel({ locale, side }: {
                   </button>
                 </> : i.initiated_by === userId ? <button disabled={busy} onClick={() => void decide(i.id,"revoked")} className="min-h-[44px] rounded-lg border border-border px-4 text-sm">
                   {fr ? "Annuler l'invitation" : "Revoke invitation"}
-                </button>}
+                </button> : null}
               </div>}
             </li>;
           })}
