@@ -35,7 +35,7 @@ select throws_ok(
              '00000000-0000-4000-e300-0000000000a0',
              '00000000-0000-4000-e300-0000000000b0',
              'authorized', now(), now()) $$,
-  '23514', 'engagements_authorized_is_not_revoked',
+  '23514', 'new row for relation "engagements" violates check constraint "engagements_authorized_is_not_revoked"',
   'T-321 a privileged insert cannot store authorized and revoked together'
 );
 
@@ -64,7 +64,7 @@ select lives_ok(
 select throws_ok(
   $$ update engagements set status = 'authorized'
       where id = '00000000-0000-4000-e300-0000000000e1' $$,
-  '23514', 'engagements_authorized_is_not_revoked',
+  '23514', 'new row for relation "engagements" violates check constraint "engagements_authorized_is_not_revoked"',
   'T-324 the firm cannot label a revoked engagement authorized'
 );
 

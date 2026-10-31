@@ -514,10 +514,11 @@ select is(
 
 -- ---------------------------------------------------------------------------
 -- Revocation. Firm B keeps its engagement row and loses its access the moment
--- revoked_at is set. Only revoked_at is set here, and status is left alone, so
--- this proves revoked_at alone is enough.
+-- revoked_at is set. Status is recorded as revoked in the same write:
+-- engagements_authorized_is_not_revoked forbids authorized and revoked_at
+-- together. Access still ends because revoked_at is set.
 -- ---------------------------------------------------------------------------
-update engagements set revoked_at = now()
+update engagements set status = 'revoked', revoked_at = now()
  where organization_id = '00000000-0000-4000-a000-00000000b001';
 
 set local role authenticated;
