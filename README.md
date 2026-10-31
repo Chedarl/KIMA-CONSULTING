@@ -450,7 +450,7 @@ direct SQL write, not only through the interface:
 | A declaration is never `filed` without evidence reference, capture date and source | `declarations` CHECK |
 | A case's filing is never `verified` without an evidence reference | `filing_verified_requires_evidence` |
 | A case is never delivered without a filing outcome | `delivery_requires_filing_outcome` |
-| An engagement fee is whole XAF, never a float | `fee_xaf integer` >= 0` |
+| An engagement fee is whole XAF, never a float | `fee_xaf integer`, `>= 0` |
 | A request can never attach to another taxpayer's case | composite FK `(case_id, taxpayer_id)` |
 | An internal event can never be marked client-visible | `event_visibility_allowed` |
 | Billing never appears in a compliance history | `event_billing_never_client_facing` |
@@ -599,7 +599,7 @@ invoice, with any confirmation field, or backdated. A client reads only their ow
 payments. A partner (`billing.manage`) confirms or rejects once. After that the payment is
 final, and the database writes the confirmer's name and the time (migrations
 `20261027210000`, `20261027210100`; tests `supabase/tests/fee_payments_test.sql`, engine
-check T-21). a payment only as the firm, and only as pending.
+check T-21). Staff can record a payment only as the firm, and only as pending.
 **Organisation scoping is merged and applied** (PR #22, migration
 `20261029213000`, production 30 Oct 2026 02:42 UTC): `member_has(cap, taxpayer_id)` requires an accepted, unrevoked
 engagement between the caller's organisation and that taxpayer, and the fee-payment
