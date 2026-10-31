@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
     "test": "node scripts/engine-check.mjs && npm run test:phase5 && npm run test:phase7:pilot",
-    "test:journey": "node scripts/journey-check.mjs && node scripts/firm-signup-journey-check.mjs && node scripts/contact-inquiry-check.mjs",
+    "test:journey": "node scripts/journey-check.mjs && node scripts/firm-signup-journey-check.mjs && node scripts/contact-inquiry-check.mjs && node scripts/onboarding-firm-optional-check.mjs",
     "test:staff:contract": "node scripts/staff-contract-smoke.mjs",
     "test:staff:screen": "node scripts/staff-screen-smoke.mjs",
     "test:staff:route": "node scripts/staff-route-smoke.mjs",
@@ -21,6 +21,7 @@
     "test:portal:firm-scope": "node scripts/portal-firm-scope-check.mjs",
     "test:phase3:mocks": "node scripts/phase3-mock-check.mjs",
     "test:phase5": "node scripts/phase5-upload-check.mjs",
+    "test:onboarding:firm-optional": "node scripts/onboarding-firm-optional-check.mjs",
     "test:phase7:pilot": "node scripts/phase7-pilot-check.mjs",
     "test:phase7:http": "node scripts/phase7-incident-http-smoke.mjs"
   },

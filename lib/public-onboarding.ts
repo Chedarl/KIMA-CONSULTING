@@ -82,7 +82,6 @@ export const EMPTY_ONBOARDING: OnboardingDraft = {
 
 export type OnboardingIssue =
   | "kind"
-  | "firm"
   | "name"
   | "contact"
   | "email"
@@ -137,22 +136,20 @@ export function displayName(draft: Pick<OnboardingDraft, "kind" | "name" | "lega
   return draft.name.trim();
 }
 
-export function issuesFor(step: OnboardingStep, draft: OnboardingDraft, requireFirm = false): OnboardingIssue[] {
+/** Firm choice is optional (owner decision, 31 Oct 2026) and never gates submit. */
+export function issuesFor(step: OnboardingStep, draft: OnboardingDraft): OnboardingIssue[] {
   if (step === "type") return draft.kind ? [] : ["kind"];
   if (step === "account") return accountIssues(draft);
   if (step === "company") return companyIssues(draft);
   if (step === "contacts") return contactIssues(draft);
-  if (step === "services") return [
-    ...(draft.services.length > 0 ? [] : ["services" as const]),
-    ...(requireFirm && !draft.firmId ? ["firm" as const] : []),
-  ];
+  if (step === "services") return draft.services.length > 0 ? [] : ["services"];
   if (step === "verify" || step === "ready") {
     return [
       ...issuesFor("type", draft),
       ...issuesFor("account", draft),
       ...issuesFor("company", draft),
       ...issuesFor("contacts", draft),
-      ...issuesFor("services", draft, requireFirm),
+      ...issuesFor("services", draft),
     ];
   }
   return [];
