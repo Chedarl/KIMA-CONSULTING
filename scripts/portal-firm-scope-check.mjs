@@ -85,21 +85,21 @@ assert.match(serviceLoad, /rq\.error \|\| ev\.error \|\| tp\.error \|\| consent\
 
 // A route parameter can change before React effects run: render only the loaded case.
 // This source-contract test complements, but does not replace, browser route-switch testing.
-assert.match(service.src, /const \\[loadedCaseId, setLoadedCaseId\\] = useState<string \\| null>\\(null\\)/);
-assert.match(service.src, /if \\(row === undefined \\|\\| loadedCaseId !== caseId\\)/,
+assert.match(service.src, /const \[loadedCaseId, setLoadedCaseId\] = useState<string \| null>\(null\)/);
+assert.match(service.src, /if \(row === undefined \|\| loadedCaseId !== caseId\)/,
   "render must hide the previous case and its approval button on route changes");
-assert.match(serviceLoad, /if \\(!data\\) \\{[\\s\\S]*?setLoadedCaseId\\(caseId\\);[\\s\\S]*?return;/,
+assert.match(serviceLoad, /if \(!data\) \{[\s\S]*?setLoadedCaseId\(caseId\);[\s\S]*?return;/,
   "not-found case load must settle the current case identity");
-assert.match(serviceLoad, /setRow\\(kase\\);[\\s\\S]*?setLoadedCaseId\\(caseId\\);/,
+assert.match(serviceLoad, /setRow\(kase\);[\s\S]*?setLoadedCaseId\(caseId\);/,
   "successful case load must record the verified case identity");
-assert.match(serviceLoad, /catch \\{[\\s\\S]*?setLoadedCaseId\\(caseId\\);/,
+assert.match(serviceLoad, /catch \{[\s\S]*?setLoadedCaseId\(caseId\);/,
   "failed case load must settle the current case identity without stale details");
-const serviceAuthChange = service.src.split("auth.onAuthStateChange((event) => {")[1]?.split("\\n    });")[0];
+const serviceAuthChange = service.src.split("auth.onAuthStateChange((event) => {")[1]?.split("\n    });")[0];
 assert.ok(serviceAuthChange?.includes("setLoadedCaseId(null)"),
   "account changes must invalidate the last loaded case identity");
 
 const serviceUpload = service.src.split("async function upload(")[1]?.split("\n  async function approveCase(")[0];
-const serviceApproval = service.src.split("async function approveCase(")[1]?.split("\n  if \(row === undefined\)")[0];
+const serviceApproval = service.src.split("async function approveCase(")[1]?.split("\n  // React can reuse")[0];
 assert.match(serviceUpload ?? "", /if \(epoch !== authEpoch\.current\) return;/);
 assert.ok((serviceApproval?.match(/if \(epoch !== authEpoch\.current\) return;/g) ?? []).length >= 2,
   "approval must ignore an old identity before and after its insert");
