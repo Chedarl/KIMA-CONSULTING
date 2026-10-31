@@ -54,8 +54,10 @@ export type CaseStage =
   | "review"
   | "filing"
   | "evidence"
+  | "client_approval"
   | "delivered"
-  | "abandoned";
+  | "abandoned"
+  | "cancelled";
 
 /**
  * What the administration acknowledged — NOT what we did.
@@ -230,6 +232,8 @@ export type ComplianceCase = {
   due_needs_confirmation: boolean;
   due_basis: "statutory" | "prorogation";
   stage: CaseStage;
+  /** Incremented in the database on every entry into client-approval. */
+  approval_round: number;
   owner: string | null;
   blocker: string | null;
   opened_at: string;
@@ -269,14 +273,16 @@ export type ComplianceCase = {
  * lesson the request lifecycle already learned with its `returned` state.
  */
 const STAGE_FLOW: Record<CaseStage, CaseStage[]> = {
-  documents: ["accounting", "abandoned"],
-  accounting: ["preparation", "documents", "abandoned"],
-  preparation: ["review", "accounting", "documents", "abandoned"],
-  review: ["filing", "preparation", "abandoned"],
-  filing: ["evidence", "review", "abandoned"],
-  evidence: ["delivered", "filing", "abandoned"],
+  documents: ["accounting", "abandoned", "cancelled"],
+  accounting: ["preparation", "documents", "abandoned", "cancelled"],
+  preparation: ["review", "accounting", "documents", "abandoned", "cancelled"],
+  review: ["filing", "preparation", "abandoned", "cancelled"],
+  filing: ["evidence", "review", "abandoned", "cancelled"],
+  evidence: ["client_approval", "filing", "abandoned", "cancelled"],
+  client_approval: ["delivered", "evidence", "cancelled"],
   delivered: [],
   abandoned: [],
+  cancelled: [],
 };
 
 export const canAdvance = (from: CaseStage, to: CaseStage): boolean =>
@@ -284,7 +290,8 @@ export const canAdvance = (from: CaseStage, to: CaseStage): boolean =>
 
 export const nextStages = (from: CaseStage): CaseStage[] => STAGE_FLOW[from] ?? [];
 
-export const isClosed = (s: CaseStage): boolean => s === "delivered" || s === "abandoned";
+export const isClosed = (s: CaseStage): boolean =>
+  s === "delivered" || s === "abandoned" || s === "cancelled";
 
 export const STAGE_LABELS: Record<CaseStage, { fr: string; en: string }> = {
   documents: { fr: "Pièces", en: "Documents" },
@@ -293,8 +300,10 @@ export const STAGE_LABELS: Record<CaseStage, { fr: string; en: string }> = {
   review: { fr: "Revue", en: "Review" },
   filing: { fr: "Dépôt", en: "Filing" },
   evidence: { fr: "Preuve de dépôt", en: "Filing evidence" },
+  client_approval: { fr: "Validation du client", en: "Client approval" },
   delivered: { fr: "Livré", en: "Delivered" },
   abandoned: { fr: "Abandonné", en: "Abandoned" },
+  cancelled: { fr: "Annulé", en: "Cancelled" },
 };
 
 export const stageLabel = (s: CaseStage, locale: "fr" | "en") =>
@@ -384,11 +393,14 @@ export function clientStatus(
     case "filing":
     case "evidence":
       return FILING_TO_CLIENT[c.filing_status];
+    case "client_approval":
+      return "waiting_on_you";
     case "delivered":
       // The database refuses delivery without a verified filing; reading the
       // filing here too keeps a bad row from saying "Complete".
       return c.filing_status === "verified" ? "complete" : FILING_TO_CLIENT[c.filing_status];
     case "abandoned":
+    case "cancelled":
       return "closed";
   }
 }
@@ -458,6 +470,8 @@ export type AdvanceInput = {
    * control by forgetting it.
    */
   approval?: ApprovalDecision;
+  /** UI gate only. The database must authenticate the approving taxpayer. */
+  clientApproved?: boolean;
   at?: string;
 };
 
@@ -473,7 +487,8 @@ export type AdvanceResult =
         | "approval_not_checked"
         | "self_approval_refused"
         | "owner_required"
-        | "filing_not_verified";
+        | "filing_not_verified"
+        | "client_approval_required";
     };
 
 /** The default when a caller supplies no filing information: assume nothing. */
@@ -526,17 +541,21 @@ export function advance(
     }
   }
 
-  // Delivery asserts an outcome to the client, so it waits on the
-  // administration rather than on us. Checked here and in the database, because
-  // a rule that lives only in TypeScript is one SQL write from being untrue.
-  // Absent filing information the move is refused rather than assumed: the
-  // safe default for a claim about the state is "we do not know".
-  if (input.to === "delivered" && !canDeliver(input.filing ?? FILING_UNKNOWN)) {
+  // Neither requesting client sign-off nor delivery may imply a successful
+  // filing before its acknowledgment is verified. Missing filing facts fail closed.
+  // The database must enforce this as well before Phase 4 can be released.
+  if ((input.to === "client_approval" || input.to === "delivered") &&
+      !canDeliver(input.filing ?? FILING_UNKNOWN)) {
     return { ok: false, reason: "filing_not_verified" };
+  }
+  if (current.stage === "client_approval" && input.to === "delivered" &&
+      input.clientApproved !== true) {
+    return { ok: false, reason: "client_approval_required" };
   }
 
   // Work that nobody owns is work that does not happen.
-  if (input.to !== "abandoned" && !current.owner && !input.by.trim()) {
+  if (input.to !== "abandoned" && input.to !== "cancelled" &&
+      !current.owner && !input.by.trim()) {
     return { ok: false, reason: "owner_required" };
   }
 
@@ -615,6 +634,10 @@ export const ADVANCE_REFUSAL_LABELS: Record<
   filing_not_verified: {
     fr: "Dépôt non vérifié : la livraison attend l'accusé de réception.",
     en: "Filing not verified: delivery waits on the acknowledgment.",
+  },
+  client_approval_required: {
+    fr: "La validation du client doit être confirmée avant la livraison.",
+    en: "Client approval must be confirmed before delivery.",
   },
 };
 

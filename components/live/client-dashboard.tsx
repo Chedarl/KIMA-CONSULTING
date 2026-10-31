@@ -89,13 +89,15 @@ export function ClientDashboard({
             "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved",
           )
           .eq("taxpayer_id", resolved.taxpayerId)
+          .eq("organization_id", resolved.organizationId)
           .is("closed_at", null),
         db
           .from("document_requests")
           .select(
             "id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count",
           )
-          .eq("taxpayer_id", resolved.taxpayerId),
+          .eq("taxpayer_id", resolved.taxpayerId)
+          .eq("organization_id", resolved.organizationId),
         db.from("taxpayers").select("legal_name").eq("id", resolved.taxpayerId).maybeSingle(),
       ]);
       if (cs.error) throw cs.error;
