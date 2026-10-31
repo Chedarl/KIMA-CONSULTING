@@ -82,6 +82,22 @@ assert.ok(serviceLoad, "client service loader must exist");
 assert.ok((serviceLoad.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length >= 4,
   "all case, engagement and consent fetch boundaries must reject stale loads");
 assert.match(serviceLoad, /rq\.error \|\| ev\.error \|\| tp\.error \|\| consent\.error/);
+
+// A route parameter can change before React effects run: render only the loaded case.
+// This source-contract test complements, but does not replace, browser route-switch testing.
+assert.match(service.src, /const \\[loadedCaseId, setLoadedCaseId\\] = useState<string \\| null>\\(null\\)/);
+assert.match(service.src, /if \\(row === undefined \\|\\| loadedCaseId !== caseId\\)/,
+  "render must hide the previous case and its approval button on route changes");
+assert.match(serviceLoad, /if \\(!data\\) \\{[\\s\\S]*?setLoadedCaseId\\(caseId\\);[\\s\\S]*?return;/,
+  "not-found case load must settle the current case identity");
+assert.match(serviceLoad, /setRow\\(kase\\);[\\s\\S]*?setLoadedCaseId\\(caseId\\);/,
+  "successful case load must record the verified case identity");
+assert.match(serviceLoad, /catch \\{[\\s\\S]*?setLoadedCaseId\\(caseId\\);/,
+  "failed case load must settle the current case identity without stale details");
+const serviceAuthChange = service.src.split("auth.onAuthStateChange((event) => {")[1]?.split("\\n    });")[0];
+assert.ok(serviceAuthChange?.includes("setLoadedCaseId(null)"),
+  "account changes must invalidate the last loaded case identity");
+
 const serviceUpload = service.src.split("async function upload(")[1]?.split("\n  async function approveCase(")[0];
 const serviceApproval = service.src.split("async function approveCase(")[1]?.split("\n  if \(row === undefined\)")[0];
 assert.match(serviceUpload ?? "", /if \(epoch !== authEpoch\.current\) return;/);
