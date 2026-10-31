@@ -58,18 +58,20 @@ select is(
 -- current_member_org with 20261030090000 (R-53), and
 -- taxpayer_id_for_niu and taxpayer_held_by_another_firm with 20261030120000
 -- (R-56); the latter replaced taxpayer_engaged_elsewhere, which asked only
--- about live engagements.
+-- about live engagements. engagement_authorized_at_is_permanent arrived with
+-- the R-56 historical authorization safeguard and runs as SECURITY INVOKER.
 select is(
   (select string_agg(distinct p.proname, ', ' order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'private'),
   'auth_identity_is_single, can_see_taxpayer, client_taxpayer_ids, '
-  'create_invitation_for_contact_internal, create_invitation_internal, '
-  'current_firm_role, current_member_id, current_member_label, '
-  'current_member_org, decide_invitation_internal, demo_taxpayer_id, engagements_grant_guard, '
-  'firm_member_has, flag_enabled, guard_client_invite_authorization, member_has, '
-  'member_has_in_org, portal_request_code, signal_firm_intake_document_change, '
-  'taxpayer_held_by_another_firm, taxpayer_id_for_niu',
+  'create_invitation_for_contact_internal, create_invitation_internal, current_firm_role, '
+  'current_member_id, current_member_label, current_member_org, '
+  'decide_invitation_internal, demo_taxpayer_id, engagement_authorized_at_is_permanent, '
+  'engagements_grant_guard, firm_member_has, firm_name_key, '
+  'flag_enabled, guard_client_invite_authorization, member_has, '
+  'member_has_in_org, portal_request_code, serialize_taxpayer_grant, '
+  'signal_firm_intake_document_change, taxpayer_held_by_another_firm, taxpayer_id_for_niu',
   'T-52 every moved helper is in private, and nothing else is'
 );
 
@@ -79,6 +81,7 @@ select is(
 -- the control, not the count: a definer helper that appears in `public` without
 -- being added to this list fails, which is the whole point.
 --
+-- sign_up_firm() is a gated authenticated-only firm creation endpoint.
 -- firm_directory() joined it with 20261030130000 (R-55). The owner decided a
 -- firm's name stays public while the record does not, and column grants cannot
 -- express that -- they are table-wide, so narrowing to (id, name) for a visitor
@@ -91,7 +94,7 @@ select is(
       and p.prosecdef
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
-  'can_write_client_note, firm_directory',
+  'admin_review_firm, can_write_client_note, firm_directory, manage_firm_staff, sign_up_firm',
   'T-53 only the definer functions named here stay callable in public'
 );
 
