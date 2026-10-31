@@ -165,7 +165,7 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
   >([]);
   const [session, setSession] = useState<FirmSession | null>(null);
   const [disclose, setDisclose] = useState<Record<string, boolean>>({});
-  const [evidence, setEvidenceState] = useState<Record<string, string>>({});
+  const [evidence, setEvidence] = useState<Record<string, string>>({});
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
