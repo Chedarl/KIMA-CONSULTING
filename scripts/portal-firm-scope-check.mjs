@@ -116,4 +116,12 @@ assert.match(serviceApproval ?? "",
 assert.match(serviceApproval ?? "",
   /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setBusy/);
 
+// A route switch can happen while the previous case's file picker remains open.
+// Reject old-case uploads and approvals at initiation, not only after an await.
+// These are source-contract checks; browser race acceptance is still required.
+assert.match(serviceUpload ?? "", /if \\(loadedCaseId !== caseId \\|\\| row\\.id !== caseId \\|\\| req\\.case_id !== caseId\\) return;/,
+  "file upload must reject stale route, case and request identities before submission");
+assert.match(serviceApproval ?? "", /if \\(loadedCaseId !== caseId \\|\\| row\\.id !== caseId\\) return;/,
+  "client approval must reject a stale route before inserting consent");
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
