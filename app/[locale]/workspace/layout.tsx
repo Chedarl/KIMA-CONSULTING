@@ -5,6 +5,7 @@ import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import { Shell, type NavItem } from "@/components/shell";
 import { FirmSearch } from "@/components/live/firm-search";
 import { FirmSessionBar } from "@/components/live/firm-session-bar";
+import { VendorRoutingLink } from "@/components/live/vendor-routing-link";
 
 /**
  * Firm workspace chrome.
@@ -28,7 +29,6 @@ export default function FirmLayout({
   const nav: NavItem[] = [
     { href: base, label: w.firm.nav.overview, icon: "grid", ready: true },
     { href: `${base}/leads`, label: w.firm.nav.leads, icon: "user", ready: true },
-    { href: `${base}/routing`, label: w.firm.nav.routing, icon: "inbox", ready: true },
     { href: `${base}/clients`, label: w.firm.nav.clients, icon: "people", ready: true },
     { href: `${base}/staff`, label: w.firm.nav.staff, icon: "people", ready: true },
     { href: `${base}/engagements`, label: w.firm.nav.engagements, icon: "folder", ready: true },
@@ -54,6 +54,7 @@ export default function FirmLayout({
       soonLabel={w.soon}
       menuLabel={w.menu}
       tone="navy"
+      extraNav={<VendorRoutingLink href={`${base}/routing`} label={w.firm.nav.routing} />}
     >
       <div className="mb-4 flex flex-col gap-3">
         <FirmSessionBar locale={locale} t={w.firmLogin} />
