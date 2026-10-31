@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { freshDraftNeedsAcceptance } from "../lib/engagements.ts";
+import { firmAskedAgain, freshDraftNeedsAcceptance } from "../lib/engagements.ts";
 
 const draft = {
   status: "draft",
@@ -20,12 +20,23 @@ test("an authorised or already accepted engagement is not that draft", () => {
   assert.equal(freshDraftNeedsAcceptance({ ...draft, revoked_at: "2026-10-31T00:00:00Z", status: "revoked" }), false);
 });
 
-test("the services board offers accept on that draft and writes accepted", () => {
+test("asking-again copy is only for a prior revoked engagement of the same firm", () => {
+  const prior = { id: "old", organization_id: "firm-a", revoked_at: "2026-01-01" };
+  assert.equal(firmAskedAgain("new", "firm-a", [prior]), true);
+  assert.equal(firmAskedAgain("new", "firm-b", [prior]), false);
+  assert.equal(firmAskedAgain("new", "firm-a", [{ ...prior, revoked_at: null }]), false);
+});
+
+test("the services board accepts only a still-open draft and does not send the clock", () => {
   const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
   assert.match(board, /freshDraftNeedsAcceptance\(e\)/);
-  assert.match(board, /status: "accepted", accepted_at:/);
-  assert.match(board, /copy\.acceptDraft/);
-  const fr = readFileSync("lib/i18n-portal.ts", "utf8");
-  assert.match(fr, /acceptDraft: "Accepter la mission"/);
-  assert.match(fr, /acceptDraft: "Accept this engagement"/);
+  assert.match(board, /\.eq\("status", "draft"\)/);
+  assert.match(board, /\.is\("accepted_at", null\)/);
+  assert.match(board, /\.select\("id"\)/);
+  assert.match(board, /error \|\| !data \|\| data\.length === 0/);
+  assert.doesNotMatch(board, /accepted_at: new Date/);
+  assert.match(board, /acceptDraftHintAgain/);
+  const copy = readFileSync("lib/i18n-portal.ts", "utf8");
+  assert.match(copy, /acceptDraftHintAgain: "Votre cabinet vous redemande/);
+  assert.match(copy, /acceptDraftHint: "Accept this engagement so the firm can begin/);
 });

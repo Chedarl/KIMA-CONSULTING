@@ -23,7 +23,7 @@ import {
   type ComplianceCase,
   type Engagement,
 } from "@/lib/cases";
-import { freshDraftNeedsAcceptance } from "@/lib/engagements";
+import { firmAskedAgain, freshDraftNeedsAcceptance } from "@/lib/engagements";
 import { audit, demoIds, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 
@@ -38,6 +38,7 @@ type CardModel = {
   provisional: boolean;
   status: ClientStatus | "not_started";
   acceptId: string | null;
+  askedAgain: boolean;
 };
 
 const CASE_COLUMNS =
@@ -52,7 +53,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
   const toast = useToast();
   const [cases, setCases] = useState<ComplianceCase[] | null>(null);
   const [requests, setRequests] = useState<CaseRequest[]>([]);
-  const [engagements, setEngagements] = useState<Engagement[]>([]);
+  const [engagements, setEngagements] = useState<(Engagement & { organization_id: string | null })[]>([]);
   const [offline, setOffline] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
@@ -76,12 +77,12 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       const [cs, rq, eng] = await Promise.all([
         db.from("compliance_cases").select(CASE_COLUMNS).eq("taxpayer_id", resolved.taxpayerId).order("due_on", { ascending: true }),
         db.from("document_requests").select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count").eq("taxpayer_id", resolved.taxpayerId),
-        db.from("engagements").select("id, taxpayer_id, status, service_code, scope_note, fee_xaf, assigned_to, authorized_at, accepted_at, revoked_at").eq("taxpayer_id", resolved.taxpayerId),
+        db.from("engagements").select("id, taxpayer_id, organization_id, status, service_code, scope_note, fee_xaf, assigned_to, authorized_at, accepted_at, revoked_at").eq("taxpayer_id", resolved.taxpayerId),
       ]);
       if (cs.error) throw cs.error;
       setCases((cs.data ?? []) as ComplianceCase[]);
       setRequests((rq.data ?? []) as CaseRequest[]);
-      setEngagements(eng.error ? [] : ((eng.data ?? []) as Engagement[]));
+      setEngagements(eng.error ? [] : ((eng.data ?? []) as (Engagement & { organization_id: string | null })[]));
       setOffline(false);
     } catch {
       setOffline(true);
@@ -111,6 +112,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
         provisional: focus.due_needs_confirmation,
         status,
         acceptId: null,
+        askedAgain: false,
       });
     }
     const covered = new Set((cases ?? []).map((c) => c.engagement_id).filter(Boolean));
@@ -126,6 +128,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
         provisional: false,
         status: accept ? "waiting_on_you" : "not_started",
         acceptId: accept ? e.id : null,
+        askedAgain: accept && firmAskedAgain(e.id, e.organization_id, engagements),
       });
     }
     return out;
@@ -161,12 +164,15 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
 
   async function acceptDraft(id: string) {
     setBusy(true);
-    const { error } = await supabase()
+    const { data, error } = await supabase()
       .from("engagements")
-      .update({ status: "accepted", accepted_at: new Date().toISOString() })
-      .eq("id", id);
+      .update({ status: "accepted" })
+      .eq("id", id)
+      .eq("status", "draft")
+      .is("accepted_at", null)
+      .select("id");
     setBusy(false);
-    if (error) {
+    if (error || !data || data.length === 0) {
       toast(copy.acceptDraftFailed, "error");
       return;
     }
@@ -303,7 +309,9 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
                     {inner}
                     {card.acceptId && (
                       <div className="mt-4 border-t border-border pt-4">
-                        <p className="mb-3 text-sm text-fg-muted">{copy.acceptDraftHint}</p>
+                        <p className="mb-3 text-sm text-fg-muted">
+                          {card.askedAgain ? copy.acceptDraftHintAgain : copy.acceptDraftHint}
+                        </p>
                         <PrimaryButton disabled={busy} onClick={() => void acceptDraft(card.acceptId!)}>
                           {copy.acceptDraft}
                         </PrimaryButton>

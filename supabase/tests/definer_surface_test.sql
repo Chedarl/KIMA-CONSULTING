@@ -72,7 +72,7 @@ select is(
   'engagements_grant_guard, firm_member_has, firm_name_key, firm_previously_granted, '
   'flag_enabled, guard_client_invite_authorization, member_has, '
   'member_has_in_org, portal_request_code, serialize_taxpayer_grant, '
-  'signal_firm_intake_document_change, taxpayer_held_by_another_firm, taxpayer_id_for_niu',
+  'signal_firm_intake_document_change, stamp_client_acceptance, taxpayer_held_by_another_firm, taxpayer_id_for_niu',
   'T-52 every moved helper is in private, and nothing else is'
 );
 

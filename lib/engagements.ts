@@ -91,6 +91,18 @@ export function freshDraftNeedsAcceptance(e: {
   return e.status === "draft" && !e.accepted_at && !e.authorized_at && !e.revoked_at;
 }
 
+/** True only when this same firm already revoked an earlier engagement. */
+export function firmAskedAgain(
+  draftId: string,
+  organizationId: string | null,
+  rows: { id: string; organization_id: string | null; revoked_at: string | null }[],
+): boolean {
+  if (!organizationId) return false;
+  return rows.some(
+    (row) => row.id !== draftId && row.organization_id === organizationId && Boolean(row.revoked_at),
+  );
+}
+
 export type DraftEngagement = {
   taxpayer_id: string;
   /**

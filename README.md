@@ -691,6 +691,7 @@ On the owner's decision of 30 Oct, opening a file for a brand-new client **autho
 the engagement. That grants nothing the firm could not grant itself a second later under
 rule 3 — no other firm holds a taxpayer created in that same call — and `accepted_at`
 stays null, so no client consent is claimed and only the taxpayer can ever write it.
+A later fresh draft (no `authorized_at`) is accepted from the client services board: the update matches `status = 'draft'` and `accepted_at` null, and an empty result is a refusal. `accepted_at` is stamped `now()` in the database for that taxpayer only. The “asking again” sentence is used only when the same firm already has a revoked engagement.
 `draftEngagement()`'s "opening a file is not the authorisation" now describes the
 engagements screen, where drafting and authorising remain two separate acts.
 
