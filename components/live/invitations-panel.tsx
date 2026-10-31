@@ -108,6 +108,8 @@ export function InvitationsPanel({ locale, side }: {
     // must never initiate an RPC. The database remains the authority.
     const invitation = invites.find((item) => item.id === id);
     if (!invitation || invitation.status !== "pending" ||
+        (side === "taxpayer" && invitation.taxpayer_id !== taxpayerId) ||
+        !Number.isFinite(new Date(invitation.expires_at).getTime()) ||
         new Date(invitation.expires_at).getTime() <= Date.now() ||
         (action === "revoked"
           ? invitation.initiated_by !== userId
@@ -126,7 +128,9 @@ export function InvitationsPanel({ locale, side }: {
   }
 
   async function requestFirm() {
-    if (!taxpayerId || !firm || busy) return;
+    // A previously selected firm must still be present in the current directory.
+    if (side !== "taxpayer" || !userId || !taxpayerId || !firm || busy ||
+        !firms.some((candidate) => candidate.id === firm)) return;
     const epoch = authEpoch.current;
     setBusy(true);
     setError("");
@@ -142,7 +146,9 @@ export function InvitationsPanel({ locale, side }: {
   }
 
   async function inviteContact() {
-    if (!engagement || !recipientEmail.trim() || busy) return;
+    // A stale engagement selection must not initiate an invitation for another firm.
+    if (side !== "firm" || !userId || !engagement || !recipientEmail.trim() || busy ||
+        !drafts.some((candidate) => candidate.id === engagement)) return;
     const epoch = authEpoch.current;
     setBusy(true);
     setError("");
@@ -174,7 +180,7 @@ export function InvitationsPanel({ locale, side }: {
               {firms.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </label>
-          <button type="button" disabled={busy || !firm} onClick={() => void requestFirm()}
+          <button type="button" disabled={busy || !firm || !firms.some((candidate) => candidate.id === firm)} onClick={() => void requestFirm()}
             className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-white disabled:opacity-50">
             {fr ? "Envoyer la demande" : "Send request"}
           </button>
@@ -198,7 +204,7 @@ export function InvitationsPanel({ locale, side }: {
               onChange={(e) => setRecipientEmail(e.target.value)}
               className="min-h-[44px] rounded-lg border border-border p-2" />
           </label>
-          <button type="button" disabled={busy || !engagement || !recipientEmail.trim()}
+          <button type="button" disabled={busy || !engagement || !recipientEmail.trim() || !drafts.some((candidate) => candidate.id === engagement)}
             onClick={() => void inviteContact()}
             className="min-h-[44px] rounded-lg bg-navy px-4 text-sm font-semibold text-white disabled:opacity-50">
             {fr ? "Inviter le client" : "Invite client"}
