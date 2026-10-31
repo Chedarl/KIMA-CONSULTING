@@ -223,7 +223,7 @@ set local role anon;
 select is(
   (select count(*) from taxpayers),
   1::bigint,
-  'T-58 with allow_demo_anon on, anon reads the demo taxpayer only'
+  'T-58 control: with allow_demo_anon on, anon reads the demo taxpayer only'
 );
 reset role;
 
