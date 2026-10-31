@@ -15,12 +15,39 @@ export function VendorRoutingLink({ href, label }: { href: string; label: string
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    let live = true;
-    void supabase().rpc("list_unassigned_registrations").then(({ error }) => {
-      if (!live) return;
-      setVisible(!error);
+    let active = true;
+    let epoch = 0;
+    let identity: string | null | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const db = supabase();
+
+    const { data: { subscription } } = db.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      if (nextUserId === identity) return; // Same-user refresh keeps the link.
+      identity = nextUserId;
+      const request = ++epoch;
+      if (timer) clearTimeout(timer);
+      // A previous administrator's link must disappear on sign-out or switch.
+      setVisible(false);
+      if (!nextUserId) return;
+      timer = setTimeout(() => {
+        void db.rpc("list_unassigned_registrations").then(({ error }) => {
+          if (!active || request !== epoch) return;
+          setVisible(!error);
+        }).catch(() => {
+          if (!active || request !== epoch) return;
+          setVisible(false);
+        });
+      }, 0);
     });
-    return () => { live = false; };
+
+    return () => {
+      active = false;
+      ++epoch;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (!visible) return null;
