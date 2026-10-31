@@ -565,7 +565,7 @@ export function InboxWorkspace({
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                       d.review_status === "accepted"
-                        ? "bg-teal-soft text-teal-text"
+                        ? "bg-success-soft text-success-text"
                         : d.review_status === "returned"
                           ? "bg-danger-soft text-danger-text"
                           : "bg-amber-soft text-amber-text"
