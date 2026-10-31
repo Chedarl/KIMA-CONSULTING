@@ -51,6 +51,8 @@ export function ClientService({
   backHref: string;
 }) {
   const [row, setRow] = useState<ComplianceCase | null | undefined>(undefined);
+  // A reused route component must never render the previous case while loading a new caseId.
+  const [loadedCaseId, setLoadedCaseId] = useState<string | null>(null);
   const [requests, setRequests] = useState<CaseRequest[]>([]);
   const [events, setEvents] = useState<CaseEvent[]>([]);
   const [offline, setOffline] = useState(false);
@@ -62,12 +64,20 @@ export function ClientService({
   const copy = usePortalCopy();
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<string | null>(null);
+  const loadEpoch = useRef(0);
+  const authEpoch = useRef(0);
+  // Updated during render: route changes invalidate prior-case mutation completions
+  // even before effect cleanup runs.
+  const activeCaseId = useRef(caseId);
+  activeCaseId.current = caseId;
   const today = todayInDouala();
 
   const load = useCallback(async () => {
+    const epoch = ++loadEpoch.current;
     try {
       const db = supabase();
       const taxpayerId = await sessionTaxpayerId();
+      if (epoch !== loadEpoch.current) return;
       if (!taxpayerId) throw new Error("Authenticated taxpayer required");
       const { data, error } = await db
         .from("compliance_cases")
@@ -75,9 +85,17 @@ export function ClientService({
         .eq("id", caseId)
         .eq("taxpayer_id", taxpayerId)
         .maybeSingle();
+      if (epoch !== loadEpoch.current) return;
       if (error) throw error;
       if (!data) {
         setRow(null);
+        setIds(null);
+        setRequests([]);
+        setEvents([]);
+        setName("");
+        setClientApproved(false);
+        setLoadedCaseId(caseId);
+        setOffline(false);
         return;
       }
       const kase = data as ComplianceCase & { organization_id: string | null };
@@ -87,12 +105,12 @@ export function ClientService({
         .eq("id", kase.engagement_id)
         .eq("taxpayer_id", taxpayerId)
         .maybeSingle();
+      if (epoch !== loadEpoch.current) return;
       if (grantError || !grant || grant.organization_id !== kase.organization_id ||
           grant.revoked_at || !["accepted","authorized"].includes(grant.status) ||
           !(grant.accepted_at || grant.authorized_at)) {
         throw new Error("Case engagement not active");
       }
-      setIds({ taxpayerId, organizationId: grant.organization_id });
       const [rq, ev, tp, consent] = await Promise.all([
         db
           .from("document_requests")
@@ -113,21 +131,62 @@ export function ClientService({
           .eq("case_id", caseId).eq("approval_round", kase.approval_round)
           .maybeSingle(),
       ]);
-      if (consent.error) throw consent.error;
+      if (epoch !== loadEpoch.current) return;
+      if (rq.error || ev.error || tp.error || consent.error) {
+        throw rq.error ?? ev.error ?? tp.error ?? consent.error;
+      }
+      setIds({ taxpayerId, organizationId: grant.organization_id });
       setRow(kase);
       setClientApproved(Boolean(consent.data));
       setRequests((rq.data ?? []) as CaseRequest[]);
       setEvents((ev.data ?? []) as CaseEvent[]);
       setName((tp.data as { legal_name?: string } | null)?.legal_name ?? "");
+      setLoadedCaseId(caseId);
       setOffline(false);
     } catch {
+      if (epoch !== loadEpoch.current) return;
+      // Fail closed: no prior-account case, consent, or request survives a failed read.
       setOffline(true);
       setRow(null);
+      setIds(null);
+      setRequests([]);
+      setEvents([]);
+      setName("");
+      setClientApproved(false);
+      setLoadedCaseId(caseId);
     }
   }, [caseId]);
 
   useEffect(() => {
     void load();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event) => {
+      if (event === "INITIAL_SESSION") return;
+      ++authEpoch.current;
+      ++loadEpoch.current;
+      // Clear the previous identity's approval and case before reloading.
+      setLoadedCaseId(null);
+      setRow(undefined);
+      setIds(null);
+      setRequests([]);
+      setEvents([]);
+      setName("");
+      setClientApproved(false);
+      setOffline(false);
+      setBusy(null);
+      setFailed(null);
+      pending.current = null;
+      if (fileRef.current) fileRef.current.value = "";
+      if (timer) clearTimeout(timer);
+      // Avoid awaiting Supabase requests inside the auth callback.
+      timer = setTimeout(() => { void load(); }, 0);
+    });
+    return () => {
+      ++authEpoch.current;
+      ++loadEpoch.current;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, [load]);
 
   useEffect(() => {
@@ -154,6 +213,8 @@ export function ClientService({
     const req = requests.find((r) => r.id === requestId);
     if (!req || !ids || !row) return;
     if (!(requestIsOutstanding(req.status) && waitsOn(req) === "client")) return;
+    const epoch = authEpoch.current;
+    const actionCaseId = caseId;
     setBusy(requestId);
     setFailed(null);
     const result = await submitRequestFile({
@@ -166,6 +227,7 @@ export function ClientService({
       actorLabel: name || "Client",
       previousStatus: req.status,
     });
+    if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
     setBusy(null);
     if (!result.ok) {
       setFailed(requestId);
@@ -177,28 +239,34 @@ export function ClientService({
 
   async function approveCase() {
     if (!row || !ids || row.stage !== "client_approval" || clientApproved) return;
+    const epoch = authEpoch.current;
+    const actionCaseId = caseId;
     setBusy("client-approval");
     setFailed(null);
     const db = supabase();
     try {
       const { data: auth, error: authError } = await db.auth.getUser();
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
       if (authError || !auth.user) throw new Error("Sign-in required");
       const { error } = await db.from("case_client_approvals").insert({
         case_id: row.id, approval_round: row.approval_round,
         taxpayer_id: ids.taxpayerId, filing_evidence_ref: row.filing_evidence_ref,
         approved_by: auth.user.id,
       });
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
       if (error) throw error;
       setClientApproved(true);
       await load();
     } catch {
-      setFailed("client-approval");
+      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");
     } finally {
-      setBusy(null);
+      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
     }
   }
 
-  if (row === undefined) {
+  // React can reuse this component for a different caseId before effects run.
+  // Do not show the previous case or its approval action during that render.
+  if (row === undefined || loadedCaseId !== caseId) {
     return (
       <div className="flex flex-col gap-2" aria-busy="true">
         {[0, 1].map((i) => (
