@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path=public,extensions;
-select plan(18);
+select plan(20);
 
 insert into auth.users(id,email) values
  ('00000000-0000-4000-a000-00000000e901','p3-firm-a@example.test'),
@@ -99,6 +99,25 @@ select is(
  (select status from engagements where organization_id='00000000-0000-4000-a000-00000000e912'
  and taxpayer_id='00000000-0000-4000-a000-00000000e921'),
  'invited','P3 taxpayer invitation does not yet authorize firm B');
+-- Use the actual invitation ID captured outside RLS to test the RPC recipient guard,
+-- rather than a null ID from a row hidden from the competing firm's session.
+select set_config('test.p3_firm_b_invitation_id',
+ (select id::text from engagement_invitations
+  where organization_id='00000000-0000-4000-a000-00000000e912'
+    and status='pending' limit 1),true);
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-a000-00000000e901","role":"authenticated"}',true);
+select throws_ok(
+ $invite$ select decide_invitation(
+ current_setting('test.p3_firm_b_invitation_id')::uuid,'accepted') $invite$,
+ '42501',null,'P3 partner of firm A cannot accept firm B invitation for shared taxpayer');
+select throws_ok(
+ $invite$ select decide_invitation(
+ current_setting('test.p3_firm_b_invitation_id')::uuid,'revoked') $invite$,
+ '42501',null,'P3 partner of firm A cannot withdraw taxpayer invitation to firm B');
+reset role;
+
 -- Admin-level direct updates still cannot bypass the invitation's decision.
 -- auth.uid remains the recipient firm for the invoker grant guard.
 select set_config('request.jwt.claims',
