@@ -24,10 +24,19 @@ export type PilotTaxpayer = {
   firstArm: "baseline" | "guided";
   cases: PilotCase[];
 };
+export type PilotFirmMeasures = {
+  documentCollectionMinutes: number;
+  followUpMinutes: number;
+  overdueTasks: number;
+  completionVisibility: boolean;
+  willingToPay: boolean;
+};
 export type PilotFirm = {
   consent: boolean;
   city: "Douala" | "Yaoundé";
   testedWorkflow: boolean;
+  /** Plan-mandated pilot measures. Absent or malformed = insufficient evidence. */
+  measures?: PilotFirmMeasures;
 };
 export type PilotInput = { taxpayers: PilotTaxpayer[]; firms: PilotFirm[] };
 export type PilotMetrics = {
@@ -39,8 +48,14 @@ export type PilotMetrics = {
   clarityPercent: number;
   criticalErrors: number;
   falseCompletions: number;
+  /** Mean time-to-correct-action over successful trials only; rounded for display. */
   baselineMeanSeconds: number;
   guidedMeanSeconds: number;
+  firmMeanDocumentCollectionMinutes: number;
+  firmMeanFollowUpMinutes: number;
+  firmOverdueTasksTotal: number;
+  firmCompletionVisibilityPercent: number;
+  firmWillingToPay: number;
 };
 export type PilotAssessment = {
   outcome: "criteria_met" | "not_met";
@@ -54,6 +69,13 @@ const percent = (count: number, n: number) => n ? Math.round((count / n) * 1000)
 const mean = (values: number[]) => values.length
   ? Math.round(values.reduce((sum, n) => sum + n, 0) / values.length)
   : 0;
+/** The five measures the plan requires from every pilot firm. */
+const firmMeasuresValid = (m?: PilotFirmMeasures): m is PilotFirmMeasures => !!m &&
+  Number.isFinite(m.documentCollectionMinutes) && m.documentCollectionMinutes >= 0 &&
+  Number.isFinite(m.followUpMinutes) && m.followUpMinutes >= 0 &&
+  Number.isSafeInteger(m.overdueTasks) && m.overdueTasks >= 0 &&
+  typeof m.completionVisibility === "boolean" &&
+  typeof m.willingToPay === "boolean";
 
 export function assessPhase7Pilot(input: PilotInput): PilotAssessment {
   if (!Array.isArray(input?.taxpayers) || !Array.isArray(input?.firms)) {
@@ -76,6 +98,11 @@ export function assessPhase7Pilot(input: PilotInput): PilotAssessment {
     !taxpayers.some(p => p.firstArm === "guided"), "counterbalance_missing");
   flag(!firms.some(f => f.city === "Douala") || !firms.some(f => f.city === "Yaoundé"), "firm_city_coverage");
   flag(firms.some(f => !f.testedWorkflow), "firm_workflow_missing");
+  // The plan's firm measures are mandatory evidence, not optional extras:
+  // document-collection time, follow-up time, overdue tasks, completion
+  // visibility and willingness to pay. Missing data fails closed.
+  flag(firms.some(f => !firmMeasuresValid(f.measures)), "firm_measures_missing");
+  flag(firms.some(f => f.measures?.completionVisibility === false), "firm_completion_not_visible");
 
   let malformed = false;
   const guided: PilotTrial[] = [];
@@ -107,14 +134,29 @@ export function assessPhase7Pilot(input: PilotInput): PilotAssessment {
   const clear = guided.filter(t => t.understandsUnresolved).length;
   const critical = guided.filter(t => t.criticalWrongInstruction).length;
   const falseCompletions = guided.filter(t => t.falseCompletion).length;
-  const baselineMean = mean(baseline.map(t => t.elapsedSeconds));
-  const guidedMean = mean(guided.map(t => t.elapsedSeconds));
+  // Protocol: time-to-CORRECT-action. An incorrect trial proves nothing about
+  // speed, so both arms filter to successful trials before any comparison.
+  const guidedCorrect = guided.filter(t => t.correctNextAction);
+  const baselineCorrect = baseline.filter(t => t.correctNextAction);
+  const baselineMean = mean(baselineCorrect.map(t => t.elapsedSeconds));
+  const guidedMean = mean(guidedCorrect.map(t => t.elapsedSeconds));
   flag(guided.length === 0 || correct / guided.length < 0.9, "next_action_below_90");
   flag(guided.length === 0 || complete / guided.length < 0.9, "evidence_below_90");
   flag(guided.length === 0 || clear / guided.length < 0.8, "clarity_below_80");
   flag(critical > 0, "critical_wrong_instruction");
   flag(falseCompletions > 0, "false_completion");
-  flag(guided.length === 0 || guidedMean >= baselineMean, "no_directional_time_improvement");
+  // Compare unrounded sums via cross-multiplication: rounding the means first
+  // hides sub-second improvements, and an arm with no successful trials fails
+  // closed rather than borrowing a mean of zero.
+  const guidedSeconds = guidedCorrect.reduce((sum, t) => sum + t.elapsedSeconds, 0);
+  const baselineSeconds = baselineCorrect.reduce((sum, t) => sum + t.elapsedSeconds, 0);
+  flag(guidedCorrect.length === 0 || baselineCorrect.length === 0 ||
+    guidedSeconds * baselineCorrect.length >= baselineSeconds * guidedCorrect.length,
+    "no_directional_time_improvement");
+
+  const measuredFirms = firms.map(f => f.measures).filter(firmMeasuresValid);
+  const firmMean = (pick: (m: PilotFirmMeasures) => number) =>
+    mean(measuredFirms.map(pick));
 
   return {
     outcome: failures.length ? "not_met" : "criteria_met",
@@ -126,6 +168,12 @@ export function assessPhase7Pilot(input: PilotInput): PilotAssessment {
       clarityPercent: percent(clear, guided.length),
       criticalErrors: critical, falseCompletions,
       baselineMeanSeconds: baselineMean, guidedMeanSeconds: guidedMean,
+      firmMeanDocumentCollectionMinutes: firmMean(m => m.documentCollectionMinutes),
+      firmMeanFollowUpMinutes: firmMean(m => m.followUpMinutes),
+      firmOverdueTasksTotal: measuredFirms.reduce((sum, m) => sum + m.overdueTasks, 0),
+      firmCompletionVisibilityPercent:
+        percent(measuredFirms.filter(m => m.completionVisibility).length, firms.length),
+      firmWillingToPay: measuredFirms.filter(m => m.willingToPay).length,
     },
     qualification: "Pilot scoring only; independent security, deployment and field validation remain required.",
   };
