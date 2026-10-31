@@ -12,7 +12,6 @@ returns table (
   id uuid,
   applicant_name text,
   applicant_email text,
-  applicant_phone text,
   taxpayer_type text,
   legal_name text,
   declared_niu text,
@@ -43,7 +42,7 @@ begin
   end if;
 
   return query
-    select r.id, r.applicant_name, r.applicant_email, r.applicant_phone,
+    select r.id, r.applicant_name, r.applicant_email,
            r.taxpayer_type, r.legal_name, r.declared_niu, r.workspace_kind,
            r.intake_channel, r.preferred_language, r.status, r.submitted_at
       from public.registrations r
@@ -56,4 +55,4 @@ grant execute on function public.list_unassigned_registrations() to authenticate
 
 comment on function public.list_unassigned_registrations() is
   'R-48: KIMA-vendor kima_admin reads unassigned registration claims for '
-  'routing. Not client access. Read only; assigning a firm is a later decision.';
+  'routing. No phone number: email is the contact. Not client access. Read only.';

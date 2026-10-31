@@ -37,8 +37,8 @@ select set_config('request.jwt.claims', '', true);
 set local role anon;
 select throws_ok(
   $$ select * from list_unassigned_registrations() $$,
-  '42501', 'KIMA administrator required',
-  'T-340 an anonymous caller cannot list unassigned applications'
+  '42501', 'permission denied for function list_unassigned_registrations',
+  'T-340 an anonymous caller cannot execute the routing list'
 );
 reset role;
 
@@ -90,8 +90,10 @@ select ok(
   position('taxpayer_id' in pg_get_function_result(
     'public.list_unassigned_registrations()'::regprocedure)) = 0
   and position('onboarding' in pg_get_function_result(
+    'public.list_unassigned_registrations()'::regprocedure)) = 0
+  and position('applicant_phone' in pg_get_function_result(
     'public.list_unassigned_registrations()'::regprocedure)) = 0,
-  'T-347 the result has no taxpayer id and no onboarding payload'
+  'T-347 the result has no taxpayer id, onboarding payload, or phone'
 );
 
 select * from finish();
