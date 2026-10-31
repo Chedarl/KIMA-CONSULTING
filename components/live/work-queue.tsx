@@ -62,7 +62,7 @@ const RISK_TONE: Record<Risk, string> = {
   overdue: "border-danger-text/40 bg-danger-soft text-danger-text",
   due_soon: "border-amber/50 bg-amber-soft text-amber-text",
   unknown: "border-border-strong bg-surface-sunken text-fg-muted",
-  on_track: "border-teal/40 bg-teal-soft text-teal-text",
+  on_track: "border-success/40 bg-success-soft text-success-text",
 };
 
 export function WorkQueue({ locale, t }: { locale: "fr" | "en"; t: Dict["queue"] }) {
@@ -201,7 +201,7 @@ export function WorkQueue({ locale, t }: { locale: "fr" | "en"; t: Dict["queue"]
                       <div className="min-w-0">
                         <Link
                           href={`/${locale}/workspace/cases/${c.id}`}
-                          className="font-display text-sm font-semibold text-fg hover:text-navy hover:underline"
+                          className="text-sm font-semibold text-navy hover:underline"
                         >
                           {obligationLabel(c.obligation_code, locale)}
                         </Link>
