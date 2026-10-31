@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(24);
+select plan(29);
 
 insert into auth.users(id,email) values
 ('00000000-0000-4000-a000-00000000f101','p4-firm-a@example.test'),
@@ -73,6 +73,12 @@ $$ update compliance_cases set stage='delivered',closed_at=now()
 where id='00000000-0000-4000-a000-00000000f161' $$,
 '23514', null, 'P4 delivery without signed consent is refused');
 
+-- A firm partner cannot create a client signature by supplying the client's UUID.
+select throws_ok(
+$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
+values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $,
+'42501', null, 'P4 firm cannot impersonate client to forge consent');
+
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -109,10 +115,28 @@ select is(
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
 0::bigint, 'P4 linked client cannot read second taxpayer case at same firm');
+-- Consent must bind to the current approval round and exact verified evidence.
+select throws_ok(
+$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
+values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-FORGED','00000000-0000-4000-a000-00000000f103') $,
+'42501', null, 'P4 client cannot sign unverified evidence');
+select throws_ok(
+$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
+values('00000000-0000-4000-a000-00000000f161',2,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $,
+'42501', null, 'P4 client cannot sign a future approval round');
 select lives_ok(
 $$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
 values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $$,
 'P4 authenticated linked client may approve');
+-- The authenticated client may append consent but cannot rewrite or remove it.
+select throws_ok(
+$ update case_client_approvals set filing_evidence_ref='ACK-FORGED'
+where case_id='00000000-0000-4000-a000-00000000f161' $,
+'42501', null, 'P4 client cannot rewrite a signed approval');
+select throws_ok(
+$ delete from case_client_approvals
+where case_id='00000000-0000-4000-a000-00000000f161' $,
+'42501', null, 'P4 client cannot delete a signed approval');
 reset role;
 
 set local role authenticated;
