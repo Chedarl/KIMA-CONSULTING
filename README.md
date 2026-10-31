@@ -129,6 +129,19 @@ npm run build
 npm start          # serves the production build
 ```
 
+**Phase 7 pilot acceptance contract.** `npm run test:phase7:pilot` scores an
+anonymous, aggregate-only pilot export (never NIUs, names or real documents).
+Taxpayer-side gates: at least 90% correct next action, 90% complete evidence,
+80% clarity on what stays unresolved, zero critical wrong instructions, zero
+false completions, and the guided arm directionally faster than baseline. Time
+is compared as **time-to-correct-action on unrounded sums**: a wrong trial
+never counts as speed, an arm with no successful trials fails closed, and
+rounding is display-only. Every pilot firm must also supply the plan's five
+measures — document-collection minutes, follow-up minutes, overdue tasks,
+completion visibility and willingness to pay. Missing or malformed measures
+fail closed with `firm_measures_missing`; a firm that cannot see completion
+state fails with `firm_completion_not_visible`.
+
 Next.js 14 (App Router) · TypeScript · Tailwind CSS 3 · Supabase.
 
 Fonts: **Inter** (body), **Poppins** (display), **IBM Plex Mono** (figures),
@@ -1107,13 +1120,13 @@ The ordinary public onboarding for taxpayers remains unchanged. For a **local or
 
 Only for an independently isolated staging Supabase project (not `vhrnrbnjhmxrygvyfirf`), set `KIMA_FIRM_SIGNUP_STAGING=1` in addition to the preview flag to exercise the real Supabase Auth OTP adapter (#43) and atomic database RPC (#46). Configure the staging email template with `{{ .Token }}`; verify Auth OTP expiry, resend limits and rate limits. Keep `app_flags.allow_firm_signup=false` everywhere until a reviewed staging test explicitly enables it on **staging only**. The UI never sets that flag. Preview deployments currently point at production; **do not enable staging mode on a production-connected preview.** After owner approval and schema-first release, entrypoint activation is a separate release-gated change.
 
-Public individual/business intake in this review branch asks the applicant to choose a receiving accounting firm from `firm_directory()`, showing KIMA's registration-number check status but making no professional-credential claim. If the directory is empty or inaccessible the form does not silently pick a firm or submit an orphan application. Coordinate deployment with the organization-scoped registrations RLS in #42 and ensure at least one real firm is available before making this version public.
+Public individual/business intake offers an optional receiving-firm choice from `firm_directory()`, showing KIMA's registration-number check status but making no professional-credential claim. Owner decision, 31 Oct 2026: choosing a firm is not a submit requirement. An application sent without one stores `organization_id` as NULL and, under the organization-scoped registrations RLS (#42), stays invisible to every firm — held for explicit routing, never silently assigned. That routing path is follow-up work, tracked openly rather than faked.
 
 General KIMA contact submissions now use `contact_inquiries` rather than unassigned `registrations` records. The dedicated schema in #51 **must** be released before this UI change; normal individual/business onboarding remains firm-choice-only and must not silently route to an unrelated practice.
 
 ### Contact inquiries versus firm-scoped applications (Phase 2)
 
-A general public contact request goes to `public.contact_inquiries`, an append-only, non-tenant inbox readable only by an active authenticated KIMA administrator. This is **not** a `registrations` row and creates no organization, client, or firm authorization. An ordinary onboarding application instead requires an explicitly selected receiving accounting firm, and its row is visible only to that firm under #42. The contact page UI is a separate Agent B change; deploy the table before the UI in the owner-approved release.
+A general public contact request goes to `public.contact_inquiries`, an append-only, non-tenant inbox readable only by an active authenticated KIMA administrator. This is **not** a `registrations` row and creates no organization, client, or firm authorization. An ordinary onboarding application may name a receiving firm — its row is then visible only to that firm under #42 — or stay unassigned, invisible to all firms until explicit routing. The contact page UI is a separate Agent B change; deploy the table before the UI in the owner-approved release.
 
 A visitor may write only the message fields (`contact_name`, `contact_email`, `contact_phone`, `inquiry_kind`, `preferred_language`, `note`). `id` and `received_at` are not granted, so a submitter can neither choose their own primary key nor backdate when KIMA received the message (T-232 .. T-234).
 
