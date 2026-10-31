@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { todayInDouala } from "@/lib/dates";
@@ -71,7 +71,7 @@ export function ClientService({
   // even before effect cleanup runs.
   const activeCaseId = useRef(caseId);
   activeCaseId.current = caseId;
-  useEffect(() => {
+  useLayoutEffect(() => {
     setBusy(null);
     setFailed(null);
     pending.current = null;
