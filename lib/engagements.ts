@@ -77,6 +77,20 @@ export function revokeEngagement(
   };
 }
 
+/**
+ * A returning client's fresh engagement: a draft with no grant and no consent.
+ * The firm must not authorise it alone; the taxpayer accepts it here.
+ * An engagement the firm already authorised (authorized_at set) is not this draft.
+ */
+export function freshDraftNeedsAcceptance(e: {
+  status: string;
+  accepted_at: string | null;
+  authorized_at: string | null;
+  revoked_at: string | null;
+}): boolean {
+  return e.status === "draft" && !e.accepted_at && !e.authorized_at && !e.revoked_at;
+}
+
 export type DraftEngagement = {
   taxpayer_id: string;
   /**

@@ -23,6 +23,7 @@ import {
   type ComplianceCase,
   type Engagement,
 } from "@/lib/cases";
+import { freshDraftNeedsAcceptance } from "@/lib/engagements";
 import { audit, demoIds, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 
@@ -36,6 +37,7 @@ type CardModel = {
   deadline: string | null;
   provisional: boolean;
   status: ClientStatus | "not_started";
+  acceptId: string | null;
 };
 
 const CASE_COLUMNS =
@@ -108,11 +110,13 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
         deadline: focus.due_on,
         provisional: focus.due_needs_confirmation,
         status,
+        acceptId: null,
       });
     }
     const covered = new Set((cases ?? []).map((c) => c.engagement_id).filter(Boolean));
     for (const e of engagements) {
       if (e.revoked_at || covered.has(e.id)) continue;
+      const accept = freshDraftNeedsAcceptance(e);
       out.push({
         id: e.id,
         href: null,
@@ -120,7 +124,8 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
         period: "—",
         deadline: null,
         provisional: false,
-        status: "not_started",
+        status: accept ? "waiting_on_you" : "not_started",
+        acceptId: accept ? e.id : null,
       });
     }
     return out;
@@ -152,6 +157,21 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       { label: copy.badgeFiling, tone: "amber-outline" as const },
       { label: clientStatusLabel(status, locale), tone: status === "filing_verified" ? ("green-outline" as const) : ("muted" as const) },
     ];
+  }
+
+  async function acceptDraft(id: string) {
+    setBusy(true);
+    const { error } = await supabase()
+      .from("engagements")
+      .update({ status: "accepted", accepted_at: new Date().toISOString() })
+      .eq("id", id);
+    setBusy(false);
+    if (error) {
+      toast(copy.acceptDraftFailed, "error");
+      return;
+    }
+    toast(copy.acceptDraftDone);
+    void load();
   }
 
   async function sendRequest() {
@@ -279,7 +299,17 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
                     {inner}
                   </Link>
                 ) : (
-                  <article className="rounded-card border border-border bg-white p-5 shadow-card">{inner}</article>
+                  <article className="rounded-card border border-border bg-white p-5 shadow-card">
+                    {inner}
+                    {card.acceptId && (
+                      <div className="mt-4 border-t border-border pt-4">
+                        <p className="mb-3 text-sm text-fg-muted">{copy.acceptDraftHint}</p>
+                        <PrimaryButton disabled={busy} onClick={() => void acceptDraft(card.acceptId!)}>
+                          {copy.acceptDraft}
+                        </PrimaryButton>
+                      </div>
+                    )}
+                  </article>
                 )}
               </li>
             );
