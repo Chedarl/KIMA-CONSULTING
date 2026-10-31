@@ -89,7 +89,7 @@ type Dict = ReturnType<typeof getWorkspaceDictionary>;
 type Taxpayer = CaseTaxpayer & { id: string; legal_name: string };
 
 const CASE_COLUMNS =
-  "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
+  "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, approval_round, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
 
 const EVENT_COLUMNS =
   "id, case_id, occurred_at, dimension, kind, actor_role, actor_label, from_value, to_value, subject_ref, reason, visibility";
@@ -200,7 +200,7 @@ export function CaseDetail({
   const signInHref = `/${locale}/firm-login`;
   const [row, setRow] = useState<ComplianceCase | null>(null);
   const [taxpayer, setTaxpayer] = useState<Taxpayer | null>(null);
-  const [engagement, setEngagement] = useState<Engagement | null>(null);
+  const [engagement, setEngagement] = useState<(Engagement & { organization_id: string }) | null>(null);
   const [assignments, setAssignments] = useState<
     { taxpayer_id: string; assigned_to: string | null }[]
   >([]);
@@ -210,6 +210,7 @@ export function CaseDetail({
   const [members, setMembers] = useState<FirmMember[]>([]);
   const [session, setSession] = useState<FirmSession | null>(null);
   const [disclose, setDisclose] = useState(false);
+  const [clientApproved, setClientApproved] = useState(false);
   const [tab, setTab] = useState<"firm" | "client">("firm");
   const [note, setNote] = useState("");
   const [noteClient, setNoteClient] = useState(false);
@@ -241,7 +242,7 @@ export function CaseDetail({
       const kase = c as unknown as ComplianceCase;
       setRow(kase);
 
-      const [tp, eng, assigned, reqs, tsk, evs, mem] = await Promise.all([
+      const [tp, eng, assigned, reqs, tsk, evs, mem, consent] = await Promise.all([
         db
           .from("taxpayers")
           .select("id, legal_name, profile_verified, tax_centre, accounting_framework, tax_regime")
@@ -274,10 +275,15 @@ export function CaseDetail({
           .order("occurred_at", { ascending: true })
           .order("created_at", { ascending: true }),
         db.from("firm_members").select("id, person_label, role, active, deactivated_at"),
+        db.from("case_client_approvals").select("case_id")
+          .eq("case_id", caseId).eq("approval_round", kase.approval_round)
+          .maybeSingle(),
       ]);
 
+      if (consent.error) throw consent.error;
+      setClientApproved(Boolean(consent.data));
       setTaxpayer((tp.data ?? null) as Taxpayer | null);
-      setEngagement((eng.data ?? null) as Engagement | null);
+      setEngagement((eng.data ?? null) as (Engagement & { organization_id: string }) | null);
       setAssignments((assigned.data ?? []) as { taxpayer_id: string; assigned_to: string | null }[]);
       setRequests((reqs.data ?? []) as CaseRequest[]);
       setTasks((tsk.data ?? []) as CaseTask[]);
@@ -408,8 +414,9 @@ export function CaseDetail({
       // Supplied only where the gate asks for it. Everywhere else no approval
       // decision has been taken, and pretending otherwise would be the bug.
       approval: to === "filing" && approval ? approval : undefined,
+      clientApproved: to === "delivered" ? clientApproved : undefined,
     }),
-    [member, findings, requests, row, approval],
+    [member, findings, requests, row, approval, clientApproved],
   );
 
   /** Ask the engine what would happen, so the screen can say so in advance. */
@@ -525,8 +532,14 @@ export function CaseDetail({
     setRefusedBy(null);
     try {
       const db = supabase();
-      const { data: org } = await db.from("organizations").select("id").limit(1).maybeSingle();
-      if (!org?.id) throw new Error("no organization");
+      // The requested case must belong to an active, exact-firm engagement.
+      const orgId = engagement?.organization_id;
+      if (!orgId || engagement.id !== row.engagement_id ||
+          engagement.taxpayer_id !== row.taxpayer_id || engagement.revoked_at ||
+          !["authorized", "accepted"].includes(engagement.status) ||
+          !(engagement.authorized_at || engagement.accepted_at)) {
+        throw new Error("No active engagement for this case");
+      }
       const due =
         askDue ||
         (() => {
@@ -536,7 +549,7 @@ export function CaseDetail({
         })();
       const { error } = await db.from("document_requests").insert({
         taxpayer_id: row.taxpayer_id,
-        organization_id: org.id,
+        organization_id: orgId,
         case_id: row.id,
         label_fr: askFr.trim(),
         label_en: askEn.trim(),

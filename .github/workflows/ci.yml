@@ -35,6 +35,8 @@ jobs:
       - run: npm run test:staff:screen
       - run: npm run test:staff:route
       - run: npm run test:staff
+      - run: npm run test:portal:firm-scope
+      - run: npm run test:phase3:mocks
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
