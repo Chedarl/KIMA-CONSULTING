@@ -66,6 +66,10 @@ export function ClientService({
   const pending = useRef<string | null>(null);
   const loadEpoch = useRef(0);
   const authEpoch = useRef(0);
+  // Updated during render: route changes invalidate prior-case mutation completions
+  // even before effect cleanup runs.
+  const activeCaseId = useRef(caseId);
+  activeCaseId.current = caseId;
   const today = todayInDouala();
 
   const load = useCallback(async () => {
@@ -210,6 +214,7 @@ export function ClientService({
     if (!req || !ids || !row) return;
     if (!(requestIsOutstanding(req.status) && waitsOn(req) === "client")) return;
     const epoch = authEpoch.current;
+    const actionCaseId = caseId;
     setBusy(requestId);
     setFailed(null);
     const result = await submitRequestFile({
@@ -222,7 +227,7 @@ export function ClientService({
       actorLabel: name || "Client",
       previousStatus: req.status,
     });
-    if (epoch !== authEpoch.current) return;
+    if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
     setBusy(null);
     if (!result.ok) {
       setFailed(requestId);
@@ -235,26 +240,27 @@ export function ClientService({
   async function approveCase() {
     if (!row || !ids || row.stage !== "client_approval" || clientApproved) return;
     const epoch = authEpoch.current;
+    const actionCaseId = caseId;
     setBusy("client-approval");
     setFailed(null);
     const db = supabase();
     try {
       const { data: auth, error: authError } = await db.auth.getUser();
-      if (epoch !== authEpoch.current) return;
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
       if (authError || !auth.user) throw new Error("Sign-in required");
       const { error } = await db.from("case_client_approvals").insert({
         case_id: row.id, approval_round: row.approval_round,
         taxpayer_id: ids.taxpayerId, filing_evidence_ref: row.filing_evidence_ref,
         approved_by: auth.user.id,
       });
-      if (epoch !== authEpoch.current) return;
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
       if (error) throw error;
       setClientApproved(true);
       await load();
     } catch {
-      if (epoch === authEpoch.current) setFailed("client-approval");
+      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");
     } finally {
-      if (epoch === authEpoch.current) setBusy(null);
+      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
     }
   }
 
