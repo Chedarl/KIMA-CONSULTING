@@ -64,7 +64,7 @@ select is(
   (select string_agg(distinct p.proname, ', ' order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'private'),
-  'auth_identity_is_single, can_see_taxpayer, case_stage_guard, client_taxpayer_ids, '
+  'auth_identity_is_single, can_see_taxpayer, case_client_approval_guard, case_stage_guard, client_taxpayer_ids, '
   'create_invitation_for_contact_internal, create_invitation_internal, current_firm_role, '
   'current_member_id, current_member_label, current_member_org, '
   'decide_invitation_internal, delivered_evidence_lock, demo_taxpayer_id, '

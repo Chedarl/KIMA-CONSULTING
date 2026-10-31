@@ -119,11 +119,13 @@ select is(
 select throws_ok(
 $$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
 values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-FORGED','00000000-0000-4000-a000-00000000f103') $$,
-'42501', null, 'P4 client cannot sign unverified evidence');
+'23514', 'client approval requires the current verified filing evidence for this round',
+'P4 client cannot sign unverified evidence');
 select throws_ok(
 $$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
 values('00000000-0000-4000-a000-00000000f161',2,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $$,
-'42501', null, 'P4 client cannot sign a future approval round');
+'23514', 'client approval requires the current verified filing evidence for this round',
+'P4 client cannot sign a future approval round');
 select lives_ok(
 $$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
 values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $$,
