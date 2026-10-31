@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path=public,extensions;
-select plan(14);
+select plan(18);
 
 insert into auth.users(id,email) values
  ('00000000-0000-4000-a000-00000000e901','p3-firm-a@example.test'),
@@ -108,14 +108,56 @@ select throws_ok(
  where organization_id='00000000-0000-4000-a000-00000000e912'
    and taxpayer_id='00000000-0000-4000-a000-00000000e921' $sql$,
  '42501',null,'P3 pending client invitation cannot be converted to a grant');
+-- Withdrawal must invalidate both recipient replay and direct firm grants.
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
+select lives_ok(
+ $ select decide_invitation(
+ (select id from engagement_invitations
+ where organization_id='00000000-0000-4000-a000-00000000e912'
+   and status='pending' limit 1),'revoked') $,
+ 'P3 taxpayer may withdraw a pending second-firm invitation');
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-a000-00000000e902","role":"authenticated"}',true);
+select throws_ok(
+ $ select decide_invitation(
+ (select id from engagement_invitations
+ where organization_id='00000000-0000-4000-a000-00000000e912'
+   and status='revoked' limit 1),'accepted') $,
+ '23514',null,'P3 withdrawn invitation cannot be accepted or replayed');
+reset role;
+
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-a000-00000000e902","role":"authenticated"}',true);
+select throws_ok(
+ $sql$ update engagements set status='authorized', authorized_at=now()
+ where organization_id='00000000-0000-4000-a000-00000000e912'
+   and taxpayer_id='00000000-0000-4000-a000-00000000e921' $sql$,
+ '42501',null,'P3 withdrawn invitation cannot authorize a direct firm grant');
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
+select lives_ok(
+ $ select * from create_invitation(
+ 'taxpayer_to_firm',
+ '00000000-0000-4000-a000-00000000e912',
+ '00000000-0000-4000-a000-00000000e921',null) $,
+ 'P3 taxpayer may send a new invitation after withdrawal');
+reset role;
+
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e902","role":"authenticated"}',true);
 select lives_ok(
- $$ select decide_invitation(
+ $ select decide_invitation(
  (select id from engagement_invitations
- where organization_id='00000000-0000-4000-a000-00000000e912' limit 1),
- 'accepted') $$,'P3 recipient firm may accept mandate');
+ where organization_id='00000000-0000-4000-a000-00000000e912' and status='pending' limit 1),
+ 'accepted') $,'P3 recipient firm may accept mandate');
 reset role;
 select is(
  (select status from engagements where organization_id='00000000-0000-4000-a000-00000000e912'
