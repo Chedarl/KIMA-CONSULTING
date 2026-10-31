@@ -72,6 +72,7 @@ export function ClientDashboard({
   const pending = useRef<string | null>(null);
   const loadEpoch = useRef(0);
   const authEpoch = useRef(0);
+  const identityRef = useRef<string | null | undefined>(undefined);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -123,10 +124,18 @@ export function ClientDashboard({
   }, [fallbackName]);
 
   useEffect(() => {
+    void supabase().auth.getUser().then(({ data }) => {
+      if (identityRef.current === undefined) identityRef.current = data.user?.id ?? null;
+    });
     void load();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const { data: { subscription } } = supabase().auth.onAuthStateChange((event) => {
-      if (event === "INITIAL_SESSION") return;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED") return;
+      // Refreshes must not invalidate uploads, approvals or active selections.
+      // SIGNED_IN may also fire for the same user: compare stable user IDs.
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      if (nextUserId === identityRef.current) return;
+      identityRef.current = nextUserId;
       // Clear the previous account immediately, before any asynchronous reload.
       ++authEpoch.current;
       ++loadEpoch.current;
