@@ -5,14 +5,14 @@
 /*
  * KIMA OS tokens.
  *
- * The brand colours come from blueprint section 9: deep navy #163B66, teal
- * green #1E9E74, soft gray #E9EEF3, dark text #142235, with amber reserved for
- * genuine attention and warning states.
+ * Owner-decided palette (29 Oct plan §4.5): navy #18243B, indigo #455DA8,
+ * background #F7F9FC, border #DCE3EC, body #273248, success #15803D, with
+ * warning and error reserved for genuine attention states. The old blueprint
+ * navy and teal are retired from the interface.
  *
- * Note the split between a brand colour and its text colour. Teal #1E9E74 is
- * only about 3:1 on white, so it is a fill and graphic colour; teal-text is the
- * darkened variant used for type and icons. Same for amber. The non-negotiable
- * is 4.5:1, so the brand colour cannot double as the text colour.
+ * The `--teal*` token names are kept as compatibility aliases for existing
+ * classes, but they now carry the indigo primary colour rather than teal.
+ * Success is a separate token and must not be confused with the logo emerald.
  */
 
 :root {
@@ -26,18 +26,22 @@
   --fg-muted: 74 90 112; /* 6.8:1 */
   --fg-subtle: 88 102 124; /* 5.9:1 on surface, 5.4:1 on surface-sunken */
 
-  --navy: 22 59 102; /* #163B66 — 9.6:1 on white */
-  --navy-strong: 15 42 74;
-  --navy-soft: 232 238 246;
+  --navy: 24 36 59; /* #18243B — 15.5:1 on white */
+  --navy-strong: 17 25 41;
+  --navy-soft: 232 237 246;
 
-  /* Firm rail stays brand navy in both themes. White on #163B66 is ~11:1. */
-  --rail: 22 59 102;
+  /* Firm rail stays brand navy in both themes. White on #18243B is ~15.5:1. */
+  --rail: 24 36 59;
   --rail-fg: 255 255 255;
   --rail-muted: 213 226 242;
 
-  --teal: 30 158 116; /* #1E9E74 — fills and graphics only */
-  --teal-text: 15 107 79; /* 5.4:1 — type and icons */
-  --teal-soft: 230 244 238;
+  --teal: 69 93 168; /* #455DA8 indigo — primary actions; white text 6.2:1 */
+  --teal-text: 69 93 168; /* #455DA8 — 6.2:1 on white */
+  --teal-soft: 233 238 248;
+
+  --success: 21 128 61; /* #15803D — 5.0:1 on white */
+  --success-text: 21 128 61;
+  --success-soft: 232 245 236; /* #E8F5EC; use #273248 text, not #15803D */
 
   --amber: 245 166 35; /* #F5A623 — fills only */
   --amber-text: 146 64 14; /* 7.0:1 */
@@ -81,13 +85,13 @@
     --fg-muted: 169 184 204;
     --fg-subtle: 132 150 173;
 
-    --navy: 120 165 220;
-    --navy-strong: 160 195 235;
-    --navy-soft: 20 38 62;
+    --navy: 148 171 213;
+    --navy-strong: 176 196 229;
+    --navy-soft: 24 36 59;
 
-    --teal: 53 188 141;
-    --teal-text: 102 214 170;
-    --teal-soft: 14 48 38;
+    --teal: 154 176 224;
+    --teal-text: 190 205 235;
+    --teal-soft: 24 38 68;
 
     --amber: 245 180 90;
     --amber-text: 242 196 120;
@@ -112,13 +116,13 @@
   --fg-muted: 169 184 204;
   --fg-subtle: 132 150 173;
 
-  --navy: 120 165 220;
-  --navy-strong: 160 195 235;
-  --navy-soft: 20 38 62;
+  --navy: 148 171 213;
+  --navy-strong: 176 196 229;
+  --navy-soft: 24 36 59;
 
-  --teal: 53 188 141;
-  --teal-text: 102 214 170;
-  --teal-soft: 14 48 38;
+  --teal: 154 176 224;
+  --teal-text: 190 205 235;
+  --teal-soft: 24 38 68;
 
   --amber: 245 180 90;
   --amber-text: 242 196 120;
@@ -218,7 +222,7 @@ body {
 }
 .lift:hover {
   border-color: rgb(var(--border-strong));
-  box-shadow: 0 6px 20px rgb(20 34 53 / 0.1);
+  box-shadow: 0 20px rgb(20 34 53 / 0.1);
 }
 
 /* Headings use the display face; body stays Inter. */
@@ -533,7 +537,7 @@ h1, h2, h3, .font-display {
  * dark theme chosen on the firm desk does not repaint these screens.
  * Firm routes do not use this class.
  *
- * Teal is darkened just enough for white label text to clear 4.5:1.
+ * Indigo #455DA8 carries white label text at 6.2:1; success stays #15803D.
  */
 .public-site {
   --bg: 255 255 255;
@@ -544,12 +548,12 @@ h1, h2, h3, .font-display {
   --fg: 13 27 42;
   --fg-muted: 71 85 105;
   --fg-subtle: 100 116 139;
-  --navy: 13 27 42;
-  --navy-strong: 8 18 32;
-  --navy-soft: 232 238 246;
-  --teal: 15 122 102; /* #0F7A66 */
-  --teal-text: 12 90 74;
-  --teal-soft: 230 244 238;
+  --navy: 24 36 59;
+  --navy-strong: 17 25 41;
+  --navy-soft: 232 237 246;
+  --teal: 69 93 168;
+  --teal-text: 69 93 168;
+  --teal-soft: 233 238 248;
   --amber: 217 149 40;
   --amber-text: 146 64 14;
   --amber-soft: 255 246 232;
@@ -595,12 +599,12 @@ h1, h2, h3, .font-display {
   --fg: 20 34 53;
   --fg-muted: 71 85 105;
   --fg-subtle: 100 116 139;
-  --navy: 13 27 42;
-  --navy-strong: 13 27 42;
-  --navy-soft: 232 238 246;
-  --teal: 30 158 116;
-  --teal-text: 15 107 79;
-  --teal-soft: 230 244 238;
+  --navy: 24 36 59;
+  --navy-strong: 24 36 59;
+  --navy-soft: 232 237 246;
+  --teal: 69 93 168;
+  --teal-text: 69 93 168;
+  --teal-soft: 233 238 248;
   --amber: 217 149 40;
   --amber-text: 146 64 14;
   --amber-soft: 255 246 232;
