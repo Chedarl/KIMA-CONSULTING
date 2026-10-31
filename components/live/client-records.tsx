@@ -67,6 +67,7 @@ function useClientRecords() {
   const [records, setRecords] = useState<Records | null>(null);
   const [offline, setOffline] = useState(false);
   const loadEpoch = useRef(0);
+  const identityRef = useRef<string | null | undefined>(undefined);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -114,19 +115,29 @@ function useClientRecords() {
   }, []);
 
   useEffect(() => {
-    void load();
+    let active = true;
+    // INITIAL_SESSION establishes the identity before the first records load.
+    // TOKEN_REFRESHED and same-user events must not erase in-progress work.
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const { data: { subscription } } = supabase().auth.onAuthStateChange((event) => {
-      if (event === "INITIAL_SESSION") return;
-      // Clear prior-account records before any asynchronous re-query.
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if (event === "TOKEN_REFRESHED") return;
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      if (identityRef.current === undefined) {
+        identityRef.current = nextUserId;
+        timer = setTimeout(() => { if (active) void load(); }, 0);
+        return;
+      }
+      if (nextUserId === identityRef.current) return;
+      identityRef.current = nextUserId;
       ++loadEpoch.current;
       setRecords(null);
       setOffline(false);
       if (timer) clearTimeout(timer);
-      // Supabase auth callbacks must not await another Supabase operation.
-      timer = setTimeout(() => { void load(); }, 0);
+      timer = setTimeout(() => { if (active && nextUserId) void load(); }, 0);
     });
     return () => {
+      active = false;
       ++loadEpoch.current;
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
