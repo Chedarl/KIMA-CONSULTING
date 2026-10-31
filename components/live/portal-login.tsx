@@ -197,6 +197,7 @@ export function PortalLogin({
             </div>
           ) : (
             <form
+              className="mt-6 flex flex-col gap-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!busy) void requestCode();
