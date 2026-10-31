@@ -124,4 +124,17 @@ assert.match(serviceUpload ?? "", /if \(loadedCaseId !== caseId \|\| row\.id !==
 assert.match(serviceApproval ?? "", /if \(loadedCaseId !== caseId \|\| row\.id !== caseId\) return;/,
   "client approval must reject a stale route before inserting consent");
 
+// An approval must not be submitted or offered before filing evidence is verified.
+// This is a UI contract; database enforcement still requires independent testing.
+assert.match(serviceApproval ?? "",
+  /if \(row\.filing_status !== "verified" \|\| !row\.filing_evidence_ref\?\.trim\(\)\) return;/,
+  "client approval must reject missing or unverified evidence before writing consent");
+assert.match(service.src,
+  /const hasVerifiedEvidence = row\.filing_status === "verified" && Boolean\(row\.filing_evidence_ref\?\.trim\(\)\)/,
+  "approval UI must derive eligibility from verified filing evidence");
+assert.match(service.src, /!clientApproved && !hasVerifiedEvidence/,
+  "unverified evidence must show a non-approval state");
+assert.match(service.src, /!clientApproved && hasVerifiedEvidence && <div className="mt-3">/,
+  "approval action must be hidden until verified evidence exists");
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
