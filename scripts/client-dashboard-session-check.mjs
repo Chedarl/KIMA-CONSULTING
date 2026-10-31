@@ -10,7 +10,7 @@ assert.equal((src.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).l
 assert.match(src, /const epoch = authEpoch\.current;[\s\S]*?if \(epoch !== authEpoch\.current\) return;/,
   "uploads must be invalidated only by an auth change, not a realtime reload");
 
-const authChange = src.split("auth.onAuthStateChange((event) => {")[1]?.split("\n    });")[0];
+const authChange = src.split("auth.onAuthStateChange((event, session) => {")[1]?.split("\n    });")[0];
 assert.ok(authChange, "auth change handler must exist");
 for (const state of ["++loadEpoch.current", "++authEpoch.current", "setIds(null)", "setClientName(fallbackName)",
   "setCases(null)", "setRequests([])", "setBusy(null)", "setFailed(null)",
@@ -25,3 +25,7 @@ assert.match(src, /setClientName\(who\?\.legal_name \?\? fallbackName\)/,
 assert.match(src, /if \(cs\.error \|\| rq\.error \|\| tp\.error\)/,
   "partial query failures must not show stale dashboard data");
 console.log("ok: client dashboard auth-change and stale-response source contracts");
+
+// Token refresh must preserve current identity, pending work and visible data.
+assert.match(src, /event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"/);
+assert.ok(src.includes("if (nextUserId === identityRef.current) return;"));

@@ -75,8 +75,16 @@ assert.match(invitations.src, /auth\.onAuthStateChange\(/);
 assert.match(invitations.src, /const epoch = \+\+loadEpoch\.current;/);
 assert.equal((invitations.src.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length, 3,
   "guard every asynchronous invitation load boundary");
-const authChange = invitations.src.split("auth.onAuthStateChange((event) => {")[1]?.split("\n    });")[0];
+const authChange = invitations.src.split("auth.onAuthStateChange((event, session) => {")[1]?.split("\n    });")[0];
 assert.ok(authChange, "auth state changes must invalidate prior session state");
+// Token refresh is not an identity change. Keep the pending invitation action
+// and selections intact; clear only on sign-out or a different user ID.
+assert.ok(authChange.includes('event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"'),
+  "ignore TOKEN_REFRESHED and other non-identity auth events");
+assert.ok(authChange.includes("if (nextUserId === identityRef.current) return;"),
+  "same-user sign-in must preserve invitation state");
+assert.ok(authChange.indexOf("if (nextUserId === identityRef.current) return;") < authChange.indexOf("setInvites([])"),
+  "identity comparison must precede clearing invitation rows");
 for (const state of ["setUserId(null)", "setTaxpayerId(null)", "setInvites([])",
   "setDrafts([])", "setFirms([])", 'setFirm("")', 'setEngagement("")',
   'setRecipientEmail("")']) {
