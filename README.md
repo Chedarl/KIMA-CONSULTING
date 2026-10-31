@@ -428,8 +428,12 @@ and the `auth-codes` Edge Function carry identical strings, so a sign-in code re
 same whichever path sent it.
 
 Indigo `#455DA8` carries white text at 6.2:1 and success `#15803D` carries
-white or light-surface text at 5.0:1. Amber remains an attention colour whose
-darkened variant carries text. Never use a fill-only colour for text.
+white or light-surface text at 5.0:1. Success **text** on a light surface is
+`#166534` (`--success-text`), 7.1:1 on white; do not set text in `#15803D`.
+`.public-site` and `.client-portal` share one danger fill, `#B91C1C`
+(`--danger: 185 28 28`). White on that fill clears 4.5:1; `#D64545` does not.
+Danger text is the same `#B91C1C`. Amber remains an attention colour
+whose darkened variant carries text. Never use a fill-only colour for text.
 
 Reusable effect utilities in `app/globals.css`, available anywhere in the app:
 
