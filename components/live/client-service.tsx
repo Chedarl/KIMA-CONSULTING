@@ -66,6 +66,8 @@ export function ClientService({
   const pending = useRef<string | null>(null);
   const loadEpoch = useRef(0);
   const authEpoch = useRef(0);
+  // A synchronous lock prevents rapid double-clicks from issuing duplicate consents.
+  const approvalInFlight = useRef<string | null>(null);
   const identityRef = useRef<string | null | undefined>(undefined);
   // Updated during render: route changes invalidate prior-case mutation completions
   // even before effect cleanup runs.
@@ -171,6 +173,7 @@ export function ClientService({
       identityRef.current = nextUserId;
       ++authEpoch.current;
       ++loadEpoch.current;
+      approvalInFlight.current = null;
       // Clear the previous identity's approval and case before reloading.
       setLoadedCaseId(null);
       setRow(undefined);
@@ -191,6 +194,7 @@ export function ClientService({
     return () => {
       ++authEpoch.current;
       ++loadEpoch.current;
+      approvalInFlight.current = null;
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
     };
@@ -252,8 +256,13 @@ export function ClientService({
     if (row.filing_status !== "verified" || !row.filing_evidence_ref?.trim()) return;
     // Do not initiate consent from a stale case while the route is changing.
     if (loadedCaseId !== caseId || row.id !== caseId) return;
+    // React state updates are asynchronous: the button's disabled state alone
+    // cannot prevent two consent inserts from rapid taps on mobile.
+    if (approvalInFlight.current !== null) return;
     const epoch = authEpoch.current;
     const actionCaseId = caseId;
+    const approvalToken = `${epoch}:${caseId}:${row.approval_round}`;
+    approvalInFlight.current = approvalToken;
     setBusy("client-approval");
     setFailed(null);
     const db = supabase();
@@ -273,6 +282,8 @@ export function ClientService({
     } catch {
       if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");
     } finally {
+      // An old account/case completion must not unlock a newer approval.
+      if (approvalInFlight.current === approvalToken) approvalInFlight.current = null;
       if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
     }
   }
