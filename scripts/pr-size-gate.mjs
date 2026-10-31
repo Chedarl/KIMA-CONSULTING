@@ -23,7 +23,11 @@ export function isIntegrationRelease(pr) {
   const nonProductionPhase34 = pr?.number === 103 &&
     pr?.base?.ref === 'integration/phase3-phase4-20261031' &&
     pr?.head?.ref === 'integration/phase3-phase4-resolved-20261031';
-  return phase2 || nonProductionPhase34;
+  // Release aggregation only: exact owner-authorized P3/P4 candidate targeting main.
+  // No exemption for individual feature PRs or a differently named branch.
+  const phase34Release = pr?.number === 113 && pr?.base?.ref === 'main' &&
+    pr?.head?.ref === 'release/phase3-phase4-mainbased-20261031';
+  return phase2 || nonProductionPhase34 || phase34Release;
 }
 
 export function validatePullRequest(pr) {
