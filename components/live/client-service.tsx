@@ -241,6 +241,8 @@ export function ClientService({
 
   async function approveCase() {
     if (!row || !ids || row.stage !== "client_approval" || clientApproved) return;
+    // Client consent must not be offered for unverified or missing filing evidence.
+    if (row.filing_status !== "verified" || !row.filing_evidence_ref?.trim()) return;
     // Do not initiate consent from a stale case while the route is changing.
     if (loadedCaseId !== caseId || row.id !== caseId) return;
     const epoch = authEpoch.current;
@@ -291,6 +293,7 @@ export function ClientService({
     );
   }
 
+  const hasVerifiedEvidence = row.filing_status === "verified" && Boolean(row.filing_evidence_ref?.trim());
   const at = clientStep(status);
 
   return (
@@ -357,7 +360,14 @@ export function ClientService({
                 ? "Vérifiez la preuve de dépôt ci-dessus avant de confirmer."
                 : "Review the filing evidence above before confirming.")}
           </p>
-          {!clientApproved && <div className="mt-3">
+          {!clientApproved && !hasVerifiedEvidence && (
+            <p role="status" className="mt-3 text-sm text-amber-text">
+              {locale === "fr"
+                ? "Validation indisponible tant que le dépôt et sa preuve ne sont pas vérifiés."
+                : "Approval is unavailable until the filing and its evidence are verified."}
+            </p>
+          )}
+          {!clientApproved && hasVerifiedEvidence && <div className="mt-3">
             <PrimaryButton onClick={() => void approveCase()} disabled={busy === "client-approval"}>
               {locale === "fr" ? "Confirmer la validation" : "Confirm approval"}
             </PrimaryButton>
