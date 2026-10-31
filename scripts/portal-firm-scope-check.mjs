@@ -68,4 +68,39 @@ assert.match(detail.src, /engagement\.id !== row\.engagement_id/);
 assert.match(detail.src, /engagement\.taxpayer_id !== row\.taxpayer_id/);
 assert.match(detail.src, /engagement\.revoked_at/);
 assert.match(detail.src, /organization_id: orgId/);
+// Session isolation: stale invitation rows must never survive an account switch.
+// This is a source-contract guard, not a substitute for browser acceptance.
+const invitations = inspect("components/live/invitations-panel.tsx");
+assert.match(invitations.src, /auth\.onAuthStateChange\(/);
+assert.match(invitations.src, /const epoch = \+\+loadEpoch\.current;/);
+assert.equal((invitations.src.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length, 3,
+  "guard every asynchronous invitation load boundary");
+const authChange = invitations.src.split("auth.onAuthStateChange((event) => {")[1]?.split("\n    });")[0];
+assert.ok(authChange, "auth state changes must invalidate prior session state");
+for (const state of ["setUserId(null)", "setTaxpayerId(null)", "setInvites([])",
+  "setDrafts([])", "setFirms([])", 'setFirm("")', 'setEngagement("")',
+  'setRecipientEmail("")']) {
+  assert.ok(authChange.includes(state), "auth change must clear " + state);
+}
+assert.match(invitations.src, /subscription\.unsubscribe\(\)/);
+assert.match(invitations.src, /timer = setTimeout\(\(\) => \{ void load\(\); \}, 0\)/);
+// Mutation responses are also asynchronous: a prior account must not update the new account's UI.
+assert.match(invitations.src, /const authEpoch = useRef\(0\);/);
+assert.ok(authChange.includes("++authEpoch.current"), "auth switch must invalidate mutations");
+for (const action of ["decide", "requestFirm", "inviteContact"]) {
+  const body = invitations.src.split("  async function " + action + "(")[1]?.split("\n  }")[0];
+  assert.ok(body, action + " must exist");
+  assert.ok(body.includes("const epoch = authEpoch.current;"), action + " must capture auth identity");
+  assert.equal((body.match(/if \(epoch !== authEpoch\.current\) return;/g) ?? []).length, 2,
+    action + " must ignore stale RPC results and stale reload completions");
+  const rpcIndex = body.indexOf("await supabase().rpc(");
+  const firstGuard = body.indexOf("if (epoch !== authEpoch.current) return;");
+  const reload = body.indexOf("await load();");
+  const secondGuard = body.lastIndexOf("if (epoch !== authEpoch.current) return;");
+  assert.ok(rpcIndex >= 0 && rpcIndex < firstGuard && firstGuard < reload && reload < secondGuard,
+    action + " must guard both asynchronous boundaries in order");
+}
+assert.ok((invitations.src.match(/\+\+authEpoch\.current;/g) ?? []).length >= 2,
+  "auth epoch must invalidate on account change and unmount");
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
