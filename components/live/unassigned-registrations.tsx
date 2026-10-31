@@ -49,18 +49,53 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
 
   useEffect(() => {
     let active = true;
-    void (async () => {
-      const { data, error: failure } = await supabase().rpc("list_unassigned_registrations");
+    let epoch = 0;
+    let identity: string | null | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const db = supabase();
+
+    // Never let an old administrator's RPC response populate a new account.
+    // Supabase calls are scheduled outside the auth callback.
+    const load = () => {
+      const request = ++epoch;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        void db.rpc("list_unassigned_registrations").then(({ data, error: failure }) => {
+          if (!active || request !== epoch) return;
+          if (failure) {
+            setRows([]);
+            setError(failure.code === "42501" ? "denied" : "offline");
+            return;
+          }
+          setError(null);
+          setRows((data ?? []) as Row[]);
+        }).catch(() => {
+          if (!active || request !== epoch) return;
+          setRows([]);
+          setError("offline");
+        });
+      }, 0);
+    };
+
+    const { data: { subscription } } = db.auth.onAuthStateChange((event, session) => {
       if (!active) return;
-      if (failure) {
-        setRows([]);
-        setError(failure.code === "42501" ? "denied" : "offline");
-        return;
-      }
-      setError(null);
-      setRows((data ?? []) as Row[]);
-    })();
-    return () => { active = false; };
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      if (nextUserId === identity) return; // TOKEN_REFRESHED / same-user events
+      identity = nextUserId;
+      ++epoch;
+      if (timer) clearTimeout(timer);
+      // Clear sensitive applicant rows immediately, before a new RPC completes.
+      setRows(nextUserId ? null : []);
+      setError(nextUserId ? null : "denied");
+      if (nextUserId) load();
+    });
+
+    return () => {
+      active = false;
+      ++epoch;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (rows === null) {
