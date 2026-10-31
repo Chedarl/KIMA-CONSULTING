@@ -19,7 +19,7 @@ Updated from `main` at #150. Open pull requests are not done until they merge.
 - Client approval of a filing is enforced in the database, not only in the screen, and the signed row is immutable after delivery (#144). Switching cases clears in-progress approval state (#145).
 - Client records stay visible across token refresh (#146). An expired-invitation error survives the reload (#147).
 - Light public and client screens pin success colours; success text is `#166534` (#148, #151). The onboarding firm list shows a red error when the directory fails, and a grey note only when it is empty (#149).
-- A KIMA administrator can read unassigned applications (routing fields only, no client file, no phone) (#150). Firm re-authorisation refusals (`42501` / `23514`) are French and English sentences (#155).
+- A KIMA administrator can read unassigned applications (routing fields only, no client file) (#150). Firm re-authorisation refusals (`42501` / `23514`) are French and English sentences (#155).
 
 **Still missing**
 
@@ -32,7 +32,7 @@ Updated from `main` at #150. Open pull requests are not done until they merge.
 - Firm workspace pages brought into the navy palette used by the client portal.
 - A French and English launch checklist that walks the taxpayer and firm journeys.
 - Assigning a firm to an unassigned application. Held until the owner decides. No KIMA administrator account is provisioned in production. Launch validation is not done.
-- Not merged yet: routing nav only for a vendor administrator (#152), a missing auth session shown as signed out rather than offline (#154), the client accept button for a fresh draft (#156), and clearing approval state before paint (#157). The light root danger fill is still `#D64545`.
+- Not merged yet: routing nav only for a vendor administrator, and the list omits the applicant phone (#152); draft serialising client approval after a case switch (#153); a missing auth session shown as signed out rather than offline (#154); the client accept button for a fresh draft (#156); clearing approval state before paint (#157). The light root danger fill is still `#D64545`.
 
 ---
 
