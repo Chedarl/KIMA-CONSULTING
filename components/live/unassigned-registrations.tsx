@@ -60,20 +60,23 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
       const request = ++epoch;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        void db.rpc("list_unassigned_registrations").then(({ data, error: failure }) => {
-          if (!active || request !== epoch) return;
-          if (failure) {
+        void (async () => {
+          try {
+            const { data, error: failure } = await db.rpc("list_unassigned_registrations");
+            if (!active || request !== epoch) return;
+            if (failure) {
+              setRows([]);
+              setError(failure.code === "42501" ? "denied" : "offline");
+              return;
+            }
+            setError(null);
+            setRows((data ?? []) as Row[]);
+          } catch {
+            if (!active || request !== epoch) return;
             setRows([]);
-            setError(failure.code === "42501" ? "denied" : "offline");
-            return;
+            setError("offline");
           }
-          setError(null);
-          setRows((data ?? []) as Row[]);
-        }).catch(() => {
-          if (!active || request !== epoch) return;
-          setRows([]);
-          setError("offline");
-        });
+        })();
       }, 0);
     };
 
