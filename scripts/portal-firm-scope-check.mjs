@@ -71,7 +71,7 @@ assert.match(detail.src, /organization_id: orgId/);
 
 const service = inspect("components/live/client-service.tsx");
 // A session switch must clear the case and consent before an old request resolves.
-assert.match(service.src, /onAuthStateChange\(\(event\) =>/);
+assert.match(service.src, /onAuthStateChange\(\(event, session\) =>/);
 assert.match(service.src, /\+\+authEpoch\.current/);
 assert.match(service.src, /\+\+loadEpoch\.current/);
 assert.match(service.src, /setRow\(undefined\)/);
@@ -94,7 +94,7 @@ assert.match(serviceLoad, /setRow\(kase\);[\s\S]*?setLoadedCaseId\(caseId\);/,
   "successful case load must record the verified case identity");
 assert.match(serviceLoad, /catch \{[\s\S]*?setLoadedCaseId\(caseId\);/,
   "failed case load must settle the current case identity without stale details");
-const serviceAuthChange = service.src.split("auth.onAuthStateChange((event) => {")[1]?.split("\n    });")[0];
+const serviceAuthChange = service.src.split("auth.onAuthStateChange((event, session) => {")[1]?.split("\n    });")[0];
 assert.ok(serviceAuthChange?.includes("setLoadedCaseId(null)"),
   "account changes must invalidate the last loaded case identity");
 
@@ -138,3 +138,7 @@ assert.match(service.src, /!clientApproved && hasVerifiedEvidence && <div classN
   "approval action must be hidden until verified evidence exists");
 
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
+
+// Token refresh must preserve current identity, pending work and visible data.
+assert.match(service.src, /event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"/);
+assert.match(service.src, /if \(nextUserId === identityRef\.current\) return;/);
