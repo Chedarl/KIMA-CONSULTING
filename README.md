@@ -122,7 +122,9 @@ without pretending the modules exist.
 npm install
 npm run dev        # http://localhost:3000
 npm run typecheck
-npm test           # pure-engine assertion harness
+npm test           # pure-engine, upload, and Phase 7 pilot assertion harness
+npm run test:phase7:pilot  # anonymous synthetic pilot scoring regression
+npm run test:phase7:http -- http://localhost:3000  # requires running server
 npm run build
 npm start          # serves the production build
 ```
