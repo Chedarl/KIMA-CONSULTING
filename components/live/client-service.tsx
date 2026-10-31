@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { demoIds, supabase } from "@/lib/supabase";
+import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { todayInDouala } from "@/lib/dates";
 import { submitRequestFile } from "@/lib/submit-request";
 import {
@@ -35,7 +35,7 @@ type Dash = ReturnType<typeof getWorkspaceDictionary>["clientDash"];
 
 
 const CASE_COLUMNS =
-  "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
+  "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, approval_round, organization_id, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
 
 export function ClientService({
   caseId,
@@ -58,6 +58,7 @@ export function ClientService({
   const [failed, setFailed] = useState<string | null>(null);
   const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
   const [name, setName] = useState("");
+  const [clientApproved, setClientApproved] = useState(false);
   const copy = usePortalCopy();
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<string | null>(null);
@@ -66,32 +67,39 @@ export function ClientService({
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      const resolved = await demoIds();
-      setIds(resolved);
-      if (!resolved) {
-        setRow(null);
-        setRequests([]);
-        setEvents([]);
-        setOffline(true);
-        return;
-      }
+      const taxpayerId = await sessionTaxpayerId();
+      if (!taxpayerId) throw new Error("Authenticated taxpayer required");
       const { data, error } = await db
         .from("compliance_cases")
         .select(CASE_COLUMNS)
         .eq("id", caseId)
-        .eq("taxpayer_id", resolved.taxpayerId)
+        .eq("taxpayer_id", taxpayerId)
         .maybeSingle();
       if (error) throw error;
       if (!data) {
         setRow(null);
         return;
       }
-      const kase = data as ComplianceCase;
-      const [rq, ev, tp] = await Promise.all([
+      const kase = data as ComplianceCase & { organization_id: string | null };
+      if (!kase.engagement_id || !kase.organization_id) throw new Error("Missing case engagement");
+      const { data: grant, error: grantError } = await db.from("engagements")
+        .select("organization_id,taxpayer_id,status,accepted_at,authorized_at,revoked_at")
+        .eq("id", kase.engagement_id)
+        .eq("taxpayer_id", taxpayerId)
+        .maybeSingle();
+      if (grantError || !grant || grant.organization_id !== kase.organization_id ||
+          grant.revoked_at || !["accepted","authorized"].includes(grant.status) ||
+          !(grant.accepted_at || grant.authorized_at)) {
+        throw new Error("Case engagement not active");
+      }
+      setIds({ taxpayerId, organizationId: grant.organization_id });
+      const [rq, ev, tp, consent] = await Promise.all([
         db
           .from("document_requests")
           .select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count")
           .eq("case_id", caseId)
+          .eq("taxpayer_id", taxpayerId)
+          .eq("organization_id", grant.organization_id)
           .order("due_on"),
         db
           .from("case_events")
@@ -101,8 +109,13 @@ export function ClientService({
           .eq("case_id", caseId)
           .order("occurred_at", { ascending: false }),
         db.from("taxpayers").select("legal_name").eq("id", kase.taxpayer_id).maybeSingle(),
+        db.from("case_client_approvals").select("case_id")
+          .eq("case_id", caseId).eq("approval_round", kase.approval_round)
+          .maybeSingle(),
       ]);
+      if (consent.error) throw consent.error;
       setRow(kase);
+      setClientApproved(Boolean(consent.data));
       setRequests((rq.data ?? []) as CaseRequest[]);
       setEvents((ev.data ?? []) as CaseEvent[]);
       setName((tp.data as { legal_name?: string } | null)?.legal_name ?? "");
@@ -160,6 +173,29 @@ export function ClientService({
     }
     setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: "submitted" } : r)));
     void load();
+  }
+
+  async function approveCase() {
+    if (!row || !ids || row.stage !== "client_approval" || clientApproved) return;
+    setBusy("client-approval");
+    setFailed(null);
+    const db = supabase();
+    try {
+      const { data: auth, error: authError } = await db.auth.getUser();
+      if (authError || !auth.user) throw new Error("Sign-in required");
+      const { error } = await db.from("case_client_approvals").insert({
+        case_id: row.id, approval_round: row.approval_round,
+        taxpayer_id: ids.taxpayerId, filing_evidence_ref: row.filing_evidence_ref,
+        approved_by: auth.user.id,
+      });
+      if (error) throw error;
+      setClientApproved(true);
+      await load();
+    } catch {
+      setFailed("client-approval");
+    } finally {
+      setBusy(null);
+    }
   }
 
   if (row === undefined) {
@@ -236,6 +272,29 @@ export function ClientService({
           <p className="mt-2 text-xs leading-snug text-fg-subtle">{t.notAFiling}</p>
         </div>
       </section>
+
+      {row.stage === "client_approval" && (
+        <section className="rounded-card border border-border bg-surface px-4 py-4">
+          <h3 className="font-display text-base font-semibold">
+            {locale === "fr" ? "Validation du client" : "Client approval"}
+          </h3>
+          <p className="mt-2 text-sm text-fg-muted">
+            {clientApproved
+              ? (locale === "fr" ? "Validation enregistrée pour ce dépôt." : "Approval recorded for this filing.")
+              : (locale === "fr"
+                ? "Vérifiez la preuve de dépôt ci-dessus avant de confirmer."
+                : "Review the filing evidence above before confirming.")}
+          </p>
+          {!clientApproved && <div className="mt-3">
+            <PrimaryButton onClick={() => void approveCase()} disabled={busy === "client-approval"}>
+              {locale === "fr" ? "Confirmer la validation" : "Confirm approval"}
+            </PrimaryButton>
+          </div>}
+          {failed === "client-approval" && <p role="alert" className="mt-2 text-sm text-danger-text">
+            {locale === "fr" ? "Validation refusée. Vérifiez votre session et réessayez." : "Approval refused. Check your session and try again."}
+          </p>}
+        </section>
+      )}
 
       <section className="rounded-card border border-border bg-surface">
         <h3 className="border-b border-border px-4 py-3 font-display text-base font-semibold">{t.requests}</h3>

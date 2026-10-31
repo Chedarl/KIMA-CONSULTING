@@ -10,6 +10,7 @@ export default function ClientMorePage({ params }: { params: { locale: string } 
   const copy = getPortalDictionary(locale);
   const base = `/${locale}/app`;
   const links = [
+    { href: `${base}/invitations`, label: locale === "fr" ? "Invitations et mandats" : "Invitations and engagements" },
     { href: `${base}/services`, label: copy.nav.services },
     { href: `${base}/requests`, label: copy.nav.requests },
     { href: `${base}/payments`, label: copy.nav.payments },

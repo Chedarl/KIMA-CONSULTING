@@ -439,6 +439,64 @@ try {
     }
   });
 
+  check("L4-1 stage flow requires client approval, and cancellation is terminal", () => {
+    assert.equal(cases.canAdvance("evidence", "delivered"), false);
+    assert.equal(cases.canAdvance("evidence", "client_approval"), true);
+    assert.equal(cases.canAdvance("client_approval", "evidence"), true);
+    assert.equal(cases.canAdvance("client_approval", "delivered"), true);
+    for (const stage of [
+      "documents", "accounting", "preparation", "review",
+      "filing", "evidence", "client_approval",
+    ]) {
+      assert.equal(cases.canAdvance(stage, "cancelled"), true, stage);
+    }
+    for (const stage of ["delivered", "abandoned", "cancelled"]) {
+      assert.equal(cases.isClosed(stage), true);
+      assert.deepEqual(cases.nextStages(stage), []);
+      assert.equal(cases.canAdvance(stage, "documents"), false);
+    }
+    for (const locale of ["fr", "en"]) {
+      assert.ok(cases.stageLabel("client_approval", locale).trim());
+      assert.ok(cases.stageLabel("cancelled", locale).trim());
+      assert.ok(cases.advanceRefusalLabel("client_approval_required", locale).trim());
+    }
+    assert.equal(cases.clientStatus({stage:"client_approval",filing_status:"verified"},false),"waiting_on_you");
+    assert.equal(cases.clientStatus({stage:"cancelled",filing_status:"verified"},false),"closed");
+  });
+
+  check("L4-2 client sign-off is unavailable until filing has been verified", () => {
+    const current = {stage: "evidence", owner: "Case Manager", prepared_by: null};
+    const base = {to: "client_approval", by: "Case Manager", at: "2026-10-30T00:00:00Z"};
+    assert.deepEqual(
+      cases.advance(current, base),
+      {ok:false,reason:"filing_not_verified"},
+    );
+    for (const filing_status of ["not_submitted", "attempted", "awaiting_verification", "correction_required"]) {
+      assert.deepEqual(cases.advance(current, {
+        ...base, filing: {filing_status, payment_evidence_status:"unknown"},
+      }), {ok:false,reason:"filing_not_verified"}, filing_status);
+    }
+    const approved = cases.advance(current, {
+      ...base, filing:{filing_status:"verified",payment_evidence_status:"unknown"},
+    });
+    assert.equal(approved.ok,true);
+    assert.equal(approved.patch.stage,"client_approval");
+  });
+
+  check("L4-1 cannot deliver without verified filing AND client approval", () => {
+    const current = {stage: "client_approval", owner: "Case Manager", prepared_by: null};
+    const verified = {filing_status: "verified", payment_evidence_status: "unknown"};
+    const missingApproval = cases.advance(current, {to:"delivered",by:"Case Manager",filing:verified});
+    assert.deepEqual(missingApproval, {ok:false,reason:"client_approval_required"});
+    const noFiling = cases.advance(current, {to:"delivered",by:"Case Manager",clientApproved:true});
+    assert.deepEqual(noFiling, {ok:false,reason:"filing_not_verified"});
+    const approved = cases.advance(current, {to:"delivered",by:"Case Manager",
+      clientApproved:true,filing:verified,at:"2026-10-30T00:00:00Z"});
+    assert.equal(approved.ok,true);
+    assert.equal(approved.patch?.stage,"delivered");
+    assert.equal(approved.patch?.closed_at,"2026-10-30T00:00:00Z");
+  });
+
   check("T-18 a code is revealed only for an undeliverable address outside production", () => {
     const reveal = (revealFlag, vercelEnv, destination) =>
       authMail.mayRevealCode({ revealFlag, vercelEnv, destination });

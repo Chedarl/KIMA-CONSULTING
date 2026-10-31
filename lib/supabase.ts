@@ -91,8 +91,18 @@ export type ActivityRow = {
  * contact rather than arbitrarily selecting one.
  */
 export type PortalContext =
-  | { status: "ready"; taxpayerId: string; organizationId: string }
-  | { status: "multiple_firms" | "no_firm" | "no_session" | "unavailable" };
+  | { status: "ready"; taxpayerId: string; organizationId: string; organizationIds: string[] }
+  | { status: "multiple_firms"; taxpayerId: string; organizationIds: string[] }
+  | { status: "no_firm" | "no_session" | "unavailable" };
+
+/** A choice is a preference, NEVER proof of authorization. */
+export function savePortalFirmChoice(taxpayerId: string, organizationId: string): void {
+  try {
+    sessionStorage.setItem("kima.portal.selectedFirm", JSON.stringify({ taxpayerId, organizationId }));
+  } catch {
+    // A blocked storage context cannot authorize any firm.
+  }
+}
 
 /** Distinguish an ambiguous firm relationship from a network or auth failure. */
 export async function resolvePortalContext(): Promise<PortalContext> {
@@ -101,20 +111,32 @@ export async function resolvePortalContext(): Promise<PortalContext> {
 
   const { data, error } = await supabase()
     .from("engagements")
-    .select("organization_id")
+    .select("organization_id, accepted_at, authorized_at")
     .eq("taxpayer_id", taxpayerId)
     .in("status", ["accepted", "authorized"])
     .is("revoked_at", null);
   if (error || !data) return { status: "unavailable" };
 
   const organizationIds = [...new Set(
-    data.map((engagement) => engagement.organization_id as string | null).filter(
-      (id): id is string => Boolean(id),
-    ),
+    data.filter((engagement) => Boolean(engagement.accepted_at || engagement.authorized_at))
+      .map((engagement) => engagement.organization_id as string | null)
+      .filter((id): id is string => Boolean(id)),
   )];
-  if (organizationIds.length > 1) return { status: "multiple_firms" };
   if (organizationIds.length === 0) return { status: "no_firm" };
-  return { status: "ready", taxpayerId, organizationId: organizationIds[0] };
+  if (organizationIds.length === 1) {
+    return { status: "ready", taxpayerId, organizationId: organizationIds[0], organizationIds };
+  }
+  let choice: { taxpayerId: string; organizationId: string } | null = null;
+  try {
+    const raw = sessionStorage.getItem("kima.portal.selectedFirm");
+    choice = raw ? JSON.parse(raw) as { taxpayerId: string; organizationId: string } : null;
+  } catch {
+    choice = null;
+  }
+  if (choice?.taxpayerId === taxpayerId && organizationIds.includes(choice.organizationId)) {
+    return { status: "ready", taxpayerId, organizationId: choice.organizationId, organizationIds };
+  }
+  return { status: "multiple_firms", taxpayerId, organizationIds };
 }
 
 export async function demoIds(): Promise<{ taxpayerId: string; organizationId: string } | null> {

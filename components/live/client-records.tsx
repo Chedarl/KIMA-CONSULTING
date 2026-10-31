@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { Card, CardHeader, Timeline } from "@/components/ui";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { EmptyState, PageHeading, Pill } from "@/components/client-portal/ui";
@@ -70,28 +70,33 @@ function useClientRecords() {
   const load = useCallback(async () => {
     try {
       const db = supabase();
+      const taxpayerId = await sessionTaxpayerId();
+      if (!taxpayerId) throw new Error("Authenticated client context required");
       const [tp, cs, rq, ev] = await Promise.all([
         db
           .from("taxpayers")
           .select(
             "id, legal_name, niu, tax_centre, taxpayer_type, tax_regime, accounting_framework, profile_verified",
           )
-          .limit(1),
-        db.from("compliance_cases").select(CASE_COLUMNS).order("due_on", { ascending: true }),
+          .eq("id", taxpayerId).maybeSingle(),
+        db.from("compliance_cases").select(CASE_COLUMNS)
+          .eq("taxpayer_id", taxpayerId).order("due_on", { ascending: true }),
         db
           .from("document_requests")
-          .select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count"),
+          .select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count")
+          .eq("taxpayer_id", taxpayerId),
         db
           .from("case_events")
           .select(
             "id, case_id, occurred_at, dimension, kind, actor_role, actor_label, from_value, to_value, subject_ref, reason, visibility",
           )
+          .eq("taxpayer_id", taxpayerId)
           .order("occurred_at", { ascending: false })
           .limit(50),
       ]);
       if (cs.error) throw cs.error;
       setRecords({
-        taxpayer: ((tp.data ?? [])[0] as TaxpayerRow | undefined) ?? null,
+        taxpayer: (tp.data as TaxpayerRow | null) ?? null,
         cases: (cs.data ?? []) as ComplianceCase[],
         requests: (rq.data ?? []) as CaseRequest[],
         events: (ev.data ?? []) as CaseEvent[],
