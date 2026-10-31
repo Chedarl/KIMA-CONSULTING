@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 
 type Invitation = {
@@ -27,18 +27,26 @@ export function InvitationsPanel({ locale, side }: {
   const [recipientEmail, setRecipientEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const loadEpoch = useRef(0);
 
   const load = useCallback(async () => {
+    const epoch = ++loadEpoch.current;
+    // Never retain a previous account's invitations during a session refresh.
+    setInvites([]);
+    setDrafts([]);
+    setFirms([]);
     const db = supabase();
     const { data: auth, error: authError } = await db.auth.getUser();
+    if (epoch !== loadEpoch.current) return;
     if (authError || !auth.user) {
       setUserId(null);
-      setInvites([]);
+      setTaxpayerId(null);
       setError(fr ? "Connexion requise." : "Sign-in required.");
       return;
     }
     setUserId(auth.user.id);
     const tp = side === "taxpayer" ? await sessionTaxpayerId() : null;
+    if (epoch !== loadEpoch.current) return;
     setTaxpayerId(tp);
     if (side === "taxpayer" && !tp) {
       setError(fr ? "Compte client requis." : "A client account is required.");
@@ -53,6 +61,7 @@ export function InvitationsPanel({ locale, side }: {
         .select("id,taxpayer_id").in("status", ["draft", "invited"])
         .is("revoked_at", null) : Promise.resolve({ data: [] }),
     ]);
+    if (epoch !== loadEpoch.current) return;
     if (rows.error || (side === "taxpayer" && "error" in directory && directory.error)) {
       setError(fr ? "Invitations indisponibles." : "Invitations unavailable.");
       return;
@@ -63,7 +72,32 @@ export function InvitationsPanel({ locale, side }: {
     setError("");
   }, [fr, side]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event) => {
+      if (event === "INITIAL_SESSION") return;
+      ++loadEpoch.current; // Invalidate requests issued under the old identity.
+      setUserId(null);
+      setTaxpayerId(null);
+      setInvites([]);
+      setDrafts([]);
+      setFirms([]);
+      setFirm("");
+      setEngagement("");
+      setRecipientEmail("");
+      setBusy(false);
+      setError("");
+      if (timer) clearTimeout(timer);
+      // Defer getUser: do not await Supabase calls inside the auth callback.
+      timer = setTimeout(() => { void load(); }, 0);
+    });
+    return () => {
+      ++loadEpoch.current;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
+    };
+  }, [load]);
 
   async function decide(id: string, action: "accepted" | "declined" | "revoked") {
     if (!userId || busy) return;
