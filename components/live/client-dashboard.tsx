@@ -80,6 +80,7 @@ export function ClientDashboard({
       if (epoch !== loadEpoch.current) return;
       setIds(resolved);
       if (!resolved) {
+        setClientName(fallbackName);
         setCases([]);
         setRequests([]);
         setOffline(true);
