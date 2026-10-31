@@ -17,17 +17,11 @@ export function changedLines(pr) {
 // The release-only collection PR aggregates previously reviewed <=300-line
 // changes. Its diff necessarily exceeds the per-feature limit; allow only
 // this exact, owner-authorized PR #64, not a name/prefix-based escape hatch.
+// Historical note: the one-off #103/#113 Phase 3/4 release exemptions were
+// removed on 31 Oct 2026 (owner decision). No new exemptions.
 export function isIntegrationRelease(pr) {
-  const phase2 = pr?.number === 64 && pr?.base?.ref === 'main' &&
+  return pr?.number === 64 && pr?.base?.ref === 'main' &&
     pr?.head?.ref === 'phase2/integration-20261030';
-  const nonProductionPhase34 = pr?.number === 103 &&
-    pr?.base?.ref === 'integration/phase3-phase4-20261031' &&
-    pr?.head?.ref === 'integration/phase3-phase4-resolved-20261031';
-  // Release aggregation only: exact owner-authorized P3/P4 candidate targeting main.
-  // No exemption for individual feature PRs or a differently named branch.
-  const phase34Release = pr?.number === 113 && pr?.base?.ref === 'main' &&
-    pr?.head?.ref === 'release/phase3-phase4-mainbased-20261031';
-  return phase2 || nonProductionPhase34 || phase34Release;
 }
 
 export function validatePullRequest(pr) {
