@@ -78,7 +78,7 @@ select is(
 -- the control, not the count: a definer helper that appears in `public` without
 -- being added to this list fails, which is the whole point.
 --
--- firm_directory() joined it with 20261030130000 (R-55). The owner decided a
+-- sign_up_firm() is gated and authenticated-only (D2); it is intentionally\n-- SECURITY DEFINER because firm tables have no direct INSERT RLS policy.\n-- firm_directory() joined it with 20261030130000 (R-55). The owner decided a
 -- firm's name stays public while the record does not, and column grants cannot
 -- express that -- they are table-wide, so narrowing to (id, name) for a visitor
 -- would narrow it for the firm's own members too. It is as narrow as the first
@@ -90,7 +90,7 @@ select is(
       and p.prosecdef
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
-  'can_write_client_note, firm_directory',
+  'can_write_client_note, firm_directory, sign_up_firm',
   'T-53 only the definer functions named here stay callable in public'
 );
 
