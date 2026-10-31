@@ -72,8 +72,8 @@ export function InvitationsPanel({ locale, side }: {
     const { error: failure } = await supabase().rpc("decide_invitation", {
       p_invitation_id: id, p_action: action,
     });
-    if (failure) setError(fr ? "Action refusée ou invitation expirée." : "Action refused or invitation expired.");
     await load();
+    if (failure) setError(fr ? "Action refusée ou invitation expirée." : "Action refused or invitation expired.");
     setBusy(false);
   }
 
@@ -85,8 +85,8 @@ export function InvitationsPanel({ locale, side }: {
       p_direction: "taxpayer_to_firm", p_organization_id: firm,
       p_taxpayer_id: taxpayerId, p_contact_id: null,
     });
-    if (failure) setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
     await load();
+    if (failure) setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
     setBusy(false);
   }
 
@@ -97,11 +97,11 @@ export function InvitationsPanel({ locale, side }: {
     const { error: failure } = await supabase().rpc("create_invitation_for_contact", {
       p_engagement_id: engagement, p_email: recipientEmail.trim(),
     });
+    if (!failure) setRecipientEmail("");
+    await load();
     if (failure) setError(fr
       ? "Destinataire indisponible. Vérifiez le compte client et l'adresse."
       : "Recipient unavailable. Check the client account and email.");
-    else setRecipientEmail("");
-    await load();
     setBusy(false);
   }
 
