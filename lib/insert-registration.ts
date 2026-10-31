@@ -11,9 +11,9 @@ export async function insertRegistration(
   workspaceRef: string,
 ): Promise<"ok" | "failed"> {
   try {
-    // Without an explicit receiving firm, the new RLS policy would make the
-    // application invisible to every firm. Never silently assign one.
-    if (!draft.firmId) return "failed";
+    // Firm choice is optional (owner decision, 31 Oct 2026). An application
+    // without one is stored unassigned: RLS keeps it invisible to every
+    // firm, held for explicit routing — never silently assigned.
     const row = registrationInsert(draft, workspaceRef);
     const db = supabase();
     const first = await db.from("registrations").insert(row.full);

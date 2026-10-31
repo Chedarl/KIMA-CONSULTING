@@ -39,9 +39,11 @@ for(const t of [fr,en]){
 const applicant = { ...onboarding.EMPTY_ONBOARDING, kind:"business",
   name:"Synthetic Applicant", email:"synthetic@example.test",
   legalName:"Example Company", services:["tax"] };
-assert.ok(onboarding.issuesFor("verify",applicant,true).includes("firm"));
+// Firm choice is optional (owner decision, 31 Oct 2026): no firm issue kind.
 assert.deepEqual(onboarding.issuesFor("verify",applicant),[]);
+assert.ok(!onboarding.issuesFor("verify",applicant).includes("firm"));
 const assigned = { ...applicant, firmId:"00000000-0000-4000-8000-000000000001" };
-assert.deepEqual(onboarding.issuesFor("verify",assigned,true),[]);
+assert.deepEqual(onboarding.issuesFor("verify",assigned),[]);
 assert.equal(onboarding.registrationInsert(assigned,"00000000-0000-4000-8000-000000000010").full.organization_id,assigned.firmId);
+assert.equal(onboarding.registrationInsert(applicant,"00000000-0000-4000-8000-000000000010").full.organization_id,undefined);
 console.log("ok firm signup validation, FR/EN, selected-firm queue");
