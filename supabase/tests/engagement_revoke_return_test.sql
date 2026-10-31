@@ -12,16 +12,16 @@
 --   2  the firm revokes the engagement            -> history, not deletion
 --   3  the client comes back: same firm, same NIU -> already_registered,
 --      null taxpayer id, and a FRESH draft        -> the consent path again
---   4  the firm authorises the fresh draft        -> the client is back
+--   4  the firm cannot authorise that draft alone -> consent is required again
+--   5  the taxpayer accepts the fresh draft       -> the client is back
 --
 -- Measured against a replay WITHOUT 20261031020000 (the function as
 -- 20261030220000 left it), the unscoped lookup returns the REVOKED engagement
 -- and no fresh draft is ever inserted. Five of these fail there: T-305 (the
--- id handed back IS the revoked row), T-306, T-307, T-311, T-312. T-310 even
--- passes -- the old code lets the firm "authorise" the revoked row in place,
--- flipping status while revoked_at stays set, a self-contradicting row that
--- grants nothing (R-59 defect (c), still reachable on main; T-311/T-312 are
--- what catch it downstream). The client can never come back, which is the
+-- id handed back IS the revoked row), T-306, T-307, T-311, T-312. T-310
+-- is the consent gate: without 20261031140000 the firm authorises the fresh
+-- draft alone and the assertion that this must be refused does not hold.
+-- The client can never come back through a new acceptance, which is the
 -- defect the owner's 31 Oct decision was meant to close.
 --
 -- Measured against a replay without 20261031010000 either, the SAME five
@@ -40,7 +40,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(14);
+select plan(16);
 
 -- ---------------------------------------------------------------------------
 -- Fixture: one firm, one partner. No taxpayer -- the journey creates it.
@@ -160,19 +160,61 @@ select is(
   'T-309 the fresh draft grants nothing yet: the client is not silently re-opened'
 );
 
--- Step 4. The firm may authorise this draft alone: the only other engagement
--- on the client is its OWN revoked one, and own rows are excluded from the
--- held-by-another-firm check (20261030160000, T-126's carve-out).
-select lives_ok(
+-- Step 4. Owning the revoked history is not consent for the fresh draft.
+-- Before 20261031140000 this update succeeded: the other-firm check ignores
+-- the caller's own rows, so the firm re-authorised with accepted_at null.
+select throws_ok(
   $$ update engagements set status = 'authorized', authorized_at = now()
       where id = (select engagement_id from rr_return) $$,
-  'T-310 step 4: the firm authorises the fresh draft -- its own former client blocks nobody'
+  '42501',
+  'a former client must accept again before this firm can be re-authorised',
+  'T-310 step 4: the firm cannot re-authorise a former client without acceptance'
 );
+
+select is(
+  (select e.status || ' / ' ||
+          case when e.accepted_at is null then 'unaccepted' else 'ACCEPTED' end
+     from engagements e join rr_return r on r.engagement_id = e.id),
+  'draft / unaccepted',
+  'T-310b the refused update leaves the fresh engagement a draft'
+);
+
+-- Step 5. The taxpayer accepts the fresh engagement. That is the consent
+-- the firm is not allowed to record for them.
+reset role;
+
+insert into auth.users (id, email) values
+  ('00000000-0000-4000-e200-0000000000a3', 'client@revret.test');
+
+insert into contacts (id, organization_id, full_name, email, auth_user_id) values
+  ('00000000-0000-4000-e200-0000000000a4', '00000000-0000-4000-e200-0000000000a0',
+   'Returning Client', 'client@revret.test', '00000000-0000-4000-e200-0000000000a3');
+
+insert into contact_account_links (contact_id, taxpayer_id, relationship, portal_access)
+values (
+  '00000000-0000-4000-e200-0000000000a4',
+  (select taxpayer_id from rr_open),
+  'owner', true);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-e200-0000000000a3","role":"authenticated"}', true);
+
+select lives_ok(
+  $$ update engagements set status = 'accepted', accepted_at = now()
+      where id = (select engagement_id from rr_return) $$,
+  'T-314 the taxpayer accepts the fresh engagement again'
+);
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-e200-0000000000a1","role":"authenticated"}', true);
 
 select is(
   (select count(*) from taxpayers t join rr_open o on o.taxpayer_id = t.id),
   1::bigint,
-  'T-311 and reads the client again: the route back works end to end'
+  'T-311 after that acceptance the firm reads the client again'
 );
 
 select is(
