@@ -71,6 +71,12 @@ export function ClientService({
   // even before effect cleanup runs.
   const activeCaseId = useRef(caseId);
   activeCaseId.current = caseId;
+  const seenCaseId = useRef(caseId);
+  if (seenCaseId.current !== caseId) {
+    seenCaseId.current = caseId;
+    setBusy(null);
+    setFailed(null);
+  }
   const today = todayInDouala();
 
   const load = useCallback(async () => {
@@ -274,6 +280,7 @@ export function ClientService({
       if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");
     } finally {
       if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
+      else if (epoch === authEpoch.current) setBusy((current) => (current === "client-approval" ? null : current));
     }
   }
 
