@@ -60,18 +60,32 @@ type Records = {
   events: CaseEvent[];
 };
 
+const EMPTY_RECORDS: Records = { taxpayer: null, cases: [], requests: [], events: [] };
+
 const CASE_COLUMNS =
   "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
 
 function useClientRecords() {
   const [records, setRecords] = useState<Records | null>(null);
   const [offline, setOffline] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
   const loadEpoch = useRef(0);
+  const identityRef = useRef<string | null | undefined>(undefined);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
     try {
       const db = supabase();
+      const { data: auth } = await db.auth.getUser();
+      if (epoch !== loadEpoch.current) return;
+      if (!auth.user) {
+        identityRef.current = null;
+        setSignedOut(true);
+        setOffline(false);
+        setRecords(EMPTY_RECORDS);
+        return;
+      }
+      setSignedOut(false);
       const taxpayerId = await sessionTaxpayerId();
       if (epoch !== loadEpoch.current) return;
       if (!taxpayerId) throw new Error("Authenticated client context required");
@@ -108,18 +122,32 @@ function useClientRecords() {
       setOffline(false);
     } catch {
       if (epoch !== loadEpoch.current) return;
+      setSignedOut(false);
       setOffline(true);
-      setRecords({ taxpayer: null, cases: [], requests: [], events: [] });
+      setRecords(EMPTY_RECORDS);
     }
   }, []);
 
   useEffect(() => {
+    void supabase().auth.getUser().then(({ data }) => {
+      if (identityRef.current === undefined) identityRef.current = data.user?.id ?? null;
+    });
     void load();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const { data: { subscription } } = supabase().auth.onAuthStateChange((event) => {
-      if (event === "INITIAL_SESSION") return;
-      // Clear prior-account records before any asynchronous re-query.
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED") return;
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      if (nextUserId === identityRef.current) return;
+      identityRef.current = nextUserId;
+      // Invalidate in-flight reads. Token refresh is not in the list above.
       ++loadEpoch.current;
+      if (nextUserId === null) {
+        setSignedOut(true);
+        setOffline(false);
+        setRecords(EMPTY_RECORDS);
+        return;
+      }
+      setSignedOut(false);
       setRecords(null);
       setOffline(false);
       if (timer) clearTimeout(timer);
@@ -149,7 +177,7 @@ function useClientRecords() {
     };
   }, [load]);
 
-  return { records, offline, load };
+  return { records, offline, signedOut, load };
 }
 
 function requestsByCase(requests: CaseRequest[]) {
@@ -216,6 +244,7 @@ function Shell({
   subtitle,
   records,
   offline,
+  signedOut,
   dash,
   r,
   children,
@@ -224,6 +253,7 @@ function Shell({
   subtitle: string;
   records: Records | null;
   offline: boolean;
+  signedOut: boolean;
   dash: DashDict;
   r: RecordsDict;
   children: React.ReactNode;
@@ -245,6 +275,10 @@ function Shell({
             <div key={i} className="skeleton h-28 rounded-card" />
           ))}
         </div>
+      ) : signedOut ? (
+        <p role="status" className="rounded-card border border-border bg-surface px-5 py-8 text-sm text-fg">
+          {r.signedOut}
+        </p>
       ) : (
         children
       )}
@@ -264,7 +298,7 @@ export function ClientCompliance({
   dash: DashDict;
   r: RecordsDict;
 }) {
-  const { records, offline } = useClientRecords();
+  const { records, offline, signedOut } = useClientRecords();
   const byCase = useMemo(() => requestsByCase(records?.requests ?? []), [records]);
 
   const tp = records?.taxpayer;
@@ -281,7 +315,7 @@ export function ClientCompliance({
     : [];
 
   return (
-    <Shell title={c.complianceTitle} subtitle={c.complianceSubtitle} records={records} offline={offline} dash={dash} r={r}>
+    <Shell title={c.complianceTitle} subtitle={c.complianceSubtitle} records={records} offline={offline} signedOut={signedOut} dash={dash} r={r}>
       <Card>
         <CardHeader title={c.profileTitle} />
         {!tp ? (
@@ -349,13 +383,13 @@ export function ClientDeclarations({
   dash: DashDict;
   r: RecordsDict;
 }) {
-  const { records, offline } = useClientRecords();
+  const { records, offline, signedOut } = useClientRecords();
   const byCase = useMemo(() => requestsByCase(records?.requests ?? []), [records]);
   const visibleEvents = useMemo(() => timeline(records?.events ?? [], "client"), [records]);
   const stepLabels = [dash.stepDocuments, dash.stepProgress, dash.stepReview, dash.stepFiling, dash.stepDone];
 
   return (
-    <Shell title={c.declarationsTitle} subtitle={c.declarationsSubtitle} records={records} offline={offline} dash={dash} r={r}>
+    <Shell title={c.declarationsTitle} subtitle={c.declarationsSubtitle} records={records} offline={offline} signedOut={signedOut} dash={dash} r={r}>
       {(records?.cases ?? []).length === 0 ? (
         <Card className="px-5 py-8">
           <p className="text-sm text-fg-muted">{r.noCases}</p>
@@ -430,7 +464,7 @@ export function ClientArchive({
   r: RecordsDict;
 }) {
   const copy = usePortalCopy();
-  const { records, offline } = useClientRecords();
+  const { records, offline, signedOut } = useClientRecords();
   const [year, setYear] = useState("all");
   const [kind, setKind] = useState("all");
 
@@ -474,6 +508,10 @@ export function ClientArchive({
           <span className="sr-only">{r.loading}</span>
           <div className="h-28 animate-pulse rounded-card bg-white" />
         </div>
+      ) : signedOut ? (
+        <p role="status" className="rounded-card border border-border bg-white px-5 py-8 text-sm text-fg">
+          {r.signedOut}
+        </p>
       ) : (
         <>
           <div className="flex flex-wrap gap-2">

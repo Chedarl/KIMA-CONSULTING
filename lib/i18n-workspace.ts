@@ -726,6 +726,7 @@ const fr = {
   },
   clientRecords: {
     loading: "Chargement de vos dossiers…",
+    signedOut: "Vous êtes déconnecté. Reconnectez-vous pour voir vos dossiers.",
     profileEmpty: "Votre profil fiscal n'est pas encore enregistré.",
     noCases: "Aucun dossier en cours pour le moment.",
     obligationsTitle: "Vos obligations",
@@ -1689,6 +1690,7 @@ const en: WorkspaceDictionary = {
   },
   clientRecords: {
     loading: "Loading your records…",
+    signedOut: "You are signed out. Sign in again to see your records.",
     profileEmpty: "Your tax profile is not on record yet.",
     noCases: "No case in progress right now.",
     obligationsTitle: "Your obligations",
