@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { Inter, Poppins, IBM_Plex_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
+import "../fonts.css";
 import "../globals.css";
 import { Footer } from "@/components/footer";
 import { SiteFrame } from "@/components/site-frame";
@@ -17,29 +17,12 @@ import { getPublicCopy } from "@/lib/i18n-public";
  * stays for tabular XAF figures and account codes, because neither Poppins nor
  * Inter ships tabular-figure behaviour as reliably for columns of money.
  *
- * Both subsets include latin-ext so French diacritics render from the webfont
- * rather than falling back mid-word.
+ * All three are served from this origin and declared in `app/fonts.css`, which
+ * is where the latin/latin-ext split and the reason for it now live. They were
+ * `next/font/google`, which made every build depend on reaching
+ * fonts.gstatic.com and failed CI three times on 30 Oct in diffs that touched
+ * no TypeScript.
  */
-const inter = Inter({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const poppins = Poppins({
-  subsets: ["latin", "latin-ext"],
-  weight: ["600", "700"],
-  variable: "--font-poppins",
-  display: "swap",
-});
-
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-plex-mono",
-  display: "swap",
-});
 
 /** Unknown locales 404 at the router rather than rendering a shell first. */
 export const dynamicParams = false;
@@ -93,7 +76,7 @@ export default function LocaleLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
       </head>
-      <body className={`${inter.variable} ${poppins.variable} ${plexMono.variable} font-sans`}>
+      <body className="font-sans">
         <a href="#main" className="skip-link">
           {t.nav.skip}
         </a>

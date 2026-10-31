@@ -67,6 +67,7 @@ const out = compile([
   "lib/vault.ts",
   "lib/public-onboarding.ts",
   "lib/auth-mail.ts",
+  "lib/firm-signup-otp.ts",
 ]);
 
 const require = createRequire(import.meta.url);
@@ -81,6 +82,8 @@ const billing = require(join(out, "billing.js"));
 const engagements = require(join(out, "engagements.js"));
 const vault = require(join(out, "vault.js"));
 const onboarding = require(join(out, "public-onboarding.js"));
+const firmSignupOtp = require(join(out, "firm-signup-otp.js"));
+const checkAsync = async (name, fn) => { await fn(); passed += 1; console.log(`ok  ${name}`); };
 
 try {
   check("packCoverage CM has mostly inferred rules", () => {
@@ -603,6 +606,81 @@ try {
     assert.equal(onboarding.isOpenWorkspaceKind("accounting_firm"), false);
     assert.equal(onboarding.isOpenWorkspaceKind("business"), true);
     assert.equal(onboarding.isWorkspaceKind("accounting_firm"), true);
+  });
+
+  await checkAsync("firm signup OTP sends through Supabase Auth with the normalized email", async () => {
+    let sent;
+    const auth = {
+      async signInWithOtp(input) { sent = input; return { error: null }; },
+      async verifyOtp() { throw Error("not called"); },
+    };
+    assert.deepEqual(await firmSignupOtp.sendFirmSignupOtp(auth, "  Owner@Example.Test  "), {
+      ok: true, email: "owner@example.test",
+    });
+    assert.deepEqual(sent, {
+      email: "owner@example.test", options: { shouldCreateUser: true },
+    });
+  });
+
+  await checkAsync("firm signup OTP validates inputs without sending or verifying", async () => {
+    let calls = 0;
+    const auth = {
+      async signInWithOtp() { calls++; return { error: null }; },
+      async verifyOtp() { calls++; return { data: { session: null, user: null }, error: null }; },
+    };
+    assert.deepEqual(await firmSignupOtp.sendFirmSignupOtp(auth, "not-an-email"), {
+      ok: false, reason: "invalid_email",
+    });
+    assert.deepEqual(await firmSignupOtp.verifyFirmSignupOtp(auth, "owner@example.test", "99999"), {
+      ok: false, reason: "invalid_code",
+    });
+    assert.deepEqual(await firmSignupOtp.verifyFirmSignupOtp(auth, "not-an-email", "123456"), {
+      ok: false, reason: "invalid_email",
+    });
+    assert.equal(calls, 0);
+  });
+
+  await checkAsync("firm signup OTP verifies code and requires actual Supabase session", async () => {
+    let verified;
+    const auth = {
+      async signInWithOtp() { throw Error("not called"); },
+      async verifyOtp(input) {
+        verified = input;
+        return { data: {
+          user: { id: "user-1", email: "owner@example.test" },
+          session: { access_token: "synthetic" },
+        }, error: null };
+      },
+    };
+    assert.deepEqual(await firmSignupOtp.verifyFirmSignupOtp(auth, " OWNER@Example.test ", "123456"), {
+      ok: true, userId: "user-1",
+    });
+    assert.deepEqual(verified, { email: "owner@example.test", token: "123456", type: "email" });
+    auth.verifyOtp = async () => ({ data: { user: { id: "user-1", email: "owner@example.test" }, session: null }, error: null });
+    assert.deepEqual(await firmSignupOtp.verifyFirmSignupOtp(auth, "owner@example.test", "123456"), {
+      ok: false, reason: "session_missing",
+    });
+    auth.verifyOtp = async () => ({ data: { user: { id: "user-1", email: "other@example.test" }, session: {} }, error: null });
+    assert.deepEqual(await firmSignupOtp.verifyFirmSignupOtp(auth, "owner@example.test", "123456"), {
+      ok: false, reason: "session_missing",
+    });
+  });
+
+  await checkAsync("firm signup OTP surfaces rate limits and invalid codes safely", async () => {
+    const auth = {
+      async signInWithOtp() { return { error: { message: "rate limit", status: 429 } }; },
+      async verifyOtp() { return { data: { user: null, session: null }, error: { message: "rate limit", status: 429 } }; },
+    };
+    assert.deepEqual(await firmSignupOtp.sendFirmSignupOtp(auth, "owner@example.test"), {
+      ok: false, reason: "rate_limited",
+    });
+    assert.deepEqual(await firmSignupOtp.verifyFirmSignupOtp(auth, "owner@example.test", "123456"), {
+      ok: false, reason: "rate_limited",
+    });
+    auth.verifyOtp = async () => ({ data: { user: null, session: null }, error: { message: "invalid OTP", status: 403 } });
+    assert.deepEqual(await firmSignupOtp.verifyFirmSignupOtp(auth, "owner@example.test", "123456"), {
+      ok: false, reason: "verification_failed",
+    });
   });
 
   console.log(`\n${passed} assertions passed`);

@@ -27,6 +27,14 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:journey
+      # The marketing consistency guard. Without this line it is decorative:
+      # the pricing section could drift back to pairing by position, or the
+      # no-authorization disclaimer could be deleted, and CI would stay green.
+      - run: npm run test:marketing
+      - run: npm run test:staff:contract
+      - run: npm run test:staff:screen
+      - run: npm run test:staff:route
+      - run: npm run test:staff
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co

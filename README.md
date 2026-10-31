@@ -320,6 +320,27 @@ waiting period before `disputed`; no next action or prototype string shows a
 number of days). Each check counts its own assertions and fails if none ran.
 CI runs it on every push (`.github/workflows/ci.yml`, Agent A's).
 
+**Registration privacy (Phase 2 / OD-5).** Public registrations are visible
+to an accounting firm only when `organization_id` names that firm and the
+member holds the required capability. Unassigned applications are **not**
+a shared firm queue and cannot be claimed by whichever firm arrives first.
+A legacy unassigned production registration still needs an explicit routing
+or closure decision; this change does not alter that row.
+
+**Suspension is enforced across all firm identity helpers (R-57).** Alongside
+the original tenant-scoped access checks, the older `firm_member_has()`,
+`current_member_id()` and `current_member_label()` now deny access for
+a suspended firm. A firm's own access returns only after authorized
+unsuspension; its clients remain able to view their own files.
+
+**Firm sign-up name hygiene (Phase 2 / OD-2).** A new accounting firm name
+will use a deterministic collision key (case, accents, punctuation, spacing
+and legal-form labels ignored) to refuse look-alike names. This is not an
+official registration or ONECCA format check. Draft D2 (#46) adds an
+atomic, verified-email `sign_up_firm()` RPC: it creates the unverified firm,
+its partner and an audit record, but `allow_firm_signup` defaults OFF until
+owner-approved release. No production sign-up is enabled.
+
 ### Two synthetic tenants
 
 Isolation cannot be asserted against one tenant, so there is a seed that creates
@@ -454,6 +475,106 @@ under their remote versions, verified on every PR and applied on push to `main`
 (see `supabase/migrations/README.md` and `docs/deployment.md`).
 
 ---
+
+### What the public site offers (Phase 2)
+
+`OPEN_WORKSPACE_KINDS` decides what the home page offers, and it is still
+`individual` and `business` — **the accounting-firm plan exists in the copy and
+is not rendered.** It appears the moment that constant admits
+`accounting_firm`, which is the last step of phase 2 and happens only after two
+firms have been tested side by side.
+
+The pricing section pairs each plan to its workspace **by kind**. It used to
+walk `OPEN_WORKSPACE_KINDS` and take `t.pricing[i]`, which worked only while
+both arrays began with the same two entries in the same order; the third plan
+was simply never reached, and reordering either array would have rendered one
+plan's words under another plan's link.
+
+The firm plan's copy said *"activation goes through a review"*. That was true of
+the design Agent A proposed and false of the one the owner chose on 30 Oct: it
+now says the workspace opens at sign-up and stays marked **unverified** until
+KIMA checks the registration number, which is the safeguard that replaced the
+review.
+
+`npm run test:marketing` holds both: every plan must name its kind, the two
+locales must list the same kinds in the same order, the home page must filter
+rather than pair by position, and the firm plan must not promise a review. It
+also asserts the disclaimer that **no tax-authority authorization, partnership
+or e-filing integration is established or claimed** is still present in both
+locales — a hard constraint, asserted rather than trusted.
+
+### Firm staff management (Phase 2)
+
+A firm partner invites, re-roles and revokes their own staff through one
+database function, `public.manage_firm_staff()`. There is no generic
+`firm_members` write policy and none is added: the table stays fail-closed and
+that function is the only route.
+
+What it will not do, by construction rather than by convention:
+
+| | |
+|---|---|
+| Grant `firm_partner` or `kima_admin` | refused — a partner cannot mint another partner or a KIMA administrator |
+| Reach another firm's staff | the caller's organisation comes from their own bound membership, never from an argument |
+| Act for a suspended firm | the partner check resolves through the access helpers, which exclude a suspended organisation |
+| Send email | nothing is sent from the database; the invitation email is a separate change |
+
+Every invite, role change and revocation appends an audit event.
+
+**A staff email is globally unique**, because `firm_issue_code()` selects a
+member by email — two rows sharing one address would make sign-in ambiguous. The
+migration checks for duplicates before it creates that index and refuses with
+the count and every colliding address. Correct or clear a stale email
+while retaining the membership record; deactivation alone does not satisfy the
+index predicate. Never silently rewrite another member's address. Production was re-checked before release:
+3 member rows, 3 with an email, 3 distinct, 0 duplicate groups.
+
+**Still outstanding:** the staff screens themselves. The function and its rules
+exist and are tested; there is no interface for a partner to use them yet, so
+staff management is reachable only through the RPC. That UI is Agent B's, and
+phase 2 is not done without it.
+
+### Approving an application (Phase 2)
+
+An accountant approves an application through one database function,
+`public.approve_registration()`, and it writes the whole client file or none of
+it: the taxpayer, its engagement, the contact, the account link that is the
+client's own route in, a portal account, the decision on the `registrations`
+row and the audit entry — one transaction, inside the approver's own firm.
+
+`SECURITY INVOKER`, so every policy still applies to every statement; every
+table it touches already had an INSERT policy a firm member can satisfy, so it
+added no policy and no new definer surface.
+
+Three outcomes:
+
+| Outcome | |
+|---|---|
+| `approved` | the client file exists and the application is decided |
+| `already_registered` | the declared NIU is already a client of KIMA, so a draft engagement is recorded for that client to accept and **nothing is approved** — one NIU is one client |
+| `already_approved` | returns the existing file rather than raising, so a double click is not an error and never a second taxpayer |
+
+**Approval does not give the taxpayer portal access.** The portal account is
+created `pending`, and `portal_request_code()` refuses a non-active account, so
+no sign-in code can be issued against it. Activating sign-in is a statement that
+this person holds this identifier; a firm clicking approve is not that, and
+phase 3's invitations are where activation belongs. T-250 asserts the refusal
+from the product's side, so changing `pending` to `active` fails a test rather
+than quietly handing out access.
+
+An application with **no declared NIU** gets no portal account at all, and the
+audit entry says so. `portal_accounts.identifier` *is* the NIU, `NOT NULL` and
+`UNIQUE` — a blank would collide with the next one and an invented one would sit
+in the table looking like an account.
+
+### Staff workspace (Phase 2, behind release gate)
+
+The bilingual `/fr/workspace/staff` and `/en/workspace/staff` routes display
+only the firm's RLS-visible members. Active partners can invite staff or
+reviewers, change those two roles, and revoke access via the audited
+`manage_firm_staff()` RPC; no direct member writes or privilege elevation.
+Invitations do not send email. Staff screens remain unmerged until owner
+approval, staging isolation checks, and final Phase 2 review.
 
 ## Where the work stands
 
@@ -977,3 +1098,23 @@ structurally-valid value.
 - `demo_taxpayer_id()` remains executable; the anon branch that uses it is off
   unless the `allow_demo_anon` row in `app_flags` is true, and that row is false
   on production since 30 Oct 2026
+
+## Phase 2 firm signup review preview (not publicly enabled)
+
+The ordinary public onboarding for taxpayers remains unchanged. For a **local or Vercel preview** build only, set `KIMA_FIRM_SIGNUP_PREVIEW=1` and visit `/fr/register?type=accounting_firm` or `/en/register?type=accounting_firm`. Without that flag the firm route is 404; Vercel production always returns 404 even if the flag is set. The route renders a **clearly identified mock**: no OTP or firm is created.
+
+Only for an independently isolated staging Supabase project (not `vhrnrbnjhmxrygvyfirf`), set `KIMA_FIRM_SIGNUP_STAGING=1` in addition to the preview flag to exercise the real Supabase Auth OTP adapter (#43) and atomic database RPC (#46). Configure the staging email template with `{{ .Token }}`; verify Auth OTP expiry, resend limits and rate limits. Keep `app_flags.allow_firm_signup=false` everywhere until a reviewed staging test explicitly enables it on **staging only**. The UI never sets that flag. Preview deployments currently point at production; **do not enable staging mode on a production-connected preview.** After owner approval and schema-first release, entrypoint activation is a separate release-gated change.
+
+Public individual/business intake in this review branch asks the applicant to choose a receiving accounting firm from `firm_directory()`, showing KIMA's registration-number check status but making no professional-credential claim. If the directory is empty or inaccessible the form does not silently pick a firm or submit an orphan application. Coordinate deployment with the organization-scoped registrations RLS in #42 and ensure at least one real firm is available before making this version public.
+
+General KIMA contact submissions now use `contact_inquiries` rather than unassigned `registrations` records. The dedicated schema in #51 **must** be released before this UI change; normal individual/business onboarding remains firm-choice-only and must not silently route to an unrelated practice.
+
+### Contact inquiries versus firm-scoped applications (Phase 2)
+
+A general public contact request goes to `public.contact_inquiries`, an append-only, non-tenant inbox readable only by an active authenticated KIMA administrator. This is **not** a `registrations` row and creates no organization, client, or firm authorization. An ordinary onboarding application instead requires an explicitly selected receiving accounting firm, and its row is visible only to that firm under #42. The contact page UI is a separate Agent B change; deploy the table before the UI in the owner-approved release.
+
+A visitor may write only the message fields (`contact_name`, `contact_email`, `contact_phone`, `inquiry_kind`, `preferred_language`, `note`). `id` and `received_at` are not granted, so a submitter can neither choose their own primary key nor backdate when KIMA received the message (T-232 .. T-234).
+
+**Release gate: direct Data API writes are OFF.** `app_flags.allow_public_contact_inquiries` defaults to `false`; the INSERT RLS policy refuses anonymous and authenticated submissions until this separate flag is explicitly enabled. This matters because PostgREST exposes the table independently of any Next.js route, so a route-only throttle or captcha cannot secure direct REST writes. Keep the flag OFF until abuse protection covers the Data API path and the owner approves activation. The synthetic pgTAP test temporarily enables the flag inside a rolled-back transaction; it does not activate production.
+
+KIMA administrator safeguard (review branch): `admin_review_firm(firm_uuid, 'verify'|'suspend'|'unsuspend', reason)` is an audited privileged RPC limited to an active Auth-bound `kima_admin` of a `kind='kima'` organization. It changes only accounting firms, requires a documented reason, and never certifies professional qualifications. No public organization UPDATE permission is granted; operator provisioning and live activation require explicit owner approval. Synthetic pgTAP covers denied callers and the two-firm signup isolation path.

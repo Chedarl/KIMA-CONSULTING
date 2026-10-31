@@ -74,6 +74,14 @@ jobs:
             echo "No SQL tests in supabase/tests."
           fi
 
+      - name: Two-session taxpayer first-grant race
+        if: steps.check.outputs.present == 'true'
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+          fi
+          bash scripts/test-two-session-first-grant.sh
+
       - name: Check for schema drift against committed migrations
         if: steps.check.outputs.present == 'true'
         run: |

@@ -47,19 +47,24 @@ const fr = {
       "Le prix dépend du travail réel. Nous le chiffrons après un court échange — pas de barème inventé ici.",
     pricing: [
       {
+        kind: "individual",
         title: "Particulier",
         body: "Déclarations personnelles et un interlocuteur qui vous répond.",
         cta: "Créer un espace particulier",
       },
       {
+        kind: "business",
         title: "Entreprise",
         body: "Suivi fiscal et comptable de la société, pièces et échéances.",
         cta: "Créer un espace entreprise",
       },
       {
+        // Pas encore proposé : OPEN_WORKSPACE_KINDS décide ce qui s'affiche.
+        kind: "accounting_firm",
         title: "Cabinet comptable",
-        body: "Un espace pour votre cabinet. L'activation passe par une revue.",
-        cta: "Demander un espace cabinet",
+        body:
+          "Un espace pour votre cabinet, ouvert dès l'inscription. Il reste marqué non vérifié tant que KIMA n'a pas contrôlé votre numéro d'inscription.",
+        cta: "Créer un espace cabinet",
       },
     ],
     aboutTitle: "À propos",
@@ -97,7 +102,9 @@ const fr = {
     contactSend: "Envoyer",
     contactSending: "Envoi…",
     contactDone: "Message reçu. Nous vous répondons sous un jour ouvré.",
-    contactFailed: "Envoi impossible pour le moment. Réessayez dans un instant.",
+    contactFailed: "Votre message n’a pas été envoyé. Vous pouvez le copier pour contacter KIMA par un autre canal.",
+    contactCopy: "Copier mon message",
+    contactCopied: "Message copié",
     kinds: {
       individual: "Particulier",
       business: "Entreprise",
@@ -190,6 +197,12 @@ const fr = {
       "Le numéro de contribuable (NIU), si vous l'avez. Le numéro du registre de commerce n'est pas la même chose.",
     contactsIntro: "Une autre personne peut suivre le dossier avec vous. Vous pouvez passer cette étape.",
     servicesIntro: "Choisissez ce que nous devons préparer. Vous pourrez en ajouter plus tard, avec votre interlocuteur.",
+    firmSelect: "Cabinet chargé de votre demande",
+    firmHelp: "Choisissez le cabinet destinataire. Son nom et sa vérification sont les seules informations publiques.",
+    firmLoading: "Chargement des cabinets…",
+    firmNone: "Aucun cabinet disponible. Contactez KIMA ; la demande ne sera pas attribuée par défaut.",
+    firmUnverified: "Non vérifié par KIMA — numéro non encore contrôlé",
+    firmVerified: "Numéro contrôlé par KIMA (ne certifie pas une qualification)",
     serviceItems: [
       { key: "tax", title: "Déclarations fiscales", body: "Particuliers et sociétés" },
       { key: "dsf", title: "Préparation de la DSF", body: "Sage, Excel ou manuel" },
@@ -228,6 +241,7 @@ const fr = {
       niu: "Ce numéro est trop court. Vérifiez-le, ou laissez le champ vide.",
       contactEmail: "L'e-mail du contact n'est pas valide.",
       contactPhone: "Le téléphone du contact n'est pas valide.",
+      firm: "Choisissez un cabinet avant d’envoyer la demande.",
       services: "Choisissez au moins un service.",
       inviteEmail: "Indiquez un e-mail valide.",
       failed: "Enregistrement impossible pour le moment. Réessayez dans un instant.",
@@ -299,19 +313,24 @@ const en: PublicCopy = {
       "The price follows the actual work. We quote it after a short conversation — no invented price list here.",
     pricing: [
       {
+        kind: "individual",
         title: "Individual",
         body: "Personal filings and a person who answers you.",
         cta: "Create an individual workspace",
       },
       {
+        kind: "business",
         title: "Business",
         body: "Company tax and accounting, documents and deadlines.",
         cta: "Create a business workspace",
       },
       {
+        // Not offered yet: OPEN_WORKSPACE_KINDS decides what appears.
+        kind: "accounting_firm",
         title: "Accounting firm",
-        body: "A workspace for your practice. Activation goes through a review.",
-        cta: "Request a firm workspace",
+        body:
+          "A workspace for your practice, open as soon as you sign up. It stays marked unverified until KIMA has checked your registration number.",
+        cta: "Create a firm workspace",
       },
     ],
     aboutTitle: "About",
@@ -349,7 +368,9 @@ const en: PublicCopy = {
     contactSend: "Send",
     contactSending: "Sending…",
     contactDone: "Message received. We reply within one working day.",
-    contactFailed: "Could not send just now. Try again in a moment.",
+    contactFailed: "Your message was not sent. You can copy it to contact KIMA through another channel.",
+    contactCopy: "Copy my message",
+    contactCopied: "Message copied",
     kinds: {
       individual: "Individual",
       business: "Business",
@@ -442,6 +463,12 @@ const en: PublicCopy = {
       "The taxpayer number (NIU), if you have it. A trade-register number is not the same thing.",
     contactsIntro: "Someone else can follow the file with you. You can skip this step.",
     servicesIntro: "Choose what we should prepare. You can add more later, with your contact at Kima.",
+    firmSelect: "Firm receiving your application",
+    firmHelp: "Select the receiving firm. Only its name and verification label are public.",
+    firmLoading: "Loading accounting firms…",
+    firmNone: "No firm is available. Contact KIMA; we will not silently assign your application.",
+    firmUnverified: "Unverified by KIMA — registration number not yet checked",
+    firmVerified: "Number checked by KIMA (not a professional qualification)",
     serviceItems: [
       { key: "tax", title: "Tax Declarations", body: "Personal & corporate" },
       { key: "dsf", title: "DSF Preparation", body: "Sage, Excel or manual" },
@@ -479,6 +506,7 @@ const en: PublicCopy = {
       niu: "That number is too short. Check it, or leave the field blank.",
       contactEmail: "The contact email does not look valid.",
       contactPhone: "The contact phone number does not look valid.",
+      firm: "Choose a firm before sending the application.",
       services: "Choose at least one service.",
       inviteEmail: "Enter a valid email.",
       failed: "Could not save just now. Try again in a moment.",

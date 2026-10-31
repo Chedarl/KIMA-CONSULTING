@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { insertRegistration } from "@/lib/insert-registration";
+import { submitKimaContact } from "@/lib/submit-kima-contact";
 import type { getPublicCopy } from "@/lib/i18n-public";
 import {
   contactLeadIssues,
@@ -26,6 +26,7 @@ export function ContactForm({ locale, copy }: { locale: "fr" | "en"; copy: Copy 
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -51,10 +52,22 @@ export function ContactForm({ locale, copy }: { locale: "fr" | "en"; copy: Copy 
     setFailed(false);
     if (found.length > 0) return;
     setBusy(true);
-    const result = await insertRegistration(draft, crypto.randomUUID());
+    const result = await submitKimaContact(draft);
     setBusy(false);
     if (result === "ok") setDone(true);
     else setFailed(true);
+  }
+
+  // Offline/disabled contact intake must never be described as sent.
+  // Let the visitor preserve their own message for another contact channel.
+  async function copyUnsentInquiry() {
+    const content = [name, email, phone, kind, note].filter(Boolean).join("\n");
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
   }
 
   if (done) {
@@ -123,6 +136,7 @@ export function ContactForm({ locale, copy }: { locale: "fr" | "en"; copy: Copy 
         {t.contactMessage}
         <textarea
           value={note}
+          maxLength={2000}
           onChange={(e) => setNote(e.target.value)}
           rows={4}
           className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
@@ -136,9 +150,13 @@ export function ContactForm({ locale, copy }: { locale: "fr" | "en"; copy: Copy 
         </ul>
       )}
       {failed && (
-        <p role="alert" className="text-sm text-danger-text">
-          {t.contactFailed}
-        </p>
+        <div role="alert" className="flex flex-col items-start gap-2 text-sm text-danger-text">
+          <p>{t.contactFailed}</p>
+          <button type="button" className="underline underline-offset-2"
+            onClick={() => void copyUnsentInquiry()}>
+            {copied ? t.contactCopied : t.contactCopy}
+          </button>
+        </div>
       )}
       <button type="submit" disabled={busy} className="public-cta inline-flex min-h-[44px] w-fit items-center rounded-lg px-5 text-sm font-semibold disabled:opacity-60">
         {busy ? t.contactSending : t.contactSend}
