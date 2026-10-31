@@ -76,8 +76,14 @@ function useClientRecords() {
     const epoch = ++loadEpoch.current;
     try {
       const db = supabase();
-      const { data: auth } = await db.auth.getUser();
+      const { data: auth, error: authError } = await db.auth.getUser();
       if (epoch !== loadEpoch.current) return;
+      if (authError) {
+        setSignedOut(false);
+        setOffline(true);
+        setRecords(EMPTY_RECORDS);
+        return;
+      }
       if (!auth.user) {
         identityRef.current = null;
         setSignedOut(true);
@@ -85,6 +91,7 @@ function useClientRecords() {
         setRecords(EMPTY_RECORDS);
         return;
       }
+      if (identityRef.current === undefined) identityRef.current = auth.user.id;
       setSignedOut(false);
       const taxpayerId = await sessionTaxpayerId();
       if (epoch !== loadEpoch.current) return;
@@ -129,9 +136,6 @@ function useClientRecords() {
   }, []);
 
   useEffect(() => {
-    void supabase().auth.getUser().then(({ data }) => {
-      if (identityRef.current === undefined) identityRef.current = data.user?.id ?? null;
-    });
     void load();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const { data: { subscription } } = supabase().auth.onAuthStateChange((event, session) => {
