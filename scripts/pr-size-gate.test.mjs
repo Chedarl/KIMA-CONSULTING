@@ -22,6 +22,16 @@ test('explicit release aggregation #64 may exceed 300 changed lines, not other P
   assert.throws(() => validatePullRequest({ ...release, head: { ref: 'another-branch' } }), /4400.*300/);
 });
 
+test('only Phase 3/4 integration PR #103 may aggregate changes on the isolated branch', () => {
+  const integration = { number: 103, additions: 5000, deletions: 500,
+    base: { ref: 'integration/phase3-phase4-20261031' },
+    head: { ref: 'integration/phase3-phase4-resolved-20261031' } };
+  assert.equal(validatePullRequest(integration), 5500);
+  assert.throws(() => validatePullRequest({ ...integration, number: 104 }), /5500.*300/);
+  assert.throws(() => validatePullRequest({ ...integration, base: { ref: 'main' } }), /5500.*300/);
+  assert.throws(() => validatePullRequest({ ...integration, head: { ref: 'some-other-branch' } }), /5500.*300/);
+});
+
 test('missing or invalid size metadata fails closed', () => {
   for (const payload of [{}, { additions: 0 }, { additions: -1, deletions: 2 },
     { additions: 3.5, deletions: 0 }, { additions: '100', deletions: 2 }]) {
