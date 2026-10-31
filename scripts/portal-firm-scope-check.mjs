@@ -141,4 +141,4 @@ console.log("ok: live engagement recipient selector and case-scoped tenant routi
 
 // Token refresh must preserve current identity, pending work and visible data.
 assert.match(service.src, /event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"/);
-assert.match(service.src, /if \(nextUserId === identityRef\.current\) return;/);
+assert.ok(service.src.includes("if (nextUserId === identityRef.current) return;"));
