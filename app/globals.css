@@ -625,7 +625,7 @@ h1, h2, h3, .font-display {
   --success: 21 128 61; /* #15803D fill */
   --success-text: 22 101 52; /* #166534 — 7.1:1 on white */
   --success-soft: 232 245 236; /* #E8F5EC */
-  --danger: 185 28 28;
+  --danger: 214 69 69; /* #D64545 — same fill as .public-site */
   --danger-text: 185 28 28;
   --danger-soft: 254 232 232;
   color-scheme: light;
