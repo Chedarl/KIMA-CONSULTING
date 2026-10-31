@@ -112,7 +112,7 @@ set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e902","role":"authenticated"}',true);
 select lives_ok(
- $ select decide_invitation(
+ $$ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e912' limit 1),
  'accepted') $$,'P3 recipient firm may accept mandate');
