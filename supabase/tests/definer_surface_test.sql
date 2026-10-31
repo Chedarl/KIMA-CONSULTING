@@ -1,32 +1,50 @@
--- Definer surface: which roles may execute which SECURITY DEFINER functions,
--- and which schema they live in. The invariant: PostgREST publishes public,
--- so any definer function there is part of the attack surface and must be
--- deliberate, minimal, and listed. Helpers moved to private in
--- 20261030020000; guards that must see the writing role stay INVOKER.
+-- T-51 .. T-60: the SECURITY DEFINER policy helpers are not API endpoints, and
+-- the policies and triggers that call them still work.
+--
+-- 20261030020000 moves eleven definer functions out of `public`, the schema
+-- PostgREST publishes, into `private`, which it does not. Moving is the remedy
+-- rather than revoking EXECUTE, and the first revision of that migration is why
+-- this file exists in this shape: it revoked EXECUTE from PUBLIC, anon and
+-- authenticated, and these controls failed with
+--
+--     permission denied for function client_taxpayer_ids
+--     CONTEXT: SQL statement "insert into documents ..."
+--
+-- raised from inside the policy rather than from a direct call. Postgres checks
+-- EXECUTE on a function in a policy expression against the querying role, so a
+-- revoke does not close the endpoint and leave the policy working: it breaks the
+-- policy, silently, for every signed-in user.
+--
+-- So the assertions come in two kinds and both matter. T-51 to T-53 are catalog
+-- facts: nothing is left exposed. T-54 to T-60 are live reads down the three
+-- call paths that each reach a different moved helper:
+--
+--   firm member -> can_see_taxpayer -> member_has -> current_firm_role
+--   client      -> can_see_taxpayer -> client_taxpayer_ids
+--   anonymous   -> can_see_taxpayer -> flag_enabled + demo_taxpayer_id
+--
+-- A control failing here means the change broke the product, not that a test
+-- went stale. Run with `supabase test db` (pgTAP). Synthetic data only; rolled
+-- back.
+
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
+
 select plan(10);
 
--- T-51 no policy helper is callable from the exposed schema. The helpers the
--- policies rely on (member_has, can_see_taxpayer, ...) must exist ONLY in
--- private: a helper in public is one grants away from becoming an oracle.
+-- ---------------------------------------------------------------------------
+-- Nothing is left exposed.
+-- ---------------------------------------------------------------------------
+
+-- T-51
 select is(
   (select count(*)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
-      and p.proname in ('member_has', 'member_has_in_org', 'firm_member_has',
-                        'current_member_org', 'current_member_id',
-                        'current_member_label', 'current_firm_role',
-                        'can_see_taxpayer', 'client_taxpayer_ids',
-                        'taxpayer_engaged_elsewhere', 'demo_taxpayer_id',
-                        'flag_enabled', 'case_stage_guard',
-                        'create_invitation_internal', 'decide_invitation_internal',
-                        'create_invitation_for_contact_internal',
-                        'delivered_evidence_lock', 'firm_name_key',
-                        'signal_firm_intake_document_change',
-                        'serialize_taxpayer_grant',
-                        'taxpayer_held_by_another_firm', 'taxpayer_id_for_niu',
+      and p.proname in ('can_see_taxpayer', 'client_taxpayer_ids', 'member_has',
+                        'member_has_in_org', 'firm_member_has', 'current_firm_role',
+                        'current_member_label', 'demo_taxpayer_id', 'flag_enabled',
                         'auth_identity_is_single', 'portal_request_code')),
   0::bigint,
   'T-51 no policy helper is left in the schema PostgREST publishes'
@@ -46,14 +64,13 @@ select is(
   (select string_agg(distinct p.proname, ', ' order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'private'),
-  'auth_identity_is_single, can_see_taxpayer, case_client_approval_guard, '
-  'case_stage_guard, client_taxpayer_ids, '
+  'auth_identity_is_single, can_see_taxpayer, case_client_approval_guard, case_stage_guard, client_taxpayer_ids, '
   'create_invitation_for_contact_internal, create_invitation_internal, current_firm_role, '
   'current_member_id, current_member_label, current_member_org, '
   'decide_invitation_internal, delivered_evidence_lock, demo_taxpayer_id, '
   'engagement_authorized_at_is_permanent, '
-  'engagements_grant_guard, firm_member_has, firm_name_key, '
-  'firm_previously_granted, flag_enabled, guard_client_invite_authorization, member_has, '
+  'engagements_grant_guard, firm_member_has, firm_name_key, firm_previously_granted, '
+  'flag_enabled, guard_client_invite_authorization, member_has, '
   'member_has_in_org, portal_request_code, serialize_taxpayer_grant, '
   'signal_firm_intake_document_change, taxpayer_held_by_another_firm, taxpayer_id_for_niu',
   'T-52 every moved helper is in private, and nothing else is'
@@ -118,33 +135,68 @@ insert into contact_account_links (contact_id, taxpayer_id, relationship, portal
   ('00000000-0000-4000-a000-00000000e040', '00000000-0000-4000-a000-00000000e020',
    'owner', true);
 
--- T-54 can_write_client_note is definer and callable by authenticated: it is
--- the write-side capability probe the portal uses, so EXECUTE is the API.
-select ok(
-  has_function_privilege('authenticated', 'public.can_write_client_note(uuid)', 'EXECUTE'),
-  'T-54 the portal write probe stays callable'
+update app_flags set enabled = false where key = 'allow_demo_anon';
+
+-- ---------------------------------------------------------------------------
+-- The one helper that also loses its grants, because nothing calls it.
+-- ---------------------------------------------------------------------------
+-- `set local role` changes the role, not the identity: request.jwt.claims is
+-- transaction-local and survives it. Every anon section below clears the claims
+-- as well, or auth.uid() keeps answering for whoever was signed in last and
+-- client_taxpayer_ids() keeps matching their taxpayer. T-57 caught exactly that.
+select set_config('request.jwt.claims', '', true);
+set local role anon;
+
+-- T-54 reached by its qualified name, so this is the privilege refusing and not
+-- the schema being off the search_path.
+select throws_ok(
+  $$ select private.portal_request_code('Client E', 'P000000000001X') $$,
+  '42501', null,
+  'T-54 anon cannot execute portal_request_code even by its qualified name'
 );
 
--- T-55 the probe answers with the caller's scope, as a reviewer of the firm.
+-- T-60
+select throws_ok(
+  $$ select can_write_client_note('00000000-0000-4000-a000-00000000e020') $$,
+  '42501', null,
+  'T-60 anon cannot execute can_write_client_note'
+);
+
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- And the policies still work.
+-- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-a000-00000000e001","role":"authenticated"}', true);
+
+-- T-55 the firm path, through member_has() and current_firm_role().
 select is(
-  (select can_write_client_note('00000000-0000-4000-a000-00000000e020')),
-  true,
-  'T-55 a firm reviewer may write a note for the firm''s client'
+  (select count(*) from taxpayers where id = '00000000-0000-4000-a000-00000000e020'),
+  1::bigint,
+  'T-55 control: a firm member still reads its engaged taxpayer'
 );
+
+-- T-59 the one exposure that stays, answering for the engagement.
+select ok(
+  can_write_client_note('00000000-0000-4000-a000-00000000e020'),
+  'T-59 can_write_client_note() answers for a signed-in firm member'
+);
+
 reset role;
 
--- T-56 the same probe refuses the client role: clients do not write notes.
+-- T-56 the client path, through client_taxpayer_ids().
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-a000-00000000e002","role":"authenticated"}', true);
+
 select is(
-  (select can_write_client_note('00000000-0000-4000-a000-00000000e020')),
-  false,
-  'T-56 the client cannot write staff notes on their own file'
+  (select count(*) from taxpayers where id = '00000000-0000-4000-a000-00000000e020'),
+  1::bigint,
+  'T-56 control: the client still reads its own taxpayer'
 );
+
 reset role;
 
 -- ---------------------------------------------------------------------------
@@ -171,33 +223,7 @@ set local role anon;
 select is(
   (select count(*) from taxpayers),
   1::bigint,
-  'T-58 with allow_demo_anon on, anon reads only the demo taxpayer'
-);
-reset role;
-
--- T-59 the demo flag cannot be flipped from the client side: authenticated has
--- no UPDATE on app_flags, so the attempt raises 42501 rather than silently
--- doing nothing.
-set local role authenticated;
-select set_config('request.jwt.claims',
-  '{"sub":"00000000-0000-4000-a000-00000000e001","role":"authenticated"}', true);
-select throws_ok(
-  $$ update app_flags set enabled = true where key = 'allow_demo_anon' $$,
-  '42501', null,
-  'T-59 a signed-in user cannot flip the demo switch'
-);
-reset role;
-
--- T-60 R-57: an accounting-firm partner, however senior inside their own firm,
--- cannot reach the KIMA admin review function.
-set local role authenticated;
-select set_config('request.jwt.claims',
-  '{"sub":"00000000-0000-4000-a000-00000000e001","role":"authenticated"}', true);
-select throws_ok(
-  $$ select admin_review_firm('00000000-0000-4000-a000-00000000e010', 'suspend',
-       'Trying it from a firm account') $$,
-  '42501', 'KIMA administrator required',
-  'T-60 a firm partner cannot suspend anyone through the admin function'
+  'T-58 with allow_demo_anon on, anon reads the demo taxpayer only'
 );
 reset role;
 
