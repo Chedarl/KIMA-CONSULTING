@@ -1124,7 +1124,7 @@ Only for an independently isolated staging Supabase project (not `vhrnrbnjhmxryg
 
 Public individual/business intake offers an optional receiving-firm choice from `firm_directory()`, showing KIMA's registration-number check status but making no professional-credential claim. Owner decision, 31 Oct 2026: choosing a firm is not a submit requirement. An application sent without one stores `organization_id` as NULL and, under the organization-scoped registrations RLS (#42), stays invisible to every firm — held for explicit routing, never silently assigned. That routing path is follow-up work, tracked openly rather than faked.
 
-General KIMA contact submissions now use `contact_inquiries` rather than unassigned `registrations` records. The dedicated schema in #51 **must** be released before this UI change; normal individual/business onboarding remains firm-choice-only and must not silently route to an unrelated practice.
+General KIMA contact submissions now use `contact_inquiries` rather than unassigned `registrations` records. The dedicated schema in #51 **must** be released before this UI change; normal individual/business onboarding keeps the receiving-firm choice optional and never silently routes an application to an unrelated practice.
 
 ### Contact inquiries versus firm-scoped applications (Phase 2)
 
