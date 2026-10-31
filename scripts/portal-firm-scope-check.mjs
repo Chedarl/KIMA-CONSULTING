@@ -180,4 +180,77 @@ assert.ok((recordHook.match(/\+\+loadEpoch\.current;/g) ?? []).length >= 3,
 assert.match(recordHook, /setRecords\(\{ taxpayer: null, cases: \[\], requests: \[\], events: \[\] \}\)/,
   "failed queries must clear all client record categories");
 
+const service = inspect("components/live/client-service.tsx");
+// A session switch must clear the case and consent before an old request resolves.
+assert.match(service.src, /onAuthStateChange\(\(event, session\) =>/);
+assert.match(service.src, /\+\+authEpoch\.current/);
+assert.match(service.src, /\+\+loadEpoch\.current/);
+assert.match(service.src, /setRow\(undefined\)/);
+assert.match(service.src, /setClientApproved\(false\)/);
+assert.match(service.src, /subscription\.unsubscribe\(\)/);
+const serviceLoad = service.src.split("const load = useCallback(async () => {")[1]?.split("\n  useEffect(() => {")[0];
+assert.ok(serviceLoad, "client service loader must exist");
+assert.ok((serviceLoad.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length >= 4,
+  "all case, engagement and consent fetch boundaries must reject stale loads");
+assert.match(serviceLoad, /rq\.error \|\| ev\.error \|\| tp\.error \|\| consent\.error/);
+
+// A route parameter can change before React effects run: render only the loaded case.
+// This source-contract test complements, but does not replace, browser route-switch testing.
+assert.match(service.src, /const \[loadedCaseId, setLoadedCaseId\] = useState<string \| null>\(null\)/);
+assert.match(service.src, /if \(row === undefined \|\| loadedCaseId !== caseId\)/,
+  "render must hide the previous case and its approval button on route changes");
+assert.match(serviceLoad, /if \(!data\) \{[\s\S]*?setLoadedCaseId\(caseId\);[\s\S]*?return;/,
+  "not-found case load must settle the current case identity");
+assert.match(serviceLoad, /setRow\(kase\);[\s\S]*?setLoadedCaseId\(caseId\);/,
+  "successful case load must record the verified case identity");
+assert.match(serviceLoad, /catch \{[\s\S]*?setLoadedCaseId\(caseId\);/,
+  "failed case load must settle the current case identity without stale details");
+const serviceAuthChange = service.src.split("auth.onAuthStateChange((event, session) => {")[1]?.split("\n    });")[0];
+assert.ok(serviceAuthChange?.includes("setLoadedCaseId(null)"),
+  "account changes must invalidate the last loaded case identity");
+
+const serviceUpload = service.src.split("async function upload(")[1]?.split("\n  async function approveCase(")[0];
+const serviceApproval = service.src.split("async function approveCase(")[1]?.split("\n  // React can reuse")[0];
+// Route switches are independent of authentication changes. Both asynchronous
+// mutation paths must reject prior-case completions before updating the new case.
+assert.match(service.src, /const activeCaseId = useRef\(caseId\)/);
+assert.match(service.src, /activeCaseId\.current = caseId/);
+assert.match(serviceUpload ?? "", /const actionCaseId = caseId;/);
+assert.match(serviceUpload ?? "",
+  /if \(epoch !== authEpoch\.current \|\| actionCaseId !== activeCaseId\.current\) return;/);
+assert.match(serviceApproval ?? "", /const actionCaseId = caseId;/);
+assert.ok((serviceApproval?.match(
+  /if \(epoch !== authEpoch\.current \|\| actionCaseId !== activeCaseId\.current\) return;/g,
+) ?? []).length >= 2, "approval must reject old sessions and old case routes before and after insert");
+assert.match(serviceApproval ?? "",
+  /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setFailed/);
+assert.match(serviceApproval ?? "",
+  /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setBusy/);
+
+// A route switch can happen while the previous case's file picker remains open.
+// Reject old-case uploads and approvals at initiation, not only after an await.
+// These are source-contract checks; browser race acceptance is still required.
+assert.match(serviceUpload ?? "", /if \(loadedCaseId !== caseId \|\| row\.id !== caseId \|\| req\.case_id !== caseId\) return;/,
+  "file upload must reject stale route, case and request identities before submission");
+assert.match(serviceApproval ?? "", /if \(loadedCaseId !== caseId \|\| row\.id !== caseId\) return;/,
+  "client approval must reject a stale route before inserting consent");
+
+// An approval must not be submitted or offered before filing evidence is verified.
+// This is a UI contract; database enforcement still requires independent testing.
+assert.match(serviceApproval ?? "",
+  /if \(row\.filing_status !== "verified" \|\| !row\.filing_evidence_ref\?\.trim\(\)\) return;/,
+  "client approval must reject missing or unverified evidence before writing consent");
+assert.match(service.src,
+  /const hasVerifiedEvidence = row\.filing_status === "verified" && Boolean\(row\.filing_evidence_ref\?\.trim\(\)\)/,
+  "approval UI must derive eligibility from verified filing evidence");
+assert.match(service.src, /!clientApproved && !hasVerifiedEvidence/,
+  "unverified evidence must show a non-approval state");
+assert.match(service.src, /!clientApproved && hasVerifiedEvidence && <div className="mt-3">/,
+  "approval action must be hidden until verified evidence exists");
+
+
+// Token refresh must preserve current identity, pending work and visible data.
+assert.match(service.src, /event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"/);
+assert.ok(service.src.includes("if (nextUserId === identityRef.current) return;"));
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
