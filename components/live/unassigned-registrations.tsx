@@ -3,6 +3,32 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+const STATUS_LABEL = {
+  submitted: { fr: "Envoyée", en: "Submitted" },
+  verifying: { fr: "Vérification", en: "Verifying" },
+  needs_info: { fr: "Information demandée", en: "Information requested" },
+  approved: { fr: "Acceptée", en: "Approved" },
+  rejected: { fr: "Refusée", en: "Declined" },
+  withdrawn: { fr: "Retirée", en: "Withdrawn" },
+} as const;
+
+const CHANNEL_LABEL = {
+  online: { fr: "En ligne", en: "Online" },
+  whatsapp: { fr: "WhatsApp", en: "WhatsApp" },
+  agency: { fr: "Agence", en: "Office" },
+  referral: { fr: "Recommandation", en: "Referral" },
+} as const;
+
+function pairLabel(
+  table: Record<string, { fr: string; en: string }>,
+  key: string,
+  fr: boolean,
+) {
+  const row = table[key];
+  if (!row) return key;
+  return fr ? row.fr : row.en;
+}
+
 type Row = {
   id: string;
   applicant_name: string;
@@ -28,7 +54,7 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
       if (!active) return;
       if (failure) {
         setRows([]);
-        setError(/administrator required/i.test(failure.message) ? "denied" : "offline");
+        setError(failure.code === "42501" ? "denied" : "offline");
         return;
       }
       setError(null);
@@ -82,7 +108,9 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
               <td className="px-4 py-3 text-fg">{row.legal_name ?? row.taxpayer_type}</td>
               <td className="tnum px-4 py-3 font-mono text-xs text-fg">{row.declared_niu ?? "—"}</td>
               <td className="tnum px-4 py-3 text-fg-muted">{row.submitted_at.slice(0, 10)}</td>
-              <td className="px-4 py-3 text-fg-muted">{row.status} · {row.intake_channel}</td>
+              <td className="px-4 py-3 text-fg-muted">
+                {pairLabel(STATUS_LABEL, row.status, fr)} · {pairLabel(CHANNEL_LABEL, row.intake_channel, fr)}
+              </td>
             </tr>
           ))}
         </tbody>

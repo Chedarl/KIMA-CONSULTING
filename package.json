@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
-    "test": "node scripts/engine-check.mjs && npm run test:phase5 && npm run test:phase7:pilot && node scripts/light-scope-tokens-check.mjs && node --experimental-strip-types --test scripts/grant-rpc-refusal.test.mjs",
+    "test": "node scripts/engine-check.mjs && npm run test:phase5 && npm run test:phase7:pilot && node scripts/light-scope-tokens-check.mjs && node --experimental-strip-types --test scripts/grant-rpc-refusal.test.mjs && node scripts/unassigned-routing-check.mjs",
     "test:journey": "node scripts/journey-check.mjs && node scripts/firm-signup-journey-check.mjs && node scripts/contact-inquiry-check.mjs && node scripts/onboarding-firm-optional-check.mjs",
     "test:staff:contract": "node scripts/staff-contract-smoke.mjs",
     "test:staff:screen": "node scripts/staff-screen-smoke.mjs",

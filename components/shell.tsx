@@ -49,6 +49,7 @@ export function Shell({
   menuLabel,
   tone = "light",
   hideMobileMenu = false,
+  extraNav = null,
   children,
 }: {
   nav: NavItem[];
@@ -60,6 +61,8 @@ export function Shell({
   tone?: "light" | "navy";
   /** Client phones use a bottom bar instead of opening this rail. */
   hideMobileMenu?: boolean;
+  /** Optional rail item rendered only when the caller decides it applies. */
+  extraNav?: ReactNode;
   children: ReactNode;
 }) {
   const pathname = usePathname() || "";
@@ -169,6 +172,7 @@ export function Shell({
               </li>
             );
           })}
+          {extraNav}
         </ul>
       </nav>
 
