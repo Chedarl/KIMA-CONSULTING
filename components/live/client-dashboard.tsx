@@ -71,6 +71,7 @@ export function ClientDashboard({
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<string | null>(null);
   const loadEpoch = useRef(0);
+  const authEpoch = useRef(0);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -127,6 +128,7 @@ export function ClientDashboard({
     const { data: { subscription } } = supabase().auth.onAuthStateChange((event) => {
       if (event === "INITIAL_SESSION") return;
       // Clear the previous account immediately, before any asynchronous reload.
+      ++authEpoch.current;
       ++loadEpoch.current;
       setIds(null);
       setClientName(fallbackName);
@@ -144,6 +146,7 @@ export function ClientDashboard({
       timer = setTimeout(() => { void load(); }, 0);
     });
     return () => {
+      ++authEpoch.current;
       ++loadEpoch.current;
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
@@ -227,7 +230,7 @@ export function ClientDashboard({
       setFailed(r.id);
       return;
     }
-    const epoch = loadEpoch.current;
+    const epoch = authEpoch.current;
     setBusy(r.id);
     setFailed(null);
     const result = await submitRequestFile({
@@ -240,7 +243,7 @@ export function ClientDashboard({
       actorLabel: clientName,
       previousStatus: r.status,
     });
-    if (epoch !== loadEpoch.current) return; // Ignore a previous account\'s upload completion.
+    if (epoch !== authEpoch.current) return; // Ignore a previous account's upload completion.
     if (!result.ok) {
       setFailed(r.id);
     } else {
