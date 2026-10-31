@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(8);
+select plan(11);
 insert into auth.users (id,email) values
  ('00000000-0000-4000-d000-00000000b001','admin-review@test.invalid'),
  ('00000000-0000-4000-d000-00000000b002','partner-review@test.invalid');
@@ -49,6 +49,27 @@ select is((select verification_status from organizations where
 select is((select count(*) from audit_events where
  resource_id='00000000-0000-4000-d000-00000000b011'
  and action='firm.admin_verify'),1::bigint,'Review is audited');
+
+-- KIMA owns the administrative audit, not the accounting firm.
+select is((select organization_id::text from audit_events where
+ resource_id='00000000-0000-4000-d000-00000000b011'
+ and action='firm.admin_verify'),
+ '00000000-0000-4000-d000-00000000b010',
+ 'Admin event belongs to KIMA vendor organisation');
+select is((select after->>'reason' from audit_events where
+ resource_id='00000000-0000-4000-d000-00000000b011'
+ and action='firm.admin_verify'),
+ 'Registration checked manually',
+ 'KIMA retains the internal administrative reason');
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-d000-00000000b002","role":"authenticated"}',true);
+select is((select count(*) from audit_events where
+ resource_id='00000000-0000-4000-d000-00000000b011'
+ and action='firm.admin_verify'),0::bigint,
+ 'Target accounting firm cannot read KIMA private review reason');
+reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims',
