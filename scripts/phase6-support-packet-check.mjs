@@ -29,6 +29,7 @@ const example = {
     note: "DO-NOT-LEAK-NOTE" }],
 };
 const packet = buildIncidentSupportPacket(example);
+assert.equal(packet.incidentId, "SYNTH-INC-1");
 assert.equal(packet.paymentState, "debit_observed");
 assert.equal(packet.transactionReferenceMasked, "•••• ABC7");
 assert.equal(packet.contacts[0].ticketMasked, "•••• 9876");
