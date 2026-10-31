@@ -124,7 +124,7 @@ select throws_ok(
  $$ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e911'
- limit 1),'accepted') $$,
+ and status='accepted' limit 1),'accepted') $,
  '23514',null,'P3 second acceptance is a forbidden replay');
 reset role;
 select is(
