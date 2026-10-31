@@ -170,7 +170,7 @@ function StageRail({
                 here
                   ? "border-navy bg-navy text-surface"
                   : done
-                    ? "border-teal/40 bg-teal-soft text-teal-text"
+                    ? "border-success/40 bg-success-soft text-success-text"
                     : "border-border bg-surface text-fg-subtle"
               }`}
             >
@@ -743,12 +743,12 @@ export function CaseDetail({
           <Dimension
             label={t.dimWork}
             value={stageLabel(row.stage, locale)}
-            tone={isClosed(row.stage) ? "text-teal-text" : "text-fg"}
+            tone={isClosed(row.stage) ? "text-success-text" : "text-fg"}
           />
           <Dimension
             label={t.dimFiling}
             value={filingLabel(row.filing_status, locale)}
-            tone={row.filing_status === "verified" ? "text-teal-text" : "text-fg"}
+            tone={row.filing_status === "verified" ? "text-success-text" : "text-fg"}
           />
           <Dimension
             label={t.dimPayment}
@@ -778,7 +778,7 @@ export function CaseDetail({
                   </span>
                   {" · "}
                   {t.acceptedCount}{" "}
-                  <span className="tnum font-semibold text-teal-text">
+                  <span className="tnum font-semibold text-success-text">
                     {requests.filter((r) => r.status === "accepted").length}
                   </span>
                   {" · "}
@@ -1020,7 +1020,7 @@ export function CaseDetail({
           <Card>
             <CardHeader title={t.gateTitle} />
             <div className="flex flex-col gap-2 p-4 sm:p-5">
-              {findings.length === 0 && <p className="text-sm text-teal-text">{t.gateClean}</p>}
+              {findings.length === 0 && <p className="text-sm text-success-text">{t.gateClean}</p>}
               {blocking.map((f) => (
                 <p
                   key={f.code}
@@ -1077,7 +1077,7 @@ export function CaseDetail({
           <Card>
             <CardHeader title={t.authority} />
             <dl className="flex flex-col gap-3 p-4 sm:p-5">
-              {!authority && <p className="text-sm text-teal-text">{t.authorityOk}</p>}
+              {!authority && <p className="text-sm text-success-text">{t.authorityOk}</p>}
               <Field label={t.scopeNote}>
                 {engagement?.scope_note ?? <span className="text-fg-muted">{t.noScope}</span>}
               </Field>

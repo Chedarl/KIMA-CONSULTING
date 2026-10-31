@@ -126,7 +126,7 @@ function statusWord(tone: CheckTone, labels: ReviewLabels): string {
 
 function StatusMark({ tone, word }: { tone: CheckTone; word: string }) {
   const color =
-    tone === "met" ? "text-teal-text" : tone === "open" ? "text-danger-text" : "text-amber-text";
+    tone === "met" ? "text-success-text" : tone === "open" ? "text-danger-text" : "text-amber-text";
   return (
     <span className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold ${color}`}>
       <svg viewBox="0 0 16 16" className="size-4" aria-hidden="true">
@@ -405,7 +405,7 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
 
   if (pending.length === 0) {
     return (
-      <p className="rounded-card border border-teal-text/30 bg-teal-soft px-4 py-3 text-sm text-teal-text">
+      <p className="rounded-card border border-success-text/30 bg-success-soft px-4 py-3 text-sm text-success-text">
         {labels.empty}
       </p>
     );
@@ -415,7 +415,7 @@ export function ReviewsPanel({ locale, labels }: { locale: "fr" | "en"; labels: 
   const tp = taxpayers[selected.taxpayer_id];
   if (!tp) {
     return (
-      <p className="rounded-card border border-teal-text/30 bg-teal-soft px-4 py-3 text-sm text-teal-text">
+      <p className="rounded-card border border-success-text/30 bg-success-soft px-4 py-3 text-sm text-success-text">
         {labels.empty}
       </p>
     );

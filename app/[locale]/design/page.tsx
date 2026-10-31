@@ -30,10 +30,10 @@ const brandColours: {
   { name: "Indigo soft", token: "--teal-soft", hex: "#E9EEF8", role: "surface" },
   { name: "Success", token: "--success", hex: "#15803D", role: "text", contrast: "5.0:1" },
   { name: "Success tint", token: "--success-soft", hex: "#E8F5EC", role: "surface" },
-  { name: "Amber", token: "--amber", hex: "#F59E0B", role: "fill", contrast: "2.1:1" },
+  { name: "Amber", token: "--amber", hex: "#F5A623", role: "fill", contrast: "2.0:1" },
   { name: "Amber text", token: "--amber-text", hex: "#92400E", role: "text", contrast: "7.0:1" },
-  { name: "Dark text", token: "--fg", hex: "#142235", role: "text", contrast: "15.8:1" },
-  { name: "Soft gray", token: "--surface-sunken", hex: "#EFF3F8", role: "surface" },
+  { name: "Dark text", token: "--fg", hex: "#273248", role: "text", contrast: "12.8:1" },
+  { name: "Soft gray", token: "--surface-sunken", hex: "#EEF3F7", role: "surface" },
 ];
 
 const statuses: StatusKind[] = [
@@ -78,7 +78,7 @@ export default function DesignPage({ params }: { params: { locale: string } }) {
             </code>
           </Card>
 
-          <Card className="flex flex-col gap-3 bg-[#0D1B2A] p-6">
+          <Card className="flex flex-col gap-3 bg-navy p-6">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#8496AD]">
               {locale === "fr" ? "Blanc, fond sombre" : "White, dark background"}
             </p>

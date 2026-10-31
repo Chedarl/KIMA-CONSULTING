@@ -54,7 +54,7 @@ const CAP = 500;
 
 const verdictTone = (value: Verdict["value"]) => {
   if (value === "fail" || value === "indeterminate") return "border-amber/50 bg-amber-soft text-amber-text";
-  if (value === "pass" || value === "partial") return "border-teal/40 bg-teal-soft text-teal-text";
+  if (value === "pass" || value === "partial") return "border-success/40 bg-success-soft text-success-text";
   return "border-border bg-surface-sunken text-fg-muted";
 };
 

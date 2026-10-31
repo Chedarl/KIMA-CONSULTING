@@ -79,7 +79,7 @@ export type AccountProfile = {
   profile_verified: boolean;
 };
 
-export type Tone = "navy" | "teal" | "amber" | "danger" | "neutral";
+export type Tone = "navy" | "success" | "amber" | "danger" | "neutral";
 
 export type Tag = {
   id: string;
@@ -148,7 +148,7 @@ export function deriveSegments(a: AccountProfile): Segment[] {
         code: a.tax_regime,
         fr: r.fr,
         en: r.en,
-        tone: abolished ? "danger" : verified ? "teal" : "amber",
+        tone: abolished ? "danger" : verified ? "success" : "amber",
         verified: verified && !abolished,
       });
       if (abolished) {

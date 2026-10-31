@@ -19,10 +19,10 @@
   --bg: 247 249 252;
   --surface: 255 255 255;
   --surface-sunken: 238 243 247; /* #EEF3F7 */
-  --border: 220 228 238;
+  --border: 220 227 236; /* #DCE3EC */
   --border-strong: 188 201 217;
 
-  --fg: 20 34 53; /* #142235 — 15.8:1 on surface */
+  --fg: 39 50 72; /* #273248 — 12.8:1 on surface */
   --fg-muted: 74 90 112; /* 6.8:1 */
   --fg-subtle: 88 102 124; /* 5.9:1 on surface, 5.4:1 on surface-sunken */
 
@@ -40,8 +40,8 @@
   --teal-soft: 233 238 248;
 
   --success: 21 128 61; /* #15803D — 5.0:1 on white */
-  --success-text: 21 128 61;
-  --success-soft: 232 245 236; /* #E8F5EC; use #273248 text, not #15803D */
+  --success-text: 22 101 52; /* #166534 — 7.1:1 on white, 6.4:1 on soft */
+  --success-soft: 232 245 236; /* #E8F5EC — pair with --success-text, not #15803D (4.47:1) */
 
   --amber: 245 166 35; /* #F5A623 — fills only */
   --amber-text: 146 64 14; /* 7.0:1 */
@@ -93,6 +93,10 @@
     --teal-text: 190 205 235;
     --teal-soft: 24 38 68;
 
+    --success: 21 128 61; /* fill unchanged — white text 5.0:1 */
+    --success-text: 52 211 153; /* #34D399 — 8.6:1 on dark surface */
+    --success-soft: 16 40 27; /* #10281B — success-text on it 8.1:1 */
+
     --amber: 245 180 90;
     --amber-text: 242 196 120;
     --amber-soft: 50 36 14;
@@ -123,6 +127,10 @@
   --teal: 154 176 224;
   --teal-text: 190 205 235;
   --teal-soft: 24 38 68;
+
+  --success: 21 128 61; /* fill unchanged — white text 5.0:1 */
+  --success-text: 52 211 153; /* #34D399 — 8.6:1 on dark surface */
+  --success-soft: 16 40 27; /* #10281B — success-text on it 8.1:1 */
 
   --amber: 245 180 90;
   --amber-text: 242 196 120;
@@ -540,12 +548,12 @@ h1, h2, h3, .font-display {
  * Indigo #455DA8 carries white label text at 6.2:1; success stays #15803D.
  */
 .public-site {
-  --bg: 255 255 255;
+  --bg: 247 249 252; /* #F7F9FC */
   --surface: 255 255 255;
   --surface-sunken: 244 247 251;
-  --border: 226 232 240;
+  --border: 220 227 236; /* #DCE3EC */
   --border-strong: 203 213 225;
-  --fg: 13 27 42;
+  --fg: 39 50 72; /* #273248 */
   --fg-muted: 71 85 105;
   --fg-subtle: 100 116 139;
   --navy: 24 36 59;
@@ -558,7 +566,7 @@ h1, h2, h3, .font-display {
   --amber-text: 146 64 14;
   --amber-soft: 255 246 232;
   color-scheme: light;
-  background: #fff;
+  background: rgb(var(--bg));
   color: rgb(var(--fg));
   min-height: 100vh;
 }
@@ -591,12 +599,12 @@ h1, h2, h3, .font-display {
 }
 
 .client-portal {
-  --bg: 244 247 251; /* #F4F7FB */
+  --bg: 247 249 252; /* #F7F9FC */
   --surface: 255 255 255;
   --surface-sunken: 241 245 249;
-  --border: 226 232 240;
+  --border: 220 227 236; /* #DCE3EC */
   --border-strong: 203 213 225;
-  --fg: 20 34 53;
+  --fg: 39 50 72; /* #273248 */
   --fg-muted: 71 85 105;
   --fg-subtle: 100 116 139;
   --navy: 24 36 59;

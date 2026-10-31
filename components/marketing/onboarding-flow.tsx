@@ -286,7 +286,7 @@ export function OnboardingFlow({
                       >
                         <span
                           className={`flex h-3.5 w-3.5 shrink-0 rounded-full ${
-                            state === "upcoming" ? "bg-border-strong" : "bg-teal"
+                            state === "upcoming" ? "bg-border-strong" : state === "done" ? "bg-success" : "bg-teal"
                           }`}
                           aria-hidden="true"
                         />
@@ -722,7 +722,7 @@ function ReadyStep({
   const href = firm ? `/${locale}/firm-login` : `/${locale}/login`;
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-10 text-center">
-      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-teal text-white" aria-hidden="true">
+      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-success text-white" aria-hidden="true">
         <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="2.4">
           <path d="M5 12.5 10 17.5 19 7.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -773,7 +773,7 @@ function ReadyStep({
         </form>
       )}
       {inviteState === "ok" && (
-        <p role="status" className="mt-4 text-sm text-teal-text">
+        <p role="status" className="mt-4 text-sm text-success-text">
           {t.inviteDone}
         </p>
       )}

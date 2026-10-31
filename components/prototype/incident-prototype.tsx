@@ -96,7 +96,7 @@ export function IncidentPrototype({ locale, t }: { locale: "fr" | "en"; t: Incid
       <NextActionCard action={action} locale={locale} t={t} />
 
       <p role="status" aria-live="polite" className="min-h-[1.25rem] text-sm font-medium">
-        {message && <span className={message.ok ? "text-teal-text" : "text-danger-text"}>{message.text}</span>}
+        {message && <span className={message.ok ? "text-success-text" : "text-danger-text"}>{message.text}</span>}
       </p>
 
       <StatusDimensions

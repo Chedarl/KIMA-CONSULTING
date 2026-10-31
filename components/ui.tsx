@@ -50,7 +50,7 @@ export function CardHeader({
  */
 const statusStyle: Record<StatusKind, { cls: string; glyph: ReactNode; dashed?: boolean }> = {
   confirmed: {
-    cls: "bg-teal-soft text-teal-text border-teal-text/30",
+    cls: "bg-success-soft text-success-text border-success-text/30",
     glyph: (
       <path
         d="M3.5 7.2 6 9.7l5-5.4"
@@ -230,7 +230,7 @@ export function Completeness({
         aria-hidden="true"
       >
         <span
-          className={`block h-full rounded-full ${complete ? "bg-teal" : "bg-amber"}`}
+          className={`block h-full rounded-full ${complete ? "bg-success" : "bg-amber"}`}
           style={{ width: `${pct}%` }}
         />
       </span>
@@ -258,7 +258,7 @@ export function Timeline({
             <span
               className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
                 s.state === "done"
-                  ? "border-teal-text bg-teal-text text-surface"
+                  ? "border-success-text bg-success-text text-surface"
                   : s.state === "current"
                     ? "border-navy bg-surface"
                     : // border-strong is ~1.7:1 and fails 1.4.11 as a state marker
@@ -282,7 +282,7 @@ export function Timeline({
             {i < steps.length - 1 && (
               <span
                 className={`my-0.5 w-0.5 flex-1 ${
-                  s.state === "done" ? "bg-teal-text/40" : "bg-border"
+                  s.state === "done" ? "bg-success-text/40" : "bg-border"
                 }`}
               />
             )}

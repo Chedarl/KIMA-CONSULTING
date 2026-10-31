@@ -73,7 +73,7 @@ export function DeadlineCalendar({ locale, t }: { locale: "fr" | "en"; t: Dict }
               ? "border-amber/50 bg-amber-soft text-amber-text"
               : row.due_basis === "prorogation"
                 ? "border-navy/30 bg-navy-soft text-navy"
-                : "border-teal/40 bg-teal-soft text-teal-text";
+                : "border-success/40 bg-success-soft text-success-text";
             const basis = row.due_needs_confirmation
               ? t.unconfirmed
               : row.due_basis === "prorogation"

@@ -44,7 +44,7 @@ const RISK_TONE: Record<Risk, string> = {
   overdue: "border-danger-text/40 bg-danger-soft text-danger-text",
   due_soon: "border-amber/50 bg-amber-soft text-amber-text",
   unknown: "border-border-strong bg-surface-sunken text-fg-muted",
-  on_track: "border-teal/40 bg-teal-soft text-teal-text",
+  on_track: "border-success/40 bg-success-soft text-success-text",
 };
 
 function groupByCase<T extends { case_id: string | null }>(rows: T[]): Record<string, T[]> {
@@ -79,15 +79,15 @@ function Tile({
   value: number;
   hint?: string;
   trend?: string;
-  tone: "neutral" | "amber" | "danger" | "teal";
+  tone: "neutral" | "amber" | "danger" | "success";
 }) {
   const accent =
     tone === "danger"
       ? "text-danger-text"
       : tone === "amber"
         ? "text-amber-text"
-        : tone === "teal"
-          ? "text-teal-text"
+        : tone === "success"
+          ? "text-success-text"
           : "text-fg";
   return (
     <div className="rounded-card border border-border bg-surface p-4">
@@ -253,7 +253,7 @@ export function FirmDashboard({
             label={t.blocked}
             value={metrics.blocked}
             hint={t.blockedHint}
-            tone={metrics.blocked > 0 ? "danger" : "teal"}
+            tone={metrics.blocked > 0 ? "danger" : "success"}
           />
         </div>
       )}

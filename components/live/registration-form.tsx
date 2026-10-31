@@ -106,7 +106,7 @@ export function RegistrationForm({
   if (done) {
     return (
       <div className="rise-in spotlight rounded-card border border-border bg-surface p-6 text-center shadow-raised">
-        <p className="font-display text-xl font-semibold text-teal-text">{t.doneTitle}</p>
+        <p className="font-display text-xl font-semibold text-success-text">{t.doneTitle}</p>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-muted">
           {t.doneBody}
         </p>

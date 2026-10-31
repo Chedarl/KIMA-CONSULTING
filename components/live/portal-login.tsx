@@ -320,7 +320,7 @@ function SessionCard({
           </div>
         ))}
       </dl>
-      <p className={`text-sm ${session.profileVerified ? "text-teal-text" : "text-amber-text"}`}>
+      <p className={`text-sm ${session.profileVerified ? "text-success-text" : "text-amber-text"}`}>
         {session.profileVerified ? t.verified : t.unverified}
       </p>
       <a href={portalHref} className="public-cta inline-flex min-h-[48px] items-center justify-center rounded-lg text-sm font-semibold">

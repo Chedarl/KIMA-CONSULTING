@@ -92,9 +92,9 @@ export function Pill({
 }) {
   const cls =
     tone === "green"
-      ? "bg-teal-soft text-teal-text"
+      ? "bg-success-soft text-success-text"
       : tone === "green-outline"
-        ? "border border-teal-text/40 bg-white text-teal-text"
+        ? "border border-success-text/40 bg-white text-success-text"
         : tone === "amber"
           ? "bg-amber-soft text-amber-text"
           : tone === "amber-outline"
@@ -162,11 +162,15 @@ export function StatusStepper({
               <div className="flex w-full items-center">
                 <span
                   aria-hidden
-                  className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : i <= current ? "bg-teal" : "bg-border"}`}
+                  className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : i <= current ? "bg-success" : "bg-border"}`}
                 />
                 <span
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-                    filled ? "bg-teal text-white" : "border-2 border-border bg-white text-fg-subtle"
+                    filled
+                      ? i === current
+                        ? "bg-teal text-white"
+                        : "bg-success text-white"
+                      : "border-2 border-border bg-white text-fg-subtle"
                   }`}
                 >
                   {i + 1}
@@ -174,7 +178,7 @@ export function StatusStepper({
                 <span
                   aria-hidden
                   className={`h-0.5 flex-1 ${
-                    i === labels.length - 1 ? "bg-transparent" : lineAfter ? "bg-teal" : "bg-border"
+                    i === labels.length - 1 ? "bg-transparent" : lineAfter ? "bg-success" : "bg-border"
                   }`}
                 />
               </div>

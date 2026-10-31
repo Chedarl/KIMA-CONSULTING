@@ -284,7 +284,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
               ) : (
                 <p
                   className={`mt-1 text-xs font-semibold ${
-                    d.review_status === "accepted" ? "text-teal-text" : "text-danger-text"
+                    d.review_status === "accepted" ? "text-success-text" : "text-danger-text"
                   }`}
                 >
                   {d.review_status === "accepted" ? labels.accepted : labels.returned}
