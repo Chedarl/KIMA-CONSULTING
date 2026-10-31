@@ -265,8 +265,8 @@ export function ClientService({
     approvalInFlight.current = approvalToken;
     setBusy("client-approval");
     setFailed(null);
-    const db = supabase();
     try {
+      const db = supabase();
       const { data: auth, error: authError } = await db.auth.getUser();
       if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
       if (authError || !auth.user) throw new Error("Sign-in required");
