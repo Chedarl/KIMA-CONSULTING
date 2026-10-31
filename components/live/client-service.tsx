@@ -324,7 +324,7 @@ export function ClientService({
                   </div>
                   {received && <p className="text-xs text-fg-muted">{t.receivedNotAccepted}</p>}
                   {accepted && (
-                    <p className="text-xs font-medium text-teal-text">{requestStatusLabel("accepted", locale)}</p>
+                    <p className="text-xs font-medium text-success-text">{requestStatusLabel("accepted", locale)}</p>
                   )}
                   {mine && (
                     <PrimaryButton

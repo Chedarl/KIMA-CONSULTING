@@ -175,7 +175,7 @@ export function CalendarBoard({ locale }: { locale: "fr" | "en" }) {
                   >
                     {cell.day}
                     {marks.length > 0 && (
-                      <span aria-hidden className={`mt-1 h-1.5 w-1.5 rounded-full ${action ? "bg-amber" : "bg-teal"}`} />
+                      <span aria-hidden className={`mt-1 h-1.5 w-1.5 rounded-full ${action ? "bg-amber" : "bg-success"}`} />
                     )}
                   </button>
                 );
@@ -220,7 +220,7 @@ export function CalendarBoard({ locale }: { locale: "fr" | "en" }) {
                         <span className="tnum block text-sm font-semibold text-fg">{formatDay(item.date, locale)}</span>
                         <span className="block text-sm text-fg-muted">{item.title}</span>
                       </span>
-                      {item.action ? <Pill tone="amber">{copy.badgeAction}</Pill> : <span aria-hidden className="h-2 w-2 rounded-full bg-teal" />}
+                      {item.action ? <Pill tone="amber">{copy.badgeAction}</Pill> : <span aria-hidden className="h-2 w-2 rounded-full bg-success" />}
                     </Link>
                   </li>
                 ))}

@@ -72,7 +72,7 @@ export function ContactForm({ locale, copy }: { locale: "fr" | "en"; copy: Copy 
 
   if (done) {
     return (
-      <p role="status" className="rounded-card border border-teal/30 bg-teal-soft px-4 py-4 text-sm text-teal-text">
+      <p role="status" className="rounded-card border border-success/30 bg-success-soft px-4 py-4 text-sm text-success-text">
         {t.contactDone}
       </p>
     );
