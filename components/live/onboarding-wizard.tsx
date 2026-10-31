@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { draftEngagement } from "@/lib/engagements";
+import { draftEngagement, grantRpcMessage } from "@/lib/engagements";
 import { audit, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import {
@@ -186,7 +186,15 @@ export function OnboardingWizard({
         outcome: "opened" | "already_registered";
         taxpayer_id: string | null;
       }> | null)?.[0];
-      if (openErr || !result) throw openErr ?? new Error("could not open the client file");
+      if (openErr || !result) {
+        const mapped = grantRpcMessage(locale, openErr);
+        if (mapped) {
+          toast(mapped, "error");
+          setBusy(false);
+          return;
+        }
+        throw openErr ?? new Error("could not open the client file");
+      }
 
       // Somebody already holds this NIU, so nothing was created and nothing is
       // disclosed: no taxpayer id comes back, and this firm reads none of that
