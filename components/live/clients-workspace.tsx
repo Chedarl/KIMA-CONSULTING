@@ -40,7 +40,7 @@ type TaxpayerRow = {
  */
 const TONE: Record<Segment["tone"], string> = {
   navy: "border-navy/30 bg-navy-soft text-navy",
-  teal: "border-teal/40 bg-teal-soft text-teal-text",
+  success: "border-success/40 bg-success-soft text-success-text",
   amber: "border-amber/40 bg-amber-soft text-amber-text",
   danger: "border-danger-text/40 bg-danger-soft text-danger-text",
   neutral: "border-border bg-surface-sunken text-fg-muted",
