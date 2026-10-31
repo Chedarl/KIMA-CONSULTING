@@ -408,6 +408,7 @@ reset role;
 
 -- ---------------------------------------------------------------------------
 -- T-175/T-176: routing is confined to B, not to the null queue.
+-- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-a000-00000000b003","role":"authenticated"}', true);
@@ -514,10 +515,11 @@ select is(
 
 -- ---------------------------------------------------------------------------
 -- Revocation. Firm B keeps its engagement row and loses its access the moment
--- revoked_at is set. Only revoked_at is set here, and status is left alone, so
--- this proves revoked_at alone is enough.
+-- revoked_at is set. Status and the date move together, as lib/engagements.ts
+-- writes them and engagements_revoked_at_means_revoked (20261101010000) now
+-- requires of every writer: a row never reads one thing and dates another.
 -- ---------------------------------------------------------------------------
-update engagements set revoked_at = now()
+update engagements set status = 'revoked', revoked_at = now()
  where organization_id = '00000000-0000-4000-a000-00000000b001';
 
 set local role authenticated;

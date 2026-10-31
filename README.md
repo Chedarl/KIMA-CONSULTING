@@ -648,7 +648,11 @@ are about a transition rather than a row:
    (`private.taxpayer_engaged_elsewhere()`). This is what keeps onboarding working: a
    firm that has just created a taxpayer is the only firm engaged with them. With the
    taxpayer's acceptance it may authorise regardless, which is how a second firm joins.
-4. An engagement **never moves** between firms or taxpayers, and a revocation is final.
+4. An engagement **never moves** between firms or taxpayers, and a revocation is
+   final: a row with `revoked_at` set can only ever read `revoked`, and a revoked
+   row's status and dates cannot change again (migration `20261101010000`, R-59
+   defect c — before it, a revoked row could be flipped back to `authorized`
+   while `revoked_at` stayed set, a record contradicting itself).
 
 A client's acceptance is narrow, and a firm cannot stand in for it
 (`20261030100000`, both found in review of #30 and both reproduced first). The
