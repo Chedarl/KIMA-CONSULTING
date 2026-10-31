@@ -12,7 +12,7 @@ const masked = (value: string | null): string | null =>
   value ? `•••• ${value.slice(-4)}` : null;
 
 export type SupportPacket = {
-  caseId: string;
+  incidentId: string;
   incidentType: Incident["type"];
   incidentStatus: Incident["status"];
   observedAt: string;
@@ -26,7 +26,7 @@ export type SupportPacket = {
 
 export function buildIncidentSupportPacket(incident: Incident): SupportPacket {
   return {
-    caseId: incident.id,
+    incidentId: incident.id,
     incidentType: incident.type,
     incidentStatus: incident.status,
     observedAt: incident.observedAt,
