@@ -23,8 +23,8 @@ for (const scope of [".public-site", ".client-portal"]) {
   has(scope, "--success-text", "22 101 52");
   has(scope, "--success-soft", "232 245 236");
 }
-has(".public-site", "--danger", "214 69 69");
-has(".client-portal", "--danger", "214 69 69");
+has(".public-site", "--danger", "185 28 28");
+has(".client-portal", "--danger", "185 28 28");
 has(".public-site", "--danger-text", "185 28 28");
 has(".public-site", "--danger-soft", "254 232 232");
 
