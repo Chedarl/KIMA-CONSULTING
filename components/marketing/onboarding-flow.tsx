@@ -96,7 +96,7 @@ export function OnboardingFlow({
   }
 
   function go(next: OnboardingStep) {
-    const found = issuesFor(step, draft, true);
+    const found = issuesFor(step, draft);
     const forward = step === "type" || sidebarIndex(next) > sidebarIndex(step);
     if (found.length > 0 && forward) {
       setIssues(found);
@@ -108,7 +108,7 @@ export function OnboardingFlow({
   }
 
   async function finish() {
-    const found = issuesFor("verify", draft, true);
+    const found = issuesFor("verify", draft);
     setIssues(found);
     setSaveFailed(false);
     if (found.length > 0 || !draft.kind) return;
@@ -623,6 +623,12 @@ function ServicesStep({
         {(firmState === "unavailable" || (firmState === "ready" && firms.length === 0)) &&
           <p role="alert" className="mt-3 text-sm text-danger-text">{t.firmNone}</p>}
         <div className="mt-3 grid gap-2">
+          <label className="flex min-h-[52px] cursor-pointer items-center gap-3 rounded-lg border border-border p-3 has-[:checked]:border-teal">
+            <input type="radio" name="receiving-firm" value=""
+              checked={!draft.firmId} onChange={() => patch({ firmId: "" })}
+              className="h-5 w-5 accent-teal" />
+            <span className="text-sm font-semibold text-fg">{t.firmLater}</span>
+          </label>
           {firms.map((firm) => (
             <label key={firm.id} className="flex min-h-[52px] cursor-pointer items-center gap-3 rounded-lg border border-border p-3 has-[:checked]:border-teal">
               <input type="radio" name="receiving-firm" value={firm.id}
@@ -637,7 +643,6 @@ function ServicesStep({
             </label>
           ))}
         </div>
-        {issues.includes("firm") && <p role="alert" className="mt-2 text-xs text-danger-text">{t.errors.firm}</p>}
       </fieldset>
     </div>
   );
