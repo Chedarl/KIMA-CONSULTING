@@ -260,6 +260,8 @@ assert.match(serviceApproval ?? "", /if \(approvalInFlight\.current !== null\) r
   "reject concurrent client consent attempts synchronously");
 assert.match(serviceApproval ?? "", /approvalInFlight\.current = approvalToken;/,
   "lock consent before the first awaited authentication call");
+assert.ok((serviceApproval ?? "").includes("try {\n      const db = supabase();"),
+  "Supabase initialization must be inside try/finally so the lock is always released");
 assert.match(serviceApproval ?? "", /if \(approvalInFlight\.current === approvalToken\) approvalInFlight\.current = null;/,
   "release only the matching approval lock");
 assert.ok(serviceAuthChange?.includes("approvalInFlight.current = null"),
