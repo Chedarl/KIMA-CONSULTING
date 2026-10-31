@@ -103,4 +103,24 @@ for (const action of ["decide", "requestFirm", "inviteContact"]) {
 assert.ok((invitations.src.match(/\+\+authEpoch\.current;/g) ?? []).length >= 2,
   "auth epoch must invalidate on account change and unmount");
 
+// Invitation decision controls must fail closed before issuing an RPC.
+// The database remains the ultimate recipient and replay authority.
+const invitationPanel = inspect("components/live/invitations-panel.tsx");
+const invitationDecision = invitationPanel.src.split("async function decide(")[1]?.split("\n  async function requestFirm(")[0] ?? "";
+for (const guard of [
+  "invites.find((item) => item.id === id)",
+  'invitation.status !== "pending"',
+  "new Date(invitation.expires_at).getTime() <= Date.now()",
+  "invitation.initiated_by !== userId",
+  "invitation.recipient_user_id !== userId",
+]) {
+  assert.ok(invitationDecision.includes(guard), "invitation action guard missing: " + guard);
+}
+assert.ok(invitationDecision.indexOf('invitation.status !== "pending"') <
+  invitationDecision.indexOf('.rpc("decide_invitation"'),
+  "check invitation eligibility before the decision RPC");
+assert.ok(invitationPanel.src.includes(
+  'i.initiated_by === userId ? <button disabled={busy} onClick={() => void decide(i.id,"revoked")}'
+), "only the invitation initiator should see the revoke action");
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
