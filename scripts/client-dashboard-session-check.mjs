@@ -28,4 +28,4 @@ console.log("ok: client dashboard auth-change and stale-response source contract
 
 // Token refresh must preserve current identity, pending work and visible data.
 assert.match(src, /event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"/);
-assert.match(src, /if \(nextUserId === identityRef\.current\) return;/);
+assert.ok(src.includes("if (nextUserId === identityRef.current) return;"));
