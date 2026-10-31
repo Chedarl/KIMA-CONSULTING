@@ -68,4 +68,24 @@ assert.match(detail.src, /engagement\.id !== row\.engagement_id/);
 assert.match(detail.src, /engagement\.taxpayer_id !== row\.taxpayer_id/);
 assert.match(detail.src, /engagement\.revoked_at/);
 assert.match(detail.src, /organization_id: orgId/);
+
+const service = inspect("components/live/client-service.tsx");
+// A session switch must clear the case and consent before an old request resolves.
+assert.match(service.src, /onAuthStateChange\(\(event\) =>/);
+assert.match(service.src, /\+\+authEpoch\.current/);
+assert.match(service.src, /\+\+loadEpoch\.current/);
+assert.match(service.src, /setRow\(undefined\)/);
+assert.match(service.src, /setClientApproved\(false\)/);
+assert.match(service.src, /subscription\.unsubscribe\(\)/);
+const serviceLoad = service.src.split("const load = useCallback(async () => {")[1]?.split("\n  useEffect(() => {")[0];
+assert.ok(serviceLoad, "client service loader must exist");
+assert.ok((serviceLoad.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length >= 4,
+  "all case, engagement and consent fetch boundaries must reject stale loads");
+assert.match(serviceLoad, /rq\.error \|\| ev\.error \|\| tp\.error \|\| consent\.error/);
+const serviceUpload = service.src.split("async function upload(")[1]?.split("\n  async function approveCase(")[0];
+const serviceApproval = service.src.split("async function approveCase(")[1]?.split("\n  if \(row === undefined\)")[0];
+assert.match(serviceUpload ?? "", /if \(epoch !== authEpoch\.current\) return;/);
+assert.ok((serviceApproval?.match(/if \(epoch !== authEpoch\.current\) return;/g) ?? []).length >= 2,
+  "approval must ignore an old identity before and after its insert");
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
