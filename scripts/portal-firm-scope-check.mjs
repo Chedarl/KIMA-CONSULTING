@@ -268,7 +268,7 @@ assert.ok(service.src.includes("if (nextUserId === identityRef.current) return;"
  * rows in place — only an identity change clears them — and a stale or
  * expired invitation click must surface an FR/EN error instead of failing
  * silently. Source-contract assertions; browser acceptance still owed. */
-const invitationLoad = invitations.src.split("const load = useCallback(async () => {")[1]?.split("\n  }, [fr, side]);")[0];
+const invitationLoad = invitations.src.split("const load = useCallback(async (options?: { keepError?: boolean }) => {")[1]?.split("\n  }, [fr, side]);")[0];
 assert.ok(invitationLoad, "invitation loader must exist");
 const invitationLoadHead = invitationLoad.split("await db.auth.getUser()")[0];
 for (const cleared of ["setInvites([])", "setDrafts([])", "setFirms([])"]) {
@@ -277,12 +277,18 @@ for (const cleared of ["setInvites([])", "setDrafts([])", "setFirms([])"]) {
 }
 assert.ok(invitationLoad.includes('setError(fr ? "Invitations indisponibles." : "Invitations unavailable.")'),
   "load failures must still surface an error");
+assert.ok(invitationLoad.includes('if (!options?.keepError) setError("");'),
+  "a kept error must survive the successful reload");
 assert.ok(invitationDecision.includes("Invitation indisponible ou expirée."),
   "stale or expired invitation clicks must surface a French error");
 assert.ok(invitationDecision.includes("Invitation unavailable or expired."),
   "stale or expired invitation clicks must surface an English error");
-assert.ok(invitationDecision.includes("void load();"),
-  "stale invitation clicks must refresh the list so the dead row disappears");
+assert.ok(!invitationDecision.includes("La liste a été actualisée"),
+  "copy must not claim the expired row was removed");
+assert.ok(!invitationDecision.includes("The list has been refreshed"),
+  "copy must not claim the expired row was removed");
+assert.ok(invitationDecision.includes("void load({ keepError: true });"),
+  "stale invitation clicks refresh the list without clearing the error");
 assert.ok(invitationDecision.indexOf("Invitation unavailable or expired.") <
   invitationDecision.indexOf('.rpc("decide_invitation"'),
   "stale-click feedback must precede the decision RPC");
