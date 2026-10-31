@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const source = readFileSync("components/live/client-records.tsx", "utf8");
+assert.match(source, /identityRef = useRef<string \| null \| undefined>\(undefined\)/);
+assert.match(source, /event === "TOKEN_REFRESHED"\) return;/);
+assert.match(source, /if \(nextUserId === identityRef\.current\) return;/);
+assert.match(source, /\+\+loadEpoch\.current;/);
+assert.match(source, /setRecords\(null\)/);
+assert.match(source, /if \(active && nextUserId\) void load\(\)/);
+console.log("ok: client records identity-only reset source contracts");
