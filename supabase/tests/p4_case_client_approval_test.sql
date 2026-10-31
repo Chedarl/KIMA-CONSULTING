@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(24);
+select plan(27);
 
 insert into auth.users(id,email) values
 ('00000000-0000-4000-a000-00000000f101','p4-firm-a@example.test'),
@@ -109,6 +109,11 @@ select is(
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
 0::bigint, 'P4 linked client cannot read second taxpayer case at same firm');
+select is(
+(with denied as (update compliance_cases set stage=stage
+  where id='00000000-0000-4000-a000-00000000f162' returning id)
+ select count(*) from denied),
+0::bigint, 'P4 linked client cannot update another taxpayer case at same firm');
 select lives_ok(
 $$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
 values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $$,
@@ -121,6 +126,11 @@ select set_config('request.jwt.claims',
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f161'),
 0::bigint, 'P4 competing firm cannot read the case');
+select is(
+(with denied as (update compliance_cases set stage=stage
+  where id='00000000-0000-4000-a000-00000000f161' returning id)
+ select count(*) from denied),
+0::bigint, 'P4 competing firm cannot update first firm case');
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
 0::bigint, 'P4 competing firm cannot read second taxpayer case');
@@ -141,6 +151,11 @@ select is(
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f163'),
 0::bigint, 'P4 first firm cannot read second firm case for shared taxpayer');
+select is(
+(with denied as (update compliance_cases set stage=stage
+  where id='00000000-0000-4000-a000-00000000f163' returning id)
+ select count(*) from denied),
+0::bigint, 'P4 first firm cannot update second firm case for shared taxpayer');
 select is(
 (select count(*) from case_client_approvals where case_id='00000000-0000-4000-a000-00000000f161'),
 1::bigint, 'P4 owning firm can read authenticated approval on its case');
