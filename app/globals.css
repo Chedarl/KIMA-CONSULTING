@@ -222,7 +222,7 @@ body {
 }
 .lift:hover {
   border-color: rgb(var(--border-strong));
-  box-shadow: 0 20px rgb(20 34 53 / 0.1);
+  box-shadow: 0 6px 20px rgb(20 34 53 / 0.1);
 }
 
 /* Headings use the display face; body stays Inter. */
