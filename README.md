@@ -129,6 +129,19 @@ npm run build
 npm start          # serves the production build
 ```
 
+**Phase 7 pilot acceptance contract.** `npm run test:phase7:pilot` scores an
+anonymous, aggregate-only pilot export (never NIUs, names or real documents).
+Taxpayer-side gates: at least 90% correct next action, 90% complete evidence,
+80% clarity on what stays unresolved, zero critical wrong instructions, zero
+false completions, and the guided arm directionally faster than baseline. Time
+is compared as **time-to-correct-action on unrounded sums**: a wrong trial
+never counts as speed, an arm with no successful trials fails closed, and
+rounding is display-only. Every pilot firm must also supply the plan's five
+measures — document-collection minutes, follow-up minutes, overdue tasks,
+completion visibility and willingness to pay. Missing or malformed measures
+fail closed with `firm_measures_missing`; a firm that cannot see completion
+state fails with `firm_completion_not_visible`.
+
 Next.js 14 (App Router) · TypeScript · Tailwind CSS 3 · Supabase.
 
 Fonts: **Inter** (body), **Poppins** (display), **IBM Plex Mono** (figures),

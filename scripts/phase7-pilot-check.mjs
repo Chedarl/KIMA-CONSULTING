@@ -26,6 +26,11 @@ const sample = {
   })),
   firms: Array.from({ length: 5 }, (_, i) => ({
     consent: true, city: i % 2 ? "Yaoundé" : "Douala", testedWorkflow: true,
+    measures: {
+      documentCollectionMinutes: 40 + i, followUpMinutes: 15,
+      overdueTasks: i === 0 ? 1 : 0, completionVisibility: true,
+      willingToPay: i !== 4,
+    },
   })),
 };
 const copy = () => structuredClone(sample);
@@ -48,6 +53,11 @@ assert.equal(result.metrics.evidencePercent, 100);
 assert.equal(result.metrics.clarityPercent, 100);
 assert.equal(result.metrics.baselineMeanSeconds, 180);
 assert.equal(result.metrics.guidedMeanSeconds, 90);
+assert.equal(result.metrics.firmWillingToPay, 4);
+assert.equal(result.metrics.firmCompletionVisibilityPercent, 100);
+assert.equal(result.metrics.firmOverdueTasksTotal, 1);
+assert.equal(result.metrics.firmMeanDocumentCollectionMinutes, 42);
+assert.equal(result.metrics.firmMeanFollowUpMinutes, 15);
 assert.match(result.qualification, /not.*launch|independent security/i);
 fail("taxpayer_sample_5_to_10", x => { x.taxpayers.length = 4; });
 fail("firm_sample_at_least_5", x => { x.firms.length = 4; });
@@ -79,6 +89,42 @@ fail("false_completion", x => { x.taxpayers[0].cases[0].guided.falseCompletion =
 fail("no_directional_time_improvement", x => {
   for (const p of x.taxpayers) for (const c of p.cases) c.guided.elapsedSeconds = 200;
 });
+// Bug 1 regression: a fast WRONG guided trial must not count as a speed
+// improvement. 17 correct guided @180s + 1 wrong @1s vs 18 baseline @180s
+// used to pass (mean 169.9 < 180); time-to-correct-action must reject it.
+fail("no_directional_time_improvement", x => {
+  for (const p of x.taxpayers) for (const c of p.cases) c.guided.elapsedSeconds = 180;
+  const wrong = x.taxpayers[0].cases[0].guided;
+  wrong.correctNextAction = false;
+  wrong.elapsedSeconds = 1;
+});
+// Bug 1, fail closed: an arm with no successful trials has no time evidence.
+fail("no_directional_time_improvement", x => {
+  for (const p of x.taxpayers) for (const c of p.cases) {
+    c.guided.correctNextAction = false;
+    c.guided.elapsedSeconds = 1;
+  }
+});
+// Bug 2 regression: rounding must not hide a real one-second total gain.
+// Guided 17x180 + 1x179 (all correct) beats baseline 18x180 and must pass.
+{
+  const input = copy();
+  for (const p of input.taxpayers) for (const c of p.cases) c.guided.elapsedSeconds = 180;
+  input.taxpayers[0].cases[0].guided.elapsedSeconds = 179;
+  const outcome = assess(input);
+  assert.equal(outcome.outcome, "criteria_met",
+    `Sub-second gain must survive: ${outcome.failures.join(", ")}`);
+  assert.equal(outcome.metrics.guidedMeanSeconds, 180); // display rounding only
+}
+// Bug 2, other direction: an exact tie on unrounded sums must fail.
+fail("no_directional_time_improvement", x => {
+  for (const p of x.taxpayers) for (const c of p.cases) c.guided.elapsedSeconds = 180;
+});
+// Plan measures: missing firm measures are insufficient evidence, and a firm
+// that cannot see completion state fails the product promise.
+fail("firm_measures_missing", x => { delete x.firms[0].measures; });
+fail("firm_measures_missing", x => { x.firms[1].measures.overdueTasks = -1; });
+fail("firm_completion_not_visible", x => { x.firms[2].measures.completionVisibility = false; });
 // No participant name, NIU or transaction reference is copied into the report.
 const sensitive = copy();
 sensitive.taxpayers[0].name = "NEVER-EXPORT-IDENTITY";
