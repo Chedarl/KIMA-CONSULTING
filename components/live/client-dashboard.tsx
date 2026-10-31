@@ -70,11 +70,14 @@ export function ClientDashboard({
   const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<string | null>(null);
+  const loadEpoch = useRef(0);
 
   const load = useCallback(async () => {
+    const epoch = ++loadEpoch.current;
     try {
       const db = supabase();
       const resolved = await demoIds();
+      if (epoch !== loadEpoch.current) return;
       setIds(resolved);
       if (!resolved) {
         setCases([]);
@@ -100,21 +103,51 @@ export function ClientDashboard({
           .eq("organization_id", resolved.organizationId),
         db.from("taxpayers").select("legal_name").eq("id", resolved.taxpayerId).maybeSingle(),
       ]);
-      if (cs.error) throw cs.error;
+      if (epoch !== loadEpoch.current) return;
+      if (cs.error || rq.error || tp.error) throw cs.error ?? rq.error ?? tp.error;
       const who = tp.data as { legal_name?: string } | null;
-      if (who?.legal_name) setClientName(who.legal_name);
+      setClientName(who?.legal_name ?? fallbackName);
       setCases((cs.data ?? []) as ComplianceCase[]);
       setRequests((rq.data ?? []) as CaseRequest[]);
       setOffline(false);
     } catch {
+      if (epoch !== loadEpoch.current) return;
+      setIds(null);
+      setClientName(fallbackName);
       setOffline(true);
       setCases([]);
+      setRequests([]);
     }
-  }, []);
+  }, [fallbackName]);
 
   useEffect(() => {
     void load();
-  }, [load]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event) => {
+      if (event === "INITIAL_SESSION") return;
+      // Clear the previous account immediately, before any asynchronous reload.
+      ++loadEpoch.current;
+      setIds(null);
+      setClientName(fallbackName);
+      setCases(null);
+      setRequests([]);
+      setOffline(false);
+      setLive(false);
+      setBusy(null);
+      setFailed(null);
+      setJustSent(null);
+      pending.current = null;
+      if (fileRef.current) fileRef.current.value = "";
+      if (timer) clearTimeout(timer);
+      // Supabase requests must run outside the auth callback.
+      timer = setTimeout(() => { void load(); }, 0);
+    });
+    return () => {
+      ++loadEpoch.current;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
+    };
+  }, [fallbackName, load]);
 
   // Live, because a client who has just sent a document should not have to
   // refresh to learn it arrived, and an accountant's decision should reach them
@@ -193,6 +226,7 @@ export function ClientDashboard({
       setFailed(r.id);
       return;
     }
+    const epoch = loadEpoch.current;
     setBusy(r.id);
     setFailed(null);
     const result = await submitRequestFile({
@@ -205,6 +239,7 @@ export function ClientDashboard({
       actorLabel: clientName,
       previousStatus: r.status,
     });
+    if (epoch !== loadEpoch.current) return; // Ignore a previous account\'s upload completion.
     if (!result.ok) {
       setFailed(r.id);
     } else {
