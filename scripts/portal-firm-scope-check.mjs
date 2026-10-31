@@ -253,4 +253,28 @@ assert.match(service.src, /!clientApproved && hasVerifiedEvidence && <div classN
 assert.match(service.src, /event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"/);
 assert.ok(service.src.includes("if (nextUserId === identityRef.current) return;"));
 
+
+/* Follow-up to the merged session-isolation work: routine reloads must swap
+ * rows in place — only an identity change clears them — and a stale or
+ * expired invitation click must surface an FR/EN error instead of failing
+ * silently. Source-contract assertions; browser acceptance still owed. */
+const invitationLoad = invitations.src.split("const load = useCallback(async () => {")[1]?.split("\n  }, [fr, side]);")[0];
+assert.ok(invitationLoad, "invitation loader must exist");
+const invitationLoadHead = invitationLoad.split("await db.auth.getUser()")[0];
+for (const cleared of ["setInvites([])", "setDrafts([])", "setFirms([])"]) {
+  assert.ok(!invitationLoadHead.includes(cleared),
+    "routine reloads must not blank " + cleared + " before refetch");
+}
+assert.ok(invitationLoad.includes('setError(fr ? "Invitations indisponibles." : "Invitations unavailable.")'),
+  "load failures must still surface an error");
+assert.ok(invitationDecision.includes("Invitation indisponible ou expirée."),
+  "stale or expired invitation clicks must surface a French error");
+assert.ok(invitationDecision.includes("Invitation unavailable or expired."),
+  "stale or expired invitation clicks must surface an English error");
+assert.ok(invitationDecision.includes("void load();"),
+  "stale invitation clicks must refresh the list so the dead row disappears");
+assert.ok(invitationDecision.indexOf("Invitation unavailable or expired.") <
+  invitationDecision.indexOf('.rpc("decide_invitation"'),
+  "stale-click feedback must precede the decision RPC");
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
