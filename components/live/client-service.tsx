@@ -212,6 +212,8 @@ export function ClientService({
   async function upload(requestId: string, file: File) {
     const req = requests.find((r) => r.id === requestId);
     if (!req || !ids || !row) return;
+    // A file chooser opened on another case must not submit to that previous case.
+    if (loadedCaseId !== caseId || row.id !== caseId || req.case_id !== caseId) return;
     if (!(requestIsOutstanding(req.status) && waitsOn(req) === "client")) return;
     const epoch = authEpoch.current;
     const actionCaseId = caseId;
@@ -239,6 +241,8 @@ export function ClientService({
 
   async function approveCase() {
     if (!row || !ids || row.stage !== "client_approval" || clientApproved) return;
+    // Do not initiate consent from a stale case while the route is changing.
+    if (loadedCaseId !== caseId || row.id !== caseId) return;
     const epoch = authEpoch.current;
     const actionCaseId = caseId;
     setBusy("client-approval");
