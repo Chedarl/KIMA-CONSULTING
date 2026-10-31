@@ -1128,7 +1128,7 @@ Official DSF formats and guidance: https://www.impots.cm/fr/declarations-statist
 
 OHADA accounting framework: https://www.ohada.org/acte-uniforme-relatif-au-droit-comptable-et-a-linformation-financiere-audcif/
 
-Cameroonian personal data protection law: https://prc.cm/fr/multimedia/documents/10258-loi-n-2024-017-du-23-12-2024-web.pdf
+Cameroonian personal data protection law: https://prc.cm/fr/multimedia/documents/10258-loi-n-2024-017-du-23-12-2024-web
 
 Official DGI taxpayer satisfaction report: https://impots.cm/sites/default/files/documents/Rapport_enqu%C3%AAte_satisfaction_DGI_31_03_2025_final.pdf
 
