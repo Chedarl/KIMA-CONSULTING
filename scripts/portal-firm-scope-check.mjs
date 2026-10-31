@@ -189,8 +189,10 @@ assert.match(records.src, /signedOut \? \(/,
   "sign-out renders an explicit state rather than the loading skeleton");
 assert.equal((recordHook.match(/auth\.getUser\(/g) ?? []).length, 1,
   "one getUser per records load, not a second call on mount");
-assert.match(recordHook, /if \(authError\) \{\s*setSignedOut\(false\);\s*setOffline\(true\);/,
-  "a getUser error is offline, not signed out");
+assert.match(recordHook, /recordsAuthFailure\(authError\) === "signed-out"/,
+  "a missing session is signed out, classified outside the component");
+assert.match(recordHook, /setOffline\(true\)/,
+  "a fetch failure still sets the offline state");
 
 const service = inspect("components/live/client-service.tsx");
 // A session switch must clear the case and consent before an old request resolves.
