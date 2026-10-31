@@ -90,8 +90,6 @@ export function Pill({
   children: ReactNode;
   tone: "green" | "green-outline" | "amber" | "amber-outline" | "muted" | "danger";
 }) {
-  // The "green" tone names predate the palette migration; they now render the
-  // success tokens, because every green pill marks a done/verified state.
   const cls =
     tone === "green"
       ? "bg-success-soft text-success-text"
@@ -204,7 +202,7 @@ export function FilterBar({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  placeholder?: string;
+  placeholder: string;
 }) {
   return (
     <label className="relative block max-w-sm">
