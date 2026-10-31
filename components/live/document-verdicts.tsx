@@ -34,7 +34,7 @@ import {
 type Dict = ReturnType<typeof getWorkspaceDictionary>;
 
 const toneFor = (v: VerdictValue) => {
-  if (v === "pass") return "border-teal/40 bg-teal-soft text-teal-text";
+  if (v === "pass") return "border-success/40 bg-success-soft text-success-text";
   if (v === "fail") return "border-danger-text/40 bg-danger-soft text-danger-text";
   if (v === "indeterminate") return "border-amber/50 bg-amber-soft text-amber-text";
   return "border-border bg-surface-sunken text-fg-muted";
@@ -172,7 +172,7 @@ export function DocumentVerdicts({
           : t.sourceUnverified;
     const tone =
       v.source.status === "verified"
-        ? "bg-teal-soft text-teal-text"
+        ? "bg-success-soft text-success-text"
         : "bg-amber-soft text-amber-text";
     return (
       <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${tone}`}>{label}</span>
@@ -331,7 +331,7 @@ export function DocumentVerdicts({
               </p>
               <p className="mt-1 text-xs text-fg-subtle">{t.missingHint}</p>
               {review.missingMentions.length === 0 ? (
-                <p className="mt-2 text-sm text-teal-text">{t.missingNone}</p>
+                <p className="mt-2 text-sm text-success-text">{t.missingNone}</p>
               ) : (
                 <ul className="mt-2 flex flex-wrap gap-2">
                   {review.missingMentions.map((m) => (

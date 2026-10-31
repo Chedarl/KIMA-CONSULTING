@@ -269,7 +269,7 @@ export function Client360({
         <span
           className={`rounded-full border px-2 py-1 text-xs font-semibold ${
             taxpayer.profile_verified
-              ? "border-teal/40 bg-teal-soft text-teal-text"
+              ? "border-success/40 bg-success-soft text-success-text"
               : "border-dashed border-amber-text/40 bg-amber-soft text-amber-text"
           }`}
         >
