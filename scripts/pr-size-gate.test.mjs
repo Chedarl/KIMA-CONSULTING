@@ -32,6 +32,16 @@ test('only Phase 3/4 integration PR #103 may aggregate changes on the isolated b
   assert.throws(() => validatePullRequest({ ...integration, head: { ref: 'some-other-branch' } }), /5500.*300/);
 });
 
+test('only main-based Phase 3/4 release PR #113 may aggregate its reviewed features', () => {
+  const release = { number: 113, additions: 5000, deletions: 200,
+    base: { ref: 'main' },
+    head: { ref: 'release/phase3-phase4-mainbased-20261031' } };
+  assert.equal(validatePullRequest(release), 5200);
+  assert.throws(() => validatePullRequest({ ...release, number: 114 }), /5200.*300/);
+  assert.throws(() => validatePullRequest({ ...release, base: { ref: 'develop' } }), /5200.*300/);
+  assert.throws(() => validatePullRequest({ ...release, head: { ref: 'another-branch' } }), /5200.*300/);
+});
+
 test('missing or invalid size metadata fails closed', () => {
   for (const payload of [{}, { additions: 0 }, { additions: -1, deletions: 2 },
     { additions: 3.5, deletions: 0 }, { additions: '100', deletions: 2 }]) {
