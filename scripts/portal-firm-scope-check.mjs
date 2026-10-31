@@ -123,4 +123,31 @@ assert.ok(invitationPanel.src.includes(
   'i.initiated_by === userId ? <button disabled={busy} onClick={() => void decide(i.id,"revoked")}'
 ), "only the invitation initiator should see the revoke action");
 
+
+/* Invitation actions must fail closed when the displayed selection belongs
+ * to a different taxpayer or has disappeared from the current session's
+ * authorized directory. Source assertions complement hosted negative tests. */
+assert.match(invitationDecision, /invitation\.taxpayer_id !== taxpayerId/);
+assert.match(invitationDecision, /!Number\.isFinite\(new Date\(invitation\.expires_at\)\.getTime\(\)\)/);
+assert.ok(invitationDecision.indexOf("invitation.taxpayer_id !== taxpayerId") <
+  invitationDecision.indexOf('.rpc("decide_invitation"'),
+  "taxpayer scope must be verified before deciding an invitation");
+const requestFirmAction = invitations.src.split("async function requestFirm(")[1]?.split("\n  async function inviteContact(")[0] ?? "";
+const inviteContactAction = invitations.src.split("async function inviteContact(")[1]?.split("\n  return (")[0] ?? "";
+for (const [name, body, required] of [
+  ["requestFirm", requestFirmAction, ['side !== "taxpayer"', "!userId", "firms.some((candidate) => candidate.id === firm)"]],
+  ["inviteContact", inviteContactAction, ['side !== "firm"', "!userId", "drafts.some((candidate) => candidate.id === engagement)"]],
+]) {
+  const rpc = body.indexOf("await supabase().rpc(");
+  assert.ok(rpc > 0, name + ": invitation RPC must exist");
+  for (const guard of required) {
+    assert.ok(body.indexOf(guard) >= 0 && body.indexOf(guard) < rpc,
+      name + ": " + guard + " must be checked before the RPC");
+  }
+}
+assert.match(invitations.src,
+  /disabled=\{busy \|\| !firm \|\| !firms\.some\(\(candidate\) => candidate\.id === firm\)\}/);
+assert.match(invitations.src,
+  /disabled=\{busy \|\| !engagement \|\| !recipientEmail\.trim\(\) \|\| !drafts\.some\(\(candidate\) => candidate\.id === engagement\)\}/);
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
