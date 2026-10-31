@@ -147,7 +147,7 @@ function statusOf(c: ComplianceCase, byCase: Record<string, CaseRequest[]>): Cli
 function StatusPill({ label, status }: { label: string; status: ClientStatus }) {
   const cls =
     status === "complete"
-      ? "border-teal-text/30 bg-teal-soft text-teal-text"
+      ? "border-success-text/30 bg-success-soft text-success-text"
       : status === "waiting_on_you"
         ? "border-amber-text/40 bg-amber-soft text-amber-text"
         : "border-border-strong bg-surface-sunken text-fg-muted";

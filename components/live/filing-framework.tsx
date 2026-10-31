@@ -280,7 +280,7 @@ export function FilingFramework({ locale, t }: { locale: "fr" | "en"; t: Dict["f
             {parsed && (
               <div
                 role="status"
-                className="rounded-lg border border-teal/40 bg-teal-soft px-3 py-2 text-sm text-teal-text"
+                className="rounded-lg border border-success/40 bg-success-soft px-3 py-2 text-sm text-success-text"
               >
                 <p className="font-semibold">{t.checkerValid}</p>
                 <p className="mt-1 text-xs">
