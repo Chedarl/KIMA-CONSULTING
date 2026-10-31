@@ -68,4 +68,26 @@ assert.match(detail.src, /engagement\.id !== row\.engagement_id/);
 assert.match(detail.src, /engagement\.taxpayer_id !== row\.taxpayer_id/);
 assert.match(detail.src, /engagement\.revoked_at/);
 assert.match(detail.src, /organization_id: orgId/);
+// Client compliance/declarations/archive must not retain another account's records.
+const recordHook = records.src.split("function useClientRecords() {")[1]?.split("\nfunction requestsByCase(")[0];
+assert.ok(recordHook, "client records hook must exist");
+assert.match(recordHook, /const epoch = \+\+loadEpoch\.current;/);
+assert.equal((recordHook.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length, 3,
+  "guard taxpayer lookup, record queries, and failure handling against stale loads");
+assert.match(recordHook, /if \(tp\.error \|\| cs\.error \|\| rq\.error \|\| ev\.error\)/,
+  "any failed tenant-scoped query must fail closed");
+const recordsAuth = recordHook.split("auth.onAuthStateChange((event) => {")[1]?.split("\n    });")[0];
+assert.ok(recordsAuth, "client record pages must react to authentication changes");
+for (const state of ["++loadEpoch.current", "setRecords(null)", "setOffline(false)"]) {
+  assert.ok(recordsAuth.includes(state), "auth change must invalidate " + state);
+}
+assert.match(recordHook, /timer = setTimeout\(\(\) => \{ void load\(\); \}, 0\)/,
+  "re-query after auth callback returns");
+assert.match(recordHook, /subscription\.unsubscribe\(\)/,
+  "auth subscription must be removed on unmount");
+assert.ok((recordHook.match(/\+\+loadEpoch\.current;/g) ?? []).length >= 3,
+  "invalidate loads on request start, auth change, and unmount");
+assert.match(recordHook, /setRecords\(\{ taxpayer: null, cases: \[\], requests: \[\], events: \[\] \}\)/,
+  "failed queries must clear all client record categories");
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
