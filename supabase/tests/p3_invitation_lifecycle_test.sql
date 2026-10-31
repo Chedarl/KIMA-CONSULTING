@@ -49,13 +49,13 @@ select is(
  and status='pending'),1::bigint,'P3 one pending invitation is stored');
 -- A contact linked to a different company is not a valid recipient.
 select throws_ok(
- $ select * from create_invitation_for_contact(
- '00000000-0000-4000-a000-00000000e951','p3-stranger@example.test') $,
+ $$ select * from create_invitation_for_contact(
+ '00000000-0000-4000-a000-00000000e951','p3-stranger@example.test') $$,
  '42501',null,'P3 firm cannot invite a contact of another taxpayer');
 -- Resending must invalidate the first pending invitation, not leave two tokens.
 select lives_ok(
- $ select * from create_invitation_for_contact(
- '00000000-0000-4000-a000-00000000e951','p3-client@example.test') $,
+ $$ select * from create_invitation_for_contact(
+ '00000000-0000-4000-a000-00000000e951','p3-client@example.test') $$,
  'P3 same-firm resend replaces pending invitation');
 select is(
  (select count(*) from engagement_invitations
@@ -66,7 +66,7 @@ select is(
  where organization_id='00000000-0000-4000-a000-00000000e911'
  and status='pending'),1::bigint,'P3 only one invitation remains pending');
 select throws_ok(
- $ update engagement_invitations set status='accepted'
+ $$ update engagement_invitations set status='accepted'
  where organization_id='00000000-0000-4000-a000-00000000e911' $$,
  '42501',null,'P3 direct invitation status updates are denied');
 reset role;
@@ -90,10 +90,10 @@ select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
 -- A revoked invitation UUID must not be usable by its intended recipient.
 select throws_ok(
- $ select decide_invitation(
+ $$ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e911'
- and status='revoked' limit 1),'accepted') $,
+ and status='revoked' limit 1),'accepted') $$,
  '23514',null,'P3 resend-invalidated invitation cannot be accepted');
 reset role;
 -- Revoke client portal access after sending: recipient identity alone is not enough.
@@ -103,10 +103,10 @@ set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
 select throws_ok(
- $ select decide_invitation(
+ $$ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e911'
- and status='pending' limit 1),'accepted') $,
+ and status='pending' limit 1),'accepted') $$,
  '42501',null,'P3 revoked portal access blocks recipient acceptance');
 reset role;
 update contact_account_links set portal_access=true
@@ -115,16 +115,16 @@ set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
 select lives_ok(
- $ select decide_invitation(
+ $$ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e911'
- and status='pending' limit 1),'accepted') $,
+ and status='pending' limit 1),'accepted') $$,
  'P3 intended taxpayer accepts the current firm invitation');
 select throws_ok(
  $$ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e911'
- and status='accepted' limit 1),'accepted') $,
+ and status='accepted' limit 1),'accepted') $$,
  '23514',null,'P3 second acceptance is a forbidden replay');
 reset role;
 select is(
