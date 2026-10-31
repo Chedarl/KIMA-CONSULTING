@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(15);
+select plan(19);
 
 insert into auth.users(id,email) values
 ('00000000-0000-4000-a000-00000000f101','p4-firm-a@example.test'),
@@ -13,10 +13,12 @@ insert into organizations(id,name) values
 ('00000000-0000-4000-a000-00000000f111','P4 Test Firm A'),
 ('00000000-0000-4000-a000-00000000f112','P4 Test Firm B');
 insert into taxpayers(id,legal_name) values
-('00000000-0000-4000-a000-00000000f121','P4 Test Company');
+('00000000-0000-4000-a000-00000000f121','P4 Test Company'),
+('00000000-0000-4000-a000-00000000f122','P4 Unlinked Company');
 insert into engagements(id,organization_id,taxpayer_id,status,authorized_at) values
 ('00000000-0000-4000-a000-00000000f131','00000000-0000-4000-a000-00000000f111','00000000-0000-4000-a000-00000000f121','authorized',now()),
-('00000000-0000-4000-a000-00000000f132','00000000-0000-4000-a000-00000000f112','00000000-0000-4000-a000-00000000f121','authorized',now());
+('00000000-0000-4000-a000-00000000f132','00000000-0000-4000-a000-00000000f112','00000000-0000-4000-a000-00000000f121','authorized',now()),
+('00000000-0000-4000-a000-00000000f133','00000000-0000-4000-a000-00000000f111','00000000-0000-4000-a000-00000000f122','authorized',now());
 insert into firm_members(id,organization_id,person_label,role,auth_user_id) values
 ('00000000-0000-4000-a000-00000000f141','00000000-0000-4000-a000-00000000f111','P4 Partner A','firm_partner','00000000-0000-4000-a000-00000000f101'),
 ('00000000-0000-4000-a000-00000000f142','00000000-0000-4000-a000-00000000f112','P4 Partner B','firm_partner','00000000-0000-4000-a000-00000000f102');
@@ -25,7 +27,8 @@ insert into contacts(id,organization_id,full_name,email,auth_user_id) values
 insert into contact_account_links(contact_id,taxpayer_id,portal_access) values
 ('00000000-0000-4000-a000-00000000f151','00000000-0000-4000-a000-00000000f121',false);
 insert into compliance_cases(id,organization_id,taxpayer_id,engagement_id,obligation_code,period_token) values
-('00000000-0000-4000-a000-00000000f161','00000000-0000-4000-a000-00000000f111','00000000-0000-4000-a000-00000000f121','00000000-0000-4000-a000-00000000f131','patente','2026A');
+('00000000-0000-4000-a000-00000000f161','00000000-0000-4000-a000-00000000f111','00000000-0000-4000-a000-00000000f121','00000000-0000-4000-a000-00000000f131','patente','2026A'),
+('00000000-0000-4000-a000-00000000f162','00000000-0000-4000-a000-00000000f111','00000000-0000-4000-a000-00000000f122','00000000-0000-4000-a000-00000000f133','patente','2026A');
 
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -93,9 +96,17 @@ where contact_id='00000000-0000-4000-a000-00000000f151';
 set local role authenticated;
 select set_config('request.jwt.claims',
 '{"sub":"00000000-0000-4000-a000-00000000f103","role":"authenticated"}',true);
+-- A linked contact's access to one taxpayer must not disclose another taxpayer
+-- even when both companies engage the same accounting firm.
+select is(
+(select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f161'),
+1::bigint, 'P4 linked client reads own company case');
+select is(
+(select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
+0::bigint, 'P4 linked client cannot read second taxpayer case at same firm');
 select lives_ok(
-$$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
-values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $$,
+$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
+values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $,
 'P4 authenticated linked client may approve');
 reset role;
 
@@ -105,13 +116,19 @@ select set_config('request.jwt.claims',
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f161'),
 0::bigint, 'P4 competing firm cannot read the case');
+select is(
+(select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
+0::bigint, 'P4 competing firm cannot read second taxpayer case');
 reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims',
 '{"sub":"00000000-0000-4000-a000-00000000f101","role":"authenticated"}',true);
+select is(
+(select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
+1::bigint, 'P4 owner firm can read its second taxpayer case');
 select lives_ok(
-$$ update compliance_cases set stage='delivered',closed_at=now()
+$ update compliance_cases set stage='delivered',closed_at=now()
 where id='00000000-0000-4000-a000-00000000f161' $$,
 'P4 owner firm can deliver after signed client consent');
 
