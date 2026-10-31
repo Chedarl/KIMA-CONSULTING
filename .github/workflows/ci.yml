@@ -15,6 +15,14 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - name: Test PR changed-line guard
+        run: node --test scripts/pr-size-gate.test.mjs
+      - name: Enforce Phase 2 PR size limit
+        if: github.event_name == 'pull_request'
+        run: node scripts/pr-size-gate.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -27,6 +35,8 @@ jobs:
       - run: npm run test:staff:screen
       - run: npm run test:staff:route
       - run: npm run test:staff
+      - run: npm run test:portal:firm-scope
+      - run: npm run test:phase3:mocks
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
