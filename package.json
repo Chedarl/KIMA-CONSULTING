@@ -18,7 +18,7 @@
     "fonts": "node scripts/fetch-fonts.mjs",
     "seed:storage": "node scripts/seed-storage.mjs",
     "test:marketing": "node scripts/marketing-consistency-check.mjs",
-    "test:portal:firm-scope": "node scripts/portal-firm-scope-check.mjs",
+    "test:portal:firm-scope": "node scripts/portal-firm-scope-check.mjs && node scripts/client-dashboard-session-check.mjs",
     "test:phase3:mocks": "node scripts/phase3-mock-check.mjs"
   },
   "dependencies": {
