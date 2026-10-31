@@ -201,7 +201,7 @@ export function Money({
   return (
     <span className={`tnum font-mono ${className}`}>
       {formatXaf(amount, locale)}
-      {" "}
+      {" "}
       <span className="text-[0.85em] text-fg-muted">{t.common.xaf}</span>
     </span>
   );
