@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(19);
+select plan(24);
 
 insert into auth.users(id,email) values
 ('00000000-0000-4000-a000-00000000f101','p4-firm-a@example.test'),
@@ -28,7 +28,8 @@ insert into contact_account_links(contact_id,taxpayer_id,portal_access) values
 ('00000000-0000-4000-a000-00000000f151','00000000-0000-4000-a000-00000000f121',false);
 insert into compliance_cases(id,organization_id,taxpayer_id,engagement_id,obligation_code,period_token) values
 ('00000000-0000-4000-a000-00000000f161','00000000-0000-4000-a000-00000000f111','00000000-0000-4000-a000-00000000f121','00000000-0000-4000-a000-00000000f131','patente','2026A'),
-('00000000-0000-4000-a000-00000000f162','00000000-0000-4000-a000-00000000f111','00000000-0000-4000-a000-00000000f122','00000000-0000-4000-a000-00000000f133','patente','2026A');
+('00000000-0000-4000-a000-00000000f162','00000000-0000-4000-a000-00000000f111','00000000-0000-4000-a000-00000000f122','00000000-0000-4000-a000-00000000f133','patente','2026A'),
+('00000000-0000-4000-a000-00000000f163','00000000-0000-4000-a000-00000000f112','00000000-0000-4000-a000-00000000f121','00000000-0000-4000-a000-00000000f132','tva','2026M10');
 
 set local role authenticated;
 select set_config('request.jwt.claims',
@@ -101,6 +102,10 @@ select set_config('request.jwt.claims',
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f161'),
 1::bigint, 'P4 linked client reads own company case');
+-- A client may see their taxpayer's cases across engaged firms; firms may not.
+select is(
+(select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f163'),
+1::bigint, 'P4 client reads own taxpayer case at second engaged firm');
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
 0::bigint, 'P4 linked client cannot read second taxpayer case at same firm');
@@ -119,6 +124,12 @@ select is(
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
 0::bigint, 'P4 competing firm cannot read second taxpayer case');
+select is(
+(select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f163'),
+1::bigint, 'P4 second firm reads only its own case for shared taxpayer');
+select is(
+(select count(*) from case_client_approvals where case_id='00000000-0000-4000-a000-00000000f161'),
+0::bigint, 'P4 second firm cannot read first firm client approval');
 reset role;
 
 set local role authenticated;
@@ -127,6 +138,12 @@ select set_config('request.jwt.claims',
 select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
 1::bigint, 'P4 owner firm can read its second taxpayer case');
+select is(
+(select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f163'),
+0::bigint, 'P4 first firm cannot read second firm case for shared taxpayer');
+select is(
+(select count(*) from case_client_approvals where case_id='00000000-0000-4000-a000-00000000f161'),
+1::bigint, 'P4 owning firm can read authenticated approval on its case');
 select lives_ok(
 $$ update compliance_cases set stage='delivered',closed_at=now()
 where id='00000000-0000-4000-a000-00000000f161' $$,
