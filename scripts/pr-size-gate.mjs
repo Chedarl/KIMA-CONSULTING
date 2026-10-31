@@ -18,8 +18,16 @@ export function changedLines(pr) {
 // changes. Its diff necessarily exceeds the per-feature limit; allow only
 // this exact, owner-authorized PR #64, not a name/prefix-based escape hatch.
 export function isIntegrationRelease(pr) {
-  return pr?.number === 64 && pr?.base?.ref === 'main' &&
+  const phase2 = pr?.number === 64 && pr?.base?.ref === 'main' &&
     pr?.head?.ref === 'phase2/integration-20261030';
+  const nonProductionPhase34 = pr?.number === 103 &&
+    pr?.base?.ref === 'integration/phase3-phase4-20261031' &&
+    pr?.head?.ref === 'integration/phase3-phase4-resolved-20261031';
+  // Release aggregation only: exact owner-authorized P3/P4 candidate targeting main.
+  // No exemption for individual feature PRs or a differently named branch.
+  const phase34Release = pr?.number === 113 && pr?.base?.ref === 'main' &&
+    pr?.head?.ref === 'release/phase3-phase4-mainbased-20261031';
+  return phase2 || nonProductionPhase34 || phase34Release;
 }
 
 export function validatePullRequest(pr) {
@@ -48,7 +56,7 @@ export async function runGate(env = process.env, fetchImpl = globalThis.fetch) {
   const pr = await response.json();
   if (String(pr.number) !== number) throw new Error('Unexpected PR identity');
   const count = validatePullRequest(pr);
-  const outcome = isIntegrationRelease(pr) ? 'EXEMPT: audited Phase 2 integration collection' : 'PASS';
+  const outcome = isIntegrationRelease(pr) ? 'EXEMPT: exact integration aggregation only; security and CI gates remain mandatory' : 'PASS';
   process.stdout.write(`PR #${number}: ${count}/${MAX_CHANGED_LINES} changed lines — ${outcome}\n`);
   return count;
 }
