@@ -104,6 +104,14 @@ export function InvitationsPanel({ locale, side }: {
 
   async function decide(id: string, action: "accepted" | "declined" | "revoked") {
     if (!userId || busy) return;
+    // A stale button, expired invitation, or another account's invitation
+    // must never initiate an RPC. The database remains the authority.
+    const invitation = invites.find((item) => item.id === id);
+    if (!invitation || invitation.status !== "pending" ||
+        new Date(invitation.expires_at).getTime() <= Date.now() ||
+        (action === "revoked"
+          ? invitation.initiated_by !== userId
+          : invitation.recipient_user_id !== userId)) return;
     const epoch = authEpoch.current;
     setBusy(true);
     setError("");
@@ -227,7 +235,7 @@ export function InvitationsPanel({ locale, side }: {
                   <button disabled={busy} onClick={() => void decide(i.id,"declined")} className="min-h-[44px] rounded-lg border border-border px-4 text-sm">
                     {fr ? "Refuser" : "Decline"}
                   </button>
-                </> : <button disabled={busy} onClick={() => void decide(i.id,"revoked")} className="min-h-[44px] rounded-lg border border-border px-4 text-sm">
+                </> : i.initiated_by === userId ? <button disabled={busy} onClick={() => void decide(i.id,"revoked")} className="min-h-[44px] rounded-lg border border-border px-4 text-sm">
                   {fr ? "Annuler l'invitation" : "Revoke invitation"}
                 </button>}
               </div>}
