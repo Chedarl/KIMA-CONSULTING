@@ -31,7 +31,7 @@ export function InvitationsPanel({ locale, side }: {
   const authEpoch = useRef(0);
   const identityRef = useRef<string | null | undefined>(undefined);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { keepError?: boolean }) => {
     const epoch = ++loadEpoch.current;
     // Identity changes clear prior rows synchronously in the auth handler
     // below. A routine reload swaps rows in place so the lists never blank
@@ -73,7 +73,7 @@ export function InvitationsPanel({ locale, side }: {
     setInvites((rows.data ?? []) as Invitation[]);
     setFirms((directory.data ?? []) as Firm[]);
     setDrafts((engagements.data ?? []) as DraftEngagement[]);
-    setError("");
+    if (!options?.keepError) setError("");
   }, [fr, side]);
 
   useEffect(() => {
@@ -125,12 +125,12 @@ export function InvitationsPanel({ locale, side }: {
         (action === "revoked"
           ? invitation.initiated_by !== userId
           : invitation.recipient_user_id !== userId)) {
-      // A stale click must still be answered: say so and refresh the list
-      // so the dead row disappears instead of failing silently.
+      // The row can stay on screen, marked expired. Say why the click did
+      // nothing, then reload without wiping that message.
       setError(fr
-        ? "Invitation indisponible ou expirée. La liste a été actualisée."
-        : "Invitation unavailable or expired. The list has been refreshed.");
-      void load();
+        ? "Invitation indisponible ou expirée."
+        : "Invitation unavailable or expired.");
+      void load({ keepError: true });
       return;
     }
     const epoch = authEpoch.current;
