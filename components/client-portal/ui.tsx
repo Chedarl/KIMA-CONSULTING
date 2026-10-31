@@ -162,7 +162,7 @@ export function StatusStepper({
               <div className="flex w-full items-center">
                 <span
                   aria-hidden
-                  className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : i <= current ? "bg-teal" :"}`}
+                  className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : i <= current ? "bg-teal" : "bg-border"}`}
                 />
                 <span
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
