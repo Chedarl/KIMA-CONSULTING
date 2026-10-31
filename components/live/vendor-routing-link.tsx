@@ -32,13 +32,16 @@ export function VendorRoutingLink({ href, label }: { href: string; label: string
       setVisible(false);
       if (!nextUserId) return;
       timer = setTimeout(() => {
-        void db.rpc("list_unassigned_registrations").then(({ error }) => {
-          if (!active || request !== epoch) return;
-          setVisible(!error);
-        }).catch(() => {
-          if (!active || request !== epoch) return;
-          setVisible(false);
-        });
+        void (async () => {
+          try {
+            const { error } = await db.rpc("list_unassigned_registrations");
+            if (!active || request !== epoch) return;
+            setVisible(!error);
+          } catch {
+            if (!active || request !== epoch) return;
+            setVisible(false);
+          }
+        })();
       }, 0);
     });
 
