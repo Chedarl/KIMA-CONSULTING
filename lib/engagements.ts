@@ -174,12 +174,49 @@ export type EngagementWriteRefusal =
   | "taxpayer_holds_another_firm"
   | "acceptance_is_the_taxpayers"
   | "engagement_cannot_move"
-  | "revocation_is_final";
+  | "revocation_is_final"
+  | "awaiting_client_acceptance"
+  | "revoked_needs_new_engagement";
+
+/**
+ * Refusals raised by open_client_file() and approve_registration() — and by
+ * the same guard when the engagements screen authorises a row.
+ * 42501 + the former-client text means the taxpayer must accept again.
+ * 23514 + engagements_authorized_is_not_revoked means the row is revoked and
+ * must not be labelled authorized; start a new engagement.
+ * A 42501 or 23514 with any other message stays unmapped.
+ */
+export function grantRpcRefusal(error: {
+  code?: string | null;
+  message?: string | null;
+} | null | undefined): "awaiting_client_acceptance" | "revoked_needs_new_engagement" | null {
+  const code = error?.code ?? "";
+  const message = (error?.message ?? "").toLowerCase();
+  const formerClient = message.includes("former client must accept");
+  const authorizedAndRevoked = message.includes("engagements_authorized_is_not_revoked");
+  if (formerClient && (code === "" || code === "42501")) return "awaiting_client_acceptance";
+  if (authorizedAndRevoked && (code === "" || code === "23514")) return "revoked_needs_new_engagement";
+  return null;
+}
+
+export function grantRpcMessage(
+  locale: "fr" | "en",
+  error: { code?: string | null; message?: string | null } | null | undefined,
+): string | null {
+  const key = grantRpcRefusal(error);
+  if (!key) return null;
+  const text = ENGAGEMENT_WRITE_REFUSAL_LABELS[key];
+  return locale === "fr" ? text.fr : text.en;
+}
 
 export function engagementWriteRefusal(detail: string | null | undefined): EngagementWriteRefusal | null {
+  const mapped = grantRpcRefusal({ message: detail });
+  if (mapped) return mapped;
   const d = (detail ?? "").toLowerCase();
   if (!d) return null;
-  if (d.includes("another firm holds this taxpayer")) return "taxpayer_holds_another_firm";
+  if (d.includes("another firm holds this taxpayer") || d.includes("another firm has held this taxpayer")) {
+    return "taxpayer_holds_another_firm";
+  }
   if (d.includes("only the taxpayer records acceptance")) return "acceptance_is_the_taxpayers";
   if (d.includes("cannot be moved to another firm or another taxpayer")) return "engagement_cannot_move";
   if (d.includes("cannot be un-revoked")) return "revocation_is_final";
@@ -202,5 +239,13 @@ export const ENGAGEMENT_WRITE_REFUSAL_LABELS: Record<EngagementWriteRefusal, { f
   revocation_is_final: {
     fr: "Une mission révoquée ne peut pas être rétablie. Une nouvelle mission est nécessaire.",
     en: "A revoked engagement cannot be restored. A new engagement is needed.",
+  },
+  awaiting_client_acceptance: {
+    fr: "En attente de l'acceptation du client. Le cabinet ne peut pas se réautoriser seul.",
+    en: "Waiting for the client to accept. The firm cannot re-authorise on its own.",
+  },
+  revoked_needs_new_engagement: {
+    fr: "Cette mission est révoquée. Ouvrez une nouvelle mission : une mission révoquée n'est jamais réautorisée.",
+    en: "This engagement is revoked. Start a new engagement: a revoked one is never re-authorised.",
   },
 };

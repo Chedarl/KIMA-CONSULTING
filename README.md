@@ -649,6 +649,7 @@ are about a transition rather than a row:
    firm that has just created a taxpayer is the only firm engaged with them. With the
    taxpayer's acceptance it may authorise regardless, which is how a second firm joins.
 4. An engagement **never moves** between firms or taxpayers, and a revocation is final.
+   Revoking always sets `status` to `revoked` together with `revoked_at`; an engagement cannot stay `authorized` once it is revoked.
 
 A client's acceptance is narrow, and a firm cannot stand in for it
 (`20261030100000`, both found in review of #30 and both reproduced first). The
