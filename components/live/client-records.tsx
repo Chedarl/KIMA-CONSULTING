@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { recordsAuthFailure } from "@/lib/client-records-auth";
 import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { Card, CardHeader, Timeline } from "@/components/ui";
 import { usePortalCopy } from "@/components/client-portal/copy";
@@ -79,6 +80,13 @@ function useClientRecords() {
       const { data: auth, error: authError } = await db.auth.getUser();
       if (epoch !== loadEpoch.current) return;
       if (authError) {
+        if (recordsAuthFailure(authError) === "signed-out") {
+          identityRef.current = null;
+          setSignedOut(true);
+          setOffline(false);
+          setRecords(EMPTY_RECORDS);
+          return;
+        }
         setSignedOut(false);
         setOffline(true);
         setRecords(EMPTY_RECORDS);
