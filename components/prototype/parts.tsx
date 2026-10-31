@@ -10,7 +10,7 @@ export type BasisTone = "declared" | "verified" | "recorded";
 
 const tone: Record<BasisTone, string> = {
   declared: "border-dashed border-amber-text/40 bg-amber-soft text-amber-text",
-  verified: "border-teal-text/30 bg-teal-soft text-teal-text",
+  verified: "border-success-text/30 bg-success-soft text-success-text",
   recorded: "border-border-strong bg-surface-sunken text-fg-muted",
 };
 

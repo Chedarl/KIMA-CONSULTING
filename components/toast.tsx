@@ -43,7 +43,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 ? "border-danger-text/40 bg-danger-soft text-danger-text"
                 : t.tone === "info"
                   ? "border-border-strong bg-surface/95 text-fg"
-                  : "border-teal-text/40 bg-teal-soft text-teal-text"
+                  : "border-success-text/40 bg-success-soft text-success-text"
             }`}
           >
             <svg

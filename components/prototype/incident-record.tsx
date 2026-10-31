@@ -133,7 +133,7 @@ export function Unresolved({ incident, t }: { incident: Incident | null; t: Inci
   return (
     <Panel title={t.unresolvedTitle} id="unresolved">
       {items.length === 0 ? (
-        <p className="text-sm text-teal-text">{t.unresolvedNothing}</p>
+        <p className="text-sm text-success-text">{t.unresolvedNothing}</p>
       ) : (
         <ul className="list-disc pl-5 text-sm text-fg">
           {items.includes("payment") && <li>{t.unresolvedPayment}</li>}
