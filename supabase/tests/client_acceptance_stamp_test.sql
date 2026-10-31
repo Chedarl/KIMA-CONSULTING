@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(3);
+select plan(4);
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-e500-0000000000a1', 'stamp-partner@example.test'),
@@ -10,7 +10,8 @@ insert into auth.users (id, email) values
 insert into organizations (id, name) values
   ('00000000-0000-4000-e500-0000000000a0', 'Stamp Firm');
 insert into taxpayers (id, legal_name) values
-  ('00000000-0000-4000-e500-0000000000b0', 'Stamp Client SARL');
+  ('00000000-0000-4000-e500-0000000000b0', 'Stamp Client SARL'),
+  ('00000000-0000-4000-e500-0000000000b1', 'Independent Stamp Client SARL');
 insert into firm_members (id, organization_id, person_label, email, role, auth_user_id) values
   ('00000000-0000-4000-e500-0000000000a2', '00000000-0000-4000-e500-0000000000a0',
    'Stamp Partner', 'stamp-partner@example.test', 'firm_partner',
@@ -42,8 +43,9 @@ select ok(
 reset role;
 
 insert into engagements (id, organization_id, taxpayer_id, status) values
+  -- A second taxpayer avoids violating the one-live-engagement-per-firm/client invariant.
   ('00000000-0000-4000-e500-0000000000e2', '00000000-0000-4000-e500-0000000000a0',
-   '00000000-0000-4000-e500-0000000000b0', 'draft');
+   '00000000-0000-4000-e500-0000000000b1', 'draft');
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-e500-0000000000a1","role":"authenticated"}', true);
@@ -52,6 +54,13 @@ select throws_ok(
       where id = '00000000-0000-4000-e500-0000000000e2' $$,
   '23514', null,
   'T-362 a firm does not receive a stamped acceptance'
+);
+
+reset role;
+select is(
+  (select status::text from engagements where id = '00000000-0000-4000-e500-0000000000e2'),
+  'draft',
+  'T-363 rejected firm acceptance leaves the independent taxpayer draft unchanged'
 );
 
 select * from finish();
