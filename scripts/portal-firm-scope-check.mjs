@@ -187,6 +187,10 @@ assert.match(recordHook, /setRecords\(EMPTY_RECORDS\)/,
   "failed queries and sign-out must clear all client record categories");
 assert.match(records.src, /signedOut \? \(/,
   "sign-out renders an explicit state rather than the loading skeleton");
+assert.equal((recordHook.match(/auth\.getUser\(/g) ?? []).length, 1,
+  "one getUser per records load, not a second call on mount");
+assert.match(recordHook, /if \(authError\) \{\s*setSignedOut\(false\);\s*setOffline\(true\);/,
+  "a getUser error is offline, not signed out");
 
 const service = inspect("components/live/client-service.tsx");
 // A session switch must clear the case and consent before an old request resolves.
