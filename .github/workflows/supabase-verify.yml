@@ -84,7 +84,7 @@ jobs:
 
       - name: Two-session approval versus direct-client-opening NIU race
         if: steps.check.outputs.present == 'true'
-        run: bash scripts/test-cross-entrypoint-niu-race.sh
+        run: bash scripts/test-cross-entrypoint-lock-proof.sh
 
       - name: Check for schema drift against committed migrations
         if: steps.check.outputs.present == 'true'
