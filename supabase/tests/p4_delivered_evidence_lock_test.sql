@@ -4,7 +4,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(13);
+select plan(16);
 
 insert into auth.users(id,email,email_confirmed_at) values
 ('00000000-0000-4000-a000-00000000f201','lock-firm@example.test',now()),
@@ -29,6 +29,16 @@ values
 ('00000000-0000-4000-a000-00000000f261','00000000-0000-4000-a000-00000000f211',
  '00000000-0000-4000-a000-00000000f221','00000000-0000-4000-a000-00000000f231',
  'patente','2026A');
+
+-- Table owner bypasses RLS. Without the approval trigger this insert is stored
+-- even though the case is still in documents and has no verified filing.
+select throws_ok(
+$$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
+values('00000000-0000-4000-a000-00000000f261',1,
+'00000000-0000-4000-a000-00000000f221','ACK-LOCK-1',
+'00000000-0000-4000-a000-00000000f202') $$,
+'23514', 'client approval requires the current verified filing evidence for this round',
+'Lock: table owner cannot record consent before the filing is verified');
 
 -- Walk the case to client approval as the firm partner (setup, not under test).
 set local role authenticated;
@@ -145,6 +155,20 @@ select is(
  where case_id='00000000-0000-4000-a000-00000000f261'),
 1::bigint,
 'Lock: the signed approval row cannot be deleted');
+
+-- The privilege denial above does not bind the table owner. After delivery the
+-- trigger does, including a role that bypasses row-level security.
+reset role;
+select throws_ok(
+$$ update case_client_approvals set filing_evidence_ref='FORGED-9'
+where case_id='00000000-0000-4000-a000-00000000f261' $$,
+'42501', 'a client approval is immutable after delivery',
+'Lock: table owner cannot rewrite consent after delivery');
+select throws_ok(
+$$ delete from case_client_approvals
+where case_id='00000000-0000-4000-a000-00000000f261' $$,
+'42501', 'a client approval is immutable after delivery',
+'Lock: table owner cannot delete consent after delivery');
 
 -- Control: non-evidence bookkeeping on a delivered case stays allowed.
 set local role authenticated;
