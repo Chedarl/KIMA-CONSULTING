@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path=public,extensions;
-select plan(18);
+select plan(24);
 
 insert into auth.users(id,email) values
  ('00000000-0000-4000-a000-00000000e901','p3-firm-a@example.test'),
@@ -13,14 +13,17 @@ insert into organizations(id,name,kind) values
  ('00000000-0000-4000-a000-00000000e911','P3 Firm A','firm'),
  ('00000000-0000-4000-a000-00000000e912','P3 Firm B','firm');
 insert into taxpayers(id,legal_name) values
- ('00000000-0000-4000-a000-00000000e921','P3 Example Client');
+ ('00000000-0000-4000-a000-00000000e921','P3 Example Client'),
+ ('00000000-0000-4000-a000-00000000e922','P3 Other Company');
 insert into firm_members(id,organization_id,person_label,role,auth_user_id) values
  ('00000000-0000-4000-a000-00000000e931','00000000-0000-4000-a000-00000000e911','P3 Partner A','firm_partner','00000000-0000-4000-a000-00000000e901'),
  ('00000000-0000-4000-a000-00000000e932','00000000-0000-4000-a000-00000000e912','P3 Partner B','firm_partner','00000000-0000-4000-a000-00000000e902');
 insert into contacts(id,organization_id,full_name,email,auth_user_id) values
- ('00000000-0000-4000-a000-00000000e941','00000000-0000-4000-a000-00000000e911','P3 Client','p3-client@example.test','00000000-0000-4000-a000-00000000e903');
+ ('00000000-0000-4000-a000-00000000e941','00000000-0000-4000-a000-00000000e911','P3 Client','p3-client@example.test','00000000-0000-4000-a000-00000000e903'),
+ ('00000000-0000-4000-a000-00000000e942','00000000-0000-4000-a000-00000000e911','P3 Other Company Contact','p3-stranger@example.test','00000000-0000-4000-a000-00000000e904');
 insert into contact_account_links(contact_id,taxpayer_id,portal_access) values
- ('00000000-0000-4000-a000-00000000e941','00000000-0000-4000-a000-00000000e921',true);
+ ('00000000-0000-4000-a000-00000000e941','00000000-0000-4000-a000-00000000e921',true),
+ ('00000000-0000-4000-a000-00000000e942','00000000-0000-4000-a000-00000000e922',true);
 insert into engagements(id,organization_id,taxpayer_id,status,authorized_at) values
  ('00000000-0000-4000-a000-00000000e951','00000000-0000-4000-a000-00000000e911','00000000-0000-4000-a000-00000000e921','draft',null);
 
@@ -44,8 +47,26 @@ select is(
  (select count(*) from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e911'
  and status='pending'),1::bigint,'P3 one pending invitation is stored');
+-- A contact linked to a different company is not a valid recipient.
 select throws_ok(
- $$ update engagement_invitations set status='accepted'
+ $ select * from create_invitation_for_contact(
+ '00000000-0000-4000-a000-00000000e951','p3-stranger@example.test') $,
+ '42501',null,'P3 firm cannot invite a contact of another taxpayer');
+-- Resending must invalidate the first pending invitation, not leave two tokens.
+select lives_ok(
+ $ select * from create_invitation_for_contact(
+ '00000000-0000-4000-a000-00000000e951','p3-client@example.test') $,
+ 'P3 same-firm resend replaces pending invitation');
+select is(
+ (select count(*) from engagement_invitations
+ where organization_id='00000000-0000-4000-a000-00000000e911'
+ and status='revoked'),1::bigint,'P3 old invitation revoked by resend');
+select is(
+ (select count(*) from engagement_invitations
+ where organization_id='00000000-0000-4000-a000-00000000e911'
+ and status='pending'),1::bigint,'P3 only one invitation remains pending');
+select throws_ok(
+ $ update engagement_invitations set status='accepted'
  where organization_id='00000000-0000-4000-a000-00000000e911' $$,
  '42501',null,'P3 direct invitation status updates are denied');
 reset role;
@@ -67,12 +88,38 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
-select lives_ok(
- $$ select decide_invitation(
+-- A revoked invitation UUID must not be usable by its intended recipient.
+select throws_ok(
+ $ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e911'
- limit 1),'accepted') $$,
- 'P3 intended taxpayer accepts the firm invitation');
+ and status='revoked' limit 1),'accepted') $,
+ '23514',null,'P3 resend-invalidated invitation cannot be accepted');
+reset role;
+-- Revoke client portal access after sending: recipient identity alone is not enough.
+update contact_account_links set portal_access=false
+ where contact_id='00000000-0000-4000-a000-00000000e941';
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
+select throws_ok(
+ $ select decide_invitation(
+ (select id from engagement_invitations
+ where organization_id='00000000-0000-4000-a000-00000000e911'
+ and status='pending' limit 1),'accepted') $,
+ '42501',null,'P3 revoked portal access blocks recipient acceptance');
+reset role;
+update contact_account_links set portal_access=true
+ where contact_id='00000000-0000-4000-a000-00000000e941';
+set local role authenticated;
+select set_config('request.jwt.claims',
+ '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
+select lives_ok(
+ $ select decide_invitation(
+ (select id from engagement_invitations
+ where organization_id='00000000-0000-4000-a000-00000000e911'
+ and status='pending' limit 1),'accepted') $,
+ 'P3 intended taxpayer accepts the current firm invitation');
 select throws_ok(
  $$ select decide_invitation(
  (select id from engagement_invitations
