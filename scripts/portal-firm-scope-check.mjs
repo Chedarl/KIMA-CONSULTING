@@ -68,4 +68,21 @@ assert.match(detail.src, /engagement\.id !== row\.engagement_id/);
 assert.match(detail.src, /engagement\.taxpayer_id !== row\.taxpayer_id/);
 assert.match(detail.src, /engagement\.revoked_at/);
 assert.match(detail.src, /organization_id: orgId/);
+// Session isolation: stale invitation rows must never survive an account switch.
+// This is a source-contract guard, not a substitute for browser acceptance.
+const invitations = inspect("components/live/invitations-panel.tsx");
+assert.match(invitations.src, /auth\.onAuthStateChange\(/);
+assert.match(invitations.src, /const epoch = \+\+loadEpoch\.current;/);
+assert.equal((invitations.src.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length, 3,
+  "guard every asynchronous invitation load boundary");
+const authChange = invitations.src.split("auth.onAuthStateChange((event) => {")[1]?.split("\n    });")[0];
+assert.ok(authChange, "auth state changes must invalidate prior session state");
+for (const state of ["setUserId(null)", "setTaxpayerId(null)", "setInvites([])",
+  "setDrafts([])", "setFirms([])", 'setFirm("")', 'setEngagement("")',
+  'setRecipientEmail("")']) {
+  assert.ok(authChange.includes(state), "auth change must clear " + state);
+}
+assert.match(invitations.src, /subscription\.unsubscribe\(\)/);
+assert.match(invitations.src, /timer = setTimeout\(\(\) => \{ void load\(\); \}, 0\)/);
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
