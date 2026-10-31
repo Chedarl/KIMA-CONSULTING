@@ -58,6 +58,9 @@ export function ClientService({
   const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // caseId can change before effects run. Stamp it during render so a busy
+  // or failed approval from the previous case cannot disable the next one.
+  const [caseStamp, setCaseStamp] = useState(caseId);
   const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
   const [name, setName] = useState("");
   const [clientApproved, setClientApproved] = useState(false);
@@ -71,6 +74,12 @@ export function ClientService({
   // even before effect cleanup runs.
   const activeCaseId = useRef(caseId);
   activeCaseId.current = caseId;
+  if (caseStamp !== caseId) {
+    setCaseStamp(caseId);
+    setBusy(null);
+    setFailed(null);
+    pending.current = null;
+  }
   const today = todayInDouala();
 
   const load = useCallback(async () => {
