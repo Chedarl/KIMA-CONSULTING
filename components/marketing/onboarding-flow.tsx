@@ -620,8 +620,12 @@ function ServicesStep({
         <legend className="text-sm font-semibold text-fg">{t.firmSelect}</legend>
         <p className="mt-1 text-sm text-fg-muted">{t.firmHelp}</p>
         {firmState === "loading" && <p role="status" className="mt-3 text-sm">{t.firmLoading}</p>}
-        {(firmState === "unavailable" || (firmState === "ready" && firms.length === 0)) &&
-          <p className="mt-3 text-sm text-fg-muted">{t.firmNone}</p>}
+        {firmState === "unavailable" && (
+          <p role="alert" className="mt-3 text-sm text-danger-text">{t.firmDirectoryError}</p>
+        )}
+        {firmState === "ready" && firms.length === 0 && (
+          <p className="mt-3 text-sm text-fg-muted">{t.firmNone}</p>
+        )}
         <div className="mt-3 grid gap-2">
           <label className="flex min-h-[52px] cursor-pointer items-center gap-3 rounded-lg border border-border p-3 has-[:checked]:border-teal">
             <input type="radio" name="receiving-firm" value=""
