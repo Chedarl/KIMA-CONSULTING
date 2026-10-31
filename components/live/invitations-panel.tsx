@@ -33,16 +33,18 @@ export function InvitationsPanel({ locale, side }: {
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
-    // Never retain a previous account's invitations during a session refresh.
-    setInvites([]);
-    setDrafts([]);
-    setFirms([]);
+    // Identity changes clear prior rows synchronously in the auth handler
+    // below. A routine reload swaps rows in place so the lists never blank
+    // out after an accept, decline or invite.
     const db = supabase();
     const { data: auth, error: authError } = await db.auth.getUser();
     if (epoch !== loadEpoch.current) return;
     if (authError || !auth.user) {
       setUserId(null);
       setTaxpayerId(null);
+      setInvites([]);
+      setDrafts([]);
+      setFirms([]);
       setError(fr ? "Connexion requise." : "Sign-in required.");
       return;
     }
@@ -122,7 +124,15 @@ export function InvitationsPanel({ locale, side }: {
         new Date(invitation.expires_at).getTime() <= Date.now() ||
         (action === "revoked"
           ? invitation.initiated_by !== userId
-          : invitation.recipient_user_id !== userId)) return;
+          : invitation.recipient_user_id !== userId)) {
+      // A stale click must still be answered: say so and refresh the list
+      // so the dead row disappears instead of failing silently.
+      setError(fr
+        ? "Invitation indisponible ou expirée. La liste a été actualisée."
+        : "Invitation unavailable or expired. The list has been refreshed.");
+      void load();
+      return;
+    }
     const epoch = authEpoch.current;
     setBusy(true);
     setError("");
