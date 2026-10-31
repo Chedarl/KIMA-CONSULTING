@@ -105,8 +105,8 @@ select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
 0::bigint, 'P4 linked client cannot read second taxpayer case at same firm');
 select lives_ok(
-$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
-values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $,
+$$ insert into case_client_approvals(case_id,approval_round,taxpayer_id,filing_evidence_ref,approved_by)
+values('00000000-0000-4000-a000-00000000f161',1,'00000000-0000-4000-a000-00000000f121','ACK-P4','00000000-0000-4000-a000-00000000f103') $$,
 'P4 authenticated linked client may approve');
 reset role;
 
@@ -128,7 +128,7 @@ select is(
 (select count(*) from compliance_cases where id='00000000-0000-4000-a000-00000000f162'),
 1::bigint, 'P4 owner firm can read its second taxpayer case');
 select lives_ok(
-$ update compliance_cases set stage='delivered',closed_at=now()
+$$ update compliance_cases set stage='delivered',closed_at=now()
 where id='00000000-0000-4000-a000-00000000f161' $$,
 'P4 owner firm can deliver after signed client consent');
 
