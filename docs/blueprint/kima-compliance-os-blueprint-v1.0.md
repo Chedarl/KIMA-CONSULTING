@@ -469,14 +469,19 @@ The platform must be immersive through interaction, clarity, and responsivenessâ
 - Helpful empty states.
 - Visible confirmations for important actions.
 
-## Proposed palette
+## Palette
 
-- Deep navy: #163B66
-- Teal green: #1E9E74
-- White: #FFFFFF
-- Soft gray: #E9EEF3
-- Dark text: #142235
-- Amber reserved for genuine attention or warning states.
+The owner-decided interface palette is recorded in
+`docs/strategy/2026-10-29-qa-and-adoption/plan.md` Â§4.5 and replaces the earlier
+navy/teal proposal:
+
+- Navy: #18243B
+- Indigo: #455DA8
+- Background: #F7F9FC
+- Border: #DCE3EC
+- Body text: #273248
+- Success: #15803D
+- Warning and error reserved for genuine attention or warning states.
 
 ## Essential screens
 

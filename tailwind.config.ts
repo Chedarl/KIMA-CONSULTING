@@ -1,9 +1,9 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Tokens mirror blueprint section 9 and
- * docs/foundation/design-system.md. Every colour is a CSS variable so light and
- * dark themes swap without touching component code.
+ * Tokens mirror the owner-decided palette in
+ * docs/strategy/2026-10-29-qa-and-adoption/plan.md §4.5. Every colour is a CSS
+ * variable so light and dark themes swap without touching component code.
  */
 const config: Config = {
   darkMode: ["class", '[data-theme="dark"]'],
@@ -30,9 +30,15 @@ const config: Config = {
           muted: "rgb(var(--rail-muted) / <alpha-value>)",
         },
         teal: {
+          // Legacy class name retained during the palette migration; values are indigo.
           DEFAULT: "rgb(var(--teal) / <alpha-value>)",
           text: "rgb(var(--teal-text) / <alpha-value>)",
           soft: "rgb(var(--teal-soft) / <alpha-value>)",
+        },
+        success: {
+          DEFAULT: "rgb(var(--success) / <alpha-value>)",
+          text: "rgb(var(--success-text) / <alpha-value>)",
+          soft: "rgb(var(--success-soft) / <alpha-value>)",
         },
         amber: {
           DEFAULT: "rgb(var(--amber) / <alpha-value>)",

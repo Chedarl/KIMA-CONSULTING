@@ -404,10 +404,12 @@ touch targets, `prefers-reduced-motion` respected, SVG icons and never emoji.
 
 ## Design
 
-Blueprint §9 is the authority: deep navy `#163B66`, teal green `#1E9E74`,
-white, soft gray `#E9EEF3`, dark text `#142235`, amber reserved for genuine
-warnings. Tokens live in `app/globals.css` as CSS variables, so light and dark
-swap without touching component code.
+The owner-decided palette in
+`docs/strategy/2026-10-29-qa-and-adoption/plan.md` §4.5 is the authority: navy
+`#18243B`, indigo `#455DA8`, background `#F7F9FC`, border `#DCE3EC`, body
+`#273248`, success `#15803D`, with warning and error reserved for genuine
+attention states. Tokens live in `app/globals.css` as CSS variables, so light
+and dark swap without touching component code.
 
 **Brand (owner decision D8, 27 Oct 2026).** The company is **KIMA CONSULTING** and
 the product name in the interface is **KIMA OS**. The official lockups live in
@@ -425,9 +427,9 @@ The mails use the same names: subjects start "KIMA OS —", the signature is
 and the `auth-codes` Edge Function carry identical strings, so a sign-in code reads the
 same whichever path sent it.
 
-Note the split between a brand colour and its text colour: teal is about 3:1 on
-white, so `--teal` is a fill and `--teal-text` is the type colour. Never use a
-fill colour for text.
+Indigo `#455DA8` carries white text at 6.2:1 and success `#15803D` carries
+white or light-surface text at 5.0:1. Amber remains an attention colour whose
+darkened variant carries text. Never use a fill-only colour for text.
 
 Reusable effect utilities in `app/globals.css`, available anywhere in the app:
 

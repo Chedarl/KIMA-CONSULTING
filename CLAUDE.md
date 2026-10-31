@@ -134,11 +134,12 @@ These come from the blueprint and are not negotiable for convenience:
 
 ## Design
 
-Blueprint section 9 is the design authority: deep navy `#163B66`, teal green
-`#1E9E74`, white, soft gray `#E9EEF3`, dark text `#142235`, amber reserved for
-genuine attention and warning states. Premium financial-technology aesthetic,
-high information density without clutter, restrained motion, excellent mobile
-experience on slow connections.
+The owner-decided palette in `docs/strategy/2026-10-29-qa-and-adoption/plan.md`
+§4.5 is the design authority: navy `#18243B`, indigo `#455DA8`, background
+`#F7F9FC`, border `#DCE3EC`, body `#273248`, success `#15803D`, with warning and
+error reserved for genuine attention and warning states. Premium
+financial-technology aesthetic, high information density without clutter,
+restrained motion, excellent mobile experience on slow connections.
 
 > `docs/design/design-system/kima-consulting/MASTER.md` is **provisional and
 > superseded** — it was generated before the blueprint was available, from a
