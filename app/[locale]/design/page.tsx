@@ -28,7 +28,8 @@ const brandColours: {
   { name: "Navy soft", token: "--navy-soft", hex: "#E8EDF6", role: "surface" },
   { name: "Indigo", token: "--teal", hex: "#455DA8", role: "text", contrast: "6.2:1" },
   { name: "Indigo soft", token: "--teal-soft", hex: "#E9EEF8", role: "surface" },
-  { name: "Success", token: "--success", hex: "#15803D", role: "text", contrast: "5.0:1" },
+  { name: "Success", token: "--success", hex: "#15803D", role: "fill" },
+  { name: "Success text", token: "--success-text", hex: "#166534", role: "text", contrast: "7.1:1" },
   { name: "Success tint", token: "--success-soft", hex: "#E8F5EC", role: "surface" },
   { name: "Amber", token: "--amber", hex: "#F5A623", role: "fill", contrast: "2.0:1" },
   { name: "Amber text", token: "--amber-text", hex: "#92400E", role: "text", contrast: "7.0:1" },
@@ -129,8 +130,8 @@ export default function DesignPage({ params }: { params: { locale: string } }) {
         <h2 className="mb-1 text-lg font-semibold text-fg">{t.design.colours}</h2>
         <p className="mb-4 max-w-2xl text-sm text-fg-muted">
           {locale === "fr"
-            ? "Indigo #455DA8 et success #15803D portent le texte sur blanc (6,2:1 et 5,0:1). Amber reste une couleur d'attention : sa variante foncée porte le texte. Les ratios sont mesurés sur la surface claire ; le thème sombre utilise des variantes distinctes."
-            : "Indigo #455DA8 and success #15803D may carry text on white (6.2:1 and 5.0:1). Amber stays an attention colour: its darkened variant carries text. Ratios are measured against the light surface; dark mode uses its own variants."}
+            ? "Le remplissage success est #15803D et le texte success est #166534 (7,1:1 sur blanc). Indigo #455DA8 porte le texte sur blanc (6,2:1). Amber reste une couleur d'attention : sa variante foncée porte le texte. Les ratios sont mesurés sur la surface claire ; le thème sombre utilise des variantes distinctes."
+            : "Success fill is #15803D and success text is #166534 (7.1:1 on white). Indigo #455DA8 may carry text on white (6.2:1). Amber stays an attention colour: its darkened variant carries text. Ratios are measured against the light surface; dark mode uses its own variants."}
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {brandColours.map((c) => (

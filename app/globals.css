@@ -565,6 +565,12 @@ h1, h2, h3, .font-display {
   --amber: 217 149 40;
   --amber-text: 146 64 14;
   --amber-soft: 255 246 232;
+  --success: 21 128 61; /* #15803D fill */
+  --success-text: 22 101 52; /* #166534 — 7.1:1 on white */
+  --success-soft: 232 245 236; /* #E8F5EC */
+  --danger: 214 69 69; /* #D64545 */
+  --danger-text: 185 28 28;
+  --danger-soft: 254 232 232;
   color-scheme: light;
   background: rgb(var(--bg));
   color: rgb(var(--fg));
@@ -616,6 +622,9 @@ h1, h2, h3, .font-display {
   --amber: 217 149 40;
   --amber-text: 146 64 14;
   --amber-soft: 255 246 232;
+  --success: 21 128 61; /* #15803D fill */
+  --success-text: 22 101 52; /* #166534 — 7.1:1 on white */
+  --success-soft: 232 245 236; /* #E8F5EC */
   --danger: 185 28 28;
   --danger-text: 185 28 28;
   --danger-soft: 254 232 232;
