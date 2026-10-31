@@ -100,8 +100,20 @@ assert.ok(serviceAuthChange?.includes("setLoadedCaseId(null)"),
 
 const serviceUpload = service.src.split("async function upload(")[1]?.split("\n  async function approveCase(")[0];
 const serviceApproval = service.src.split("async function approveCase(")[1]?.split("\n  // React can reuse")[0];
-assert.match(serviceUpload ?? "", /if \(epoch !== authEpoch\.current\) return;/);
-assert.ok((serviceApproval?.match(/if \(epoch !== authEpoch\.current\) return;/g) ?? []).length >= 2,
-  "approval must ignore an old identity before and after its insert");
+// Route switches are independent of authentication changes. Both asynchronous
+// mutation paths must reject prior-case completions before updating the new case.
+assert.match(service.src, /const activeCaseId = useRef\(caseId\)/);
+assert.match(service.src, /activeCaseId\.current = caseId/);
+assert.match(serviceUpload ?? "", /const actionCaseId = caseId;/);
+assert.match(serviceUpload ?? "",
+  /if \(epoch !== authEpoch\.current \|\| actionCaseId !== activeCaseId\.current\) return;/);
+assert.match(serviceApproval ?? "", /const actionCaseId = caseId;/);
+assert.ok((serviceApproval?.match(
+  /if \(epoch !== authEpoch\.current \|\| actionCaseId !== activeCaseId\.current\) return;/g,
+) ?? []).length >= 2, "approval must reject old sessions and old case routes before and after insert");
+assert.match(serviceApproval ?? "",
+  /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setFailed/);
+assert.match(serviceApproval ?? "",
+  /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setBusy/);
 
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
