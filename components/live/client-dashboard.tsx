@@ -241,7 +241,7 @@ export function ClientDashboard({
       href: documentsHref,
       value: sentCount,
       label: copy.shared,
-      valueClass: "text-teal",
+      valueClass: "text-success-text",
     },
     {
       href: `/${locale}/app/calendar`,
@@ -275,7 +275,7 @@ export function ClientDashboard({
       )}
 
       {justSent && (
-        <p className="rounded-card border border-teal/40 bg-teal-soft px-4 py-3 text-sm text-teal-text" role="status">
+        <p className="rounded-card border border-success/40 bg-success-soft px-4 py-3 text-sm text-success-text" role="status">
           {justSent} — {t.sent}
         </p>
       )}
