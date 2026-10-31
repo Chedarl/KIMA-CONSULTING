@@ -162,23 +162,31 @@ assert.match(invitations.src,
 const recordHook = records.src.split("function useClientRecords() {")[1]?.split("\nfunction requestsByCase(")[0];
 assert.ok(recordHook, "client records hook must exist");
 assert.match(recordHook, /const epoch = \+\+loadEpoch\.current;/);
-assert.equal((recordHook.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length, 3,
-  "guard taxpayer lookup, record queries, and failure handling against stale loads");
+assert.equal((recordHook.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length, 4,
+  "guard auth lookup, taxpayer lookup, record queries, and failure handling against stale loads");
 assert.match(recordHook, /if \(tp\.error \|\| cs\.error \|\| rq\.error \|\| ev\.error\)/,
   "any failed tenant-scoped query must fail closed");
-const recordsAuth = recordHook.split("auth.onAuthStateChange((event) => {")[1]?.split("\n    });")[0];
+const recordsAuth = recordHook.split("auth.onAuthStateChange((event, session) => {")[1]?.split("\n    });")[0];
 assert.ok(recordsAuth, "client record pages must react to authentication changes");
 for (const state of ["++loadEpoch.current", "setRecords(null)", "setOffline(false)"]) {
   assert.ok(recordsAuth.includes(state), "auth change must invalidate " + state);
 }
+assert.match(recordsAuth, /event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"/,
+  "token refresh and other non-identity events must not reset records");
+assert.match(recordsAuth, /if \(nextUserId === identityRef\.current\) return;/);
+assert.match(recordsAuth, /setSignedOut\(true\)/);
+assert.match(recordsAuth, /setRecords\(EMPTY_RECORDS\)/);
 assert.match(recordHook, /timer = setTimeout\(\(\) => \{ void load\(\); \}, 0\)/,
   "re-query after auth callback returns");
 assert.match(recordHook, /subscription\.unsubscribe\(\)/,
   "auth subscription must be removed on unmount");
 assert.ok((recordHook.match(/\+\+loadEpoch\.current;/g) ?? []).length >= 3,
   "invalidate loads on request start, auth change, and unmount");
-assert.match(recordHook, /setRecords\(\{ taxpayer: null, cases: \[\], requests: \[\], events: \[\] \}\)/,
-  "failed queries must clear all client record categories");
+assert.match(records.src, /const EMPTY_RECORDS: Records = \{ taxpayer: null, cases: \[\], requests: \[\], events: \[\] \}/);
+assert.match(recordHook, /setRecords\(EMPTY_RECORDS\)/,
+  "failed queries and sign-out must clear all client record categories");
+assert.match(records.src, /signedOut \? \(/,
+  "sign-out renders an explicit state rather than the loading skeleton");
 
 const service = inspect("components/live/client-service.tsx");
 // A session switch must clear the case and consent before an old request resolves.
