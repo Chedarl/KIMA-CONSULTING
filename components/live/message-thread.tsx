@@ -450,7 +450,7 @@ export function MessageThread({
                 const mine = m.sender === "taxpayer";
                 return (
                   <li key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm text-white ${mine ? "bg-teal-text" : "bg-[#163B66]"}`}>
+                    <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm text-white ${mine ? "bg-teal-text" : "bg-navy"}`}>
                       <p className="whitespace-pre-wrap break-words">{m.body}</p>
                     </div>
                   </li>
@@ -477,7 +477,7 @@ export function MessageThread({
               <button
                 type="submit"
                 disabled={busy || Boolean(sendBlocked) || needsFirm || draft.trim().length === 0}
-                className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-white hover:bg-[#0c5a42] disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
               >
                 {busy ? labels.sending : labels.send}
               </button>
