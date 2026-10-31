@@ -253,4 +253,18 @@ assert.match(service.src, /!clientApproved && hasVerifiedEvidence && <div classN
 assert.match(service.src, /event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"/);
 assert.ok(service.src.includes("if (nextUserId === identityRef.current) return;"));
 
+// A double-tap must not submit two consent inserts before React disables the button.
+// These are source-contract checks, not authenticated browser concurrency proof.
+assert.match(service.src, /const approvalInFlight = useRef<string \\| null>\\(null\\)/);
+assert.match(serviceApproval ?? "", /if \\(approvalInFlight\\.current !== null\\) return;/,
+  "reject concurrent client consent attempts synchronously");
+assert.match(serviceApproval ?? "", /approvalInFlight\\.current = approvalToken;/,
+  "lock consent before the first awaited authentication call");
+assert.match(serviceApproval ?? "", /if \\(approvalInFlight\\.current === approvalToken\\) approvalInFlight\\.current = null;/,
+  "release only the matching approval lock");
+assert.ok(serviceAuthChange?.includes("approvalInFlight.current = null"),
+  "real identity changes must reset the prior account's consent lock");
+assert.match(service.src, /approvalInFlight\\.current = null;[\\s\\S]*?subscription\\.unsubscribe\\(\\)/,
+  "unmount and route changes must invalidate pending consent locks");
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
