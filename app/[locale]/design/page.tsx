@@ -23,12 +23,13 @@ const brandColours: {
   role: "text" | "fill" | "surface";
   contrast?: string;
 }[] = [
-  { name: "Navy", token: "--navy", hex: "#163B66", role: "text", contrast: "9.6:1" },
-  { name: "Navy strong", token: "--navy-strong", hex: "#0F2A4A", role: "fill" },
-  { name: "Navy soft", token: "--navy-soft", hex: "#E8EEF6", role: "surface" },
-  { name: "Teal", token: "--teal", hex: "#1E9E74", role: "fill", contrast: "3.0:1" },
-  { name: "Teal text", token: "--teal-text", hex: "#0F6B4F", role: "text", contrast: "5.4:1" },
-  { name: "Teal soft", token: "--teal-soft", hex: "#E6F4EE", role: "surface" },
+  { name: "Navy", token: "--navy", hex: "#18243B", role: "text", contrast: "15.5:1" },
+  { name: "Navy strong", token: "--navy-strong", hex: "#111929", role: "fill" },
+  { name: "Navy soft", token: "--navy-soft", hex: "#E8EDF6", role: "surface" },
+  { name: "Indigo", token: "--teal", hex: "#455DA8", role: "text", contrast: "6.2:1" },
+  { name: "Indigo soft", token: "--teal-soft", hex: "#E9EEF8", role: "surface" },
+  { name: "Success", token: "--success", hex: "#15803D", role: "text", contrast: "5.0:1" },
+  { name: "Success tint", token: "--success-soft", hex: "#E8F5EC", role: "surface" },
   { name: "Amber", token: "--amber", hex: "#F59E0B", role: "fill", contrast: "2.1:1" },
   { name: "Amber text", token: "--amber-text", hex: "#92400E", role: "text", contrast: "7.0:1" },
   { name: "Dark text", token: "--fg", hex: "#142235", role: "text", contrast: "15.8:1" },
@@ -128,8 +129,8 @@ export default function DesignPage({ params }: { params: { locale: string } }) {
         <h2 className="mb-1 text-lg font-semibold text-fg">{t.design.colours}</h2>
         <p className="mb-4 max-w-2xl text-sm text-fg-muted">
           {locale === "fr"
-            ? "Teal #1E9E74 et amber #F59E0B n'atteignent pas 4,5:1 sur blanc : ce sont des couleurs de remplissage. Leurs variantes foncées portent le texte. Les ratios indiqués sont mesurés sur la surface claire ; le thème sombre utilise des variantes distinctes."
-            : "Teal #1E9E74 and amber #F59E0B do not reach 4.5:1 on white, so they are fill colours. Their darkened variants carry text. The ratios shown are measured against the light surface; dark mode uses its own variants."}
+            ? "Indigo #455DA8 et success #15803D portent le texte sur blanc (6,2:1 et 5,0:1). Amber reste une couleur d'attention : sa variante foncée porte le texte. Les ratios sont mesurés sur la surface claire ; le thème sombre utilise des variantes distinctes."
+            : "Indigo #455DA8 and success #15803D may carry text on white (6.2:1 and 5.0:1). Amber stays an attention colour: its darkened variant carries text. Ratios are measured against the light surface; dark mode uses its own variants."}
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {brandColours.map((c) => (

@@ -76,7 +76,7 @@ export function PrimaryButton({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex min-h-[44px] items-center justify-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0c5a42] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-teal-text disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`inline-flex min-h-[44px] items-center justify-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-teal-text disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
     >
       {children}
     </button>
@@ -162,7 +162,7 @@ export function StatusStepper({
               <div className="flex w-full items-center">
                 <span
                   aria-hidden
-                  className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : i <= current ? "bg-teal" : "bg-border"}`}
+                  className={`h-0.5 flex-1 ${i === 0 ? "bg-transparent" : i <= current ? "bg-teal" :"}`}
                 />
                 <span
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
