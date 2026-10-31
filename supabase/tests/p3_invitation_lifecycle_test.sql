@@ -113,10 +113,10 @@ set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
 select lives_ok(
- $ select decide_invitation(
+ $invite$ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e912'
-   and status='pending' limit 1),'revoked') $,
+   and status='pending' limit 1),'revoked') $invite$,
  'P3 taxpayer may withdraw a pending second-firm invitation');
 reset role;
 
@@ -124,10 +124,10 @@ set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e902","role":"authenticated"}',true);
 select throws_ok(
- $ select decide_invitation(
+ $invite$ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e912'
-   and status='revoked' limit 1),'accepted') $,
+   and status='revoked' limit 1),'accepted') $invite$,
  '23514',null,'P3 withdrawn invitation cannot be accepted or replayed');
 reset role;
 
@@ -143,10 +143,10 @@ set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e903","role":"authenticated"}',true);
 select lives_ok(
- $ select * from create_invitation(
+ $invite$ select * from create_invitation(
  'taxpayer_to_firm',
  '00000000-0000-4000-a000-00000000e912',
- '00000000-0000-4000-a000-00000000e921',null) $,
+ '00000000-0000-4000-a000-00000000e921',null) $invite$,
  'P3 taxpayer may send a new invitation after withdrawal');
 reset role;
 
@@ -154,10 +154,10 @@ set local role authenticated;
 select set_config('request.jwt.claims',
  '{"sub":"00000000-0000-4000-a000-00000000e902","role":"authenticated"}',true);
 select lives_ok(
- $ select decide_invitation(
+ $invite$ select decide_invitation(
  (select id from engagement_invitations
  where organization_id='00000000-0000-4000-a000-00000000e912' and status='pending' limit 1),
- 'accepted') $,'P3 recipient firm may accept mandate');
+ 'accepted') $invite$,'P3 recipient firm may accept mandate');
 reset role;
 select is(
  (select status from engagements where organization_id='00000000-0000-4000-a000-00000000e912'
