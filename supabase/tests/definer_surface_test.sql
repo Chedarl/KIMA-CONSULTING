@@ -88,6 +88,10 @@ select is(
 -- express that -- they are table-wide, so narrowing to (id, name) for a visitor
 -- would narrow it for the firm's own members too. It is as narrow as the first
 -- entry: no arguments, no writes, two columns out, nothing a caller can steer.
+-- list_unassigned_registrations() (20261031170000) and
+-- route_unassigned_registration() (20261101000000) both re-check the bound
+-- kima_admin inside and raise 42501 for anyone else, so EXECUTE alone buys a
+-- caller nothing.
 select is(
   (select coalesce(string_agg(p.proname, ', ' order by p.proname), '(none)')
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -95,7 +99,8 @@ select is(
       and p.prosecdef
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
-  'admin_review_firm, can_write_client_note, firm_directory, list_unassigned_registrations, manage_firm_staff, sign_up_firm',
+  'admin_review_firm, can_write_client_note, firm_directory, list_unassigned_registrations, '
+  'manage_firm_staff, route_unassigned_registration, sign_up_firm',
   'T-53 only the definer functions named here stay callable in public'
 );
 
