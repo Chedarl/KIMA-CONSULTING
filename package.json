@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
-    "test": "node scripts/engine-check.mjs && npm run test:phase5",
+    "test": "node scripts/engine-check.mjs && npm run test:phase5 && npm run test:phase6",
     "test:journey": "node scripts/journey-check.mjs && node scripts/firm-signup-journey-check.mjs && node scripts/contact-inquiry-check.mjs",
     "test:staff:contract": "node scripts/staff-contract-smoke.mjs",
     "test:staff:screen": "node scripts/staff-screen-smoke.mjs",
@@ -20,7 +20,8 @@
     "test:marketing": "node scripts/marketing-consistency-check.mjs",
     "test:portal:firm-scope": "node scripts/portal-firm-scope-check.mjs",
     "test:phase3:mocks": "node scripts/phase3-mock-check.mjs",
-    "test:phase5": "node scripts/phase5-upload-check.mjs"
+    "test:phase5": "node scripts/phase5-upload-check.mjs",
+    "test:phase6": "node scripts/phase6-support-packet-check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
