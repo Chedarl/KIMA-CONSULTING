@@ -9,6 +9,31 @@ services. Initial market Cameroon, expansion CEMAC. French and English, XAF.
 > Interface prototype with demonstration data only. No DGI authorization,
 > partnership or e-filing integration is established or claimed.
 
+## Status: done / still missing
+
+Updated from `main` at #150. Open pull requests are not done until they merge.
+
+**Done**
+
+- A former client returns only on a fresh engagement, and must accept again (#142). Revoking sets `status` to `revoked` with `revoked_at`; a row cannot be `authorized` and revoked (#143).
+- Client approval of a filing is enforced in the database, not only in the screen, and the signed row is immutable after delivery (#144). Switching cases clears in-progress approval state (#145).
+- Client records stay visible across token refresh (#146). An expired-invitation error survives the reload (#147).
+- Light public and client screens pin success colours; success text is `#166534` (#148, #151). The onboarding firm list shows a red error when the directory fails, and a grey note only when it is empty (#149).
+- A KIMA administrator can read unassigned applications (routing fields only, no client file, no phone) (#150). Firm re-authorisation refusals (`42501` / `23514`) are French and English sentences (#155).
+
+**Still missing**
+
+- Tax calendar for the taxpayer and the firm (upcoming and overdue, French and English).
+- Client document upload and the evidence vault, with storage isolation. Received is not accepted.
+- Document exchange per engagement, with an audit trail of uploads, views, and downloads.
+- Client–firm messages per engagement. Firm-internal notes stay invisible to the client. Attachments go through the vault.
+- In-app reminders for deadlines.
+- Payment-incident recovery. Finish #124; do not start a second packet.
+- Firm workspace pages brought into the navy palette used by the client portal.
+- A French and English launch checklist that walks the taxpayer and firm journeys.
+- Assigning a firm to an unassigned application. Held until the owner decides. No KIMA administrator account is provisioned in production. Launch validation is not done.
+- Not merged yet: routing nav only for a vendor administrator (#152), a missing auth session shown as signed out rather than offline (#154), the client accept button for a fresh draft (#156), and clearing approval state before paint (#157). The light root danger fill is still `#D64545`.
+
 ---
 
 ## Why this exists
