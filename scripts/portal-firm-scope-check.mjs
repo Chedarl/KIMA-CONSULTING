@@ -553,3 +553,27 @@ assert.ok(!realtimeThread.includes("setMsgs((prev) =>"),
   "never append an unverified realtime payload directly to the thread");
 assert.match(realtimeThread, /\}, \[taxpayerId, side, orgId, load\]\);/,
   "subscription must capture the current authorization loader");
+
+
+// A composer must not render its own message before Auth and engagement checks
+// complete. The send operation must also refuse a stale taxpayer/firm selection
+// after an asynchronous authorization read, before inserting anything.
+// This is a source-contract regression; authenticated race/RLS tests remain gates.
+const sendInsert = firmThreadSend.indexOf('.from("messages").insert(optimistic)');
+const sendGuard = firmThreadSend.indexOf('if (!isCurrentSend()) throw new Error("Message context changed");');
+assert.ok(sendInsert > 0 && sendGuard > 0 && sendGuard < sendInsert,
+  "send must reject changed taxpayer/firm/load generation before database insert");
+assert.match(thread.src, /const currentOrg = useRef\(orgId\)/);
+assert.match(thread.src, /currentOrg\.current = orgId/);
+assert.ok(firmThreadSend.includes("const sendGeneration = loadGeneration.current;") &&
+  firmThreadSend.includes("sendGeneration === loadGeneration.current") &&
+  firmThreadSend.includes("taxpayerId === currentTaxpayer.current") &&
+  firmThreadSend.includes("chosenOrg === currentOrg.current"),
+  "send must bind its async operation to the mounted taxpayer, firm and grant generation");
+assert.ok(!firmThreadSend.includes("setMsgs((prev) => [...(prev ?? []), optimistic])"),
+  "unverified optimistic content must not be rendered before the authorization check");
+assert.ok(firmThreadSend.indexOf('setDraft((value) => value.trim() === body ? "" : value);') > sendInsert &&
+  firmThreadSend.indexOf("void load();") > sendInsert,
+  "clear sent draft only after insert, then reload through authenticated tenant-scoped reads");
+assert.ok(firmThreadSend.includes('if (isCurrentSend()) toast(labels.failed, "error");'),
+  "a stale send failure must not report an error in the next tenant context");
