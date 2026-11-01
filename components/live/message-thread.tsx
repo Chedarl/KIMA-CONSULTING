@@ -315,16 +315,17 @@ export function MessageThread({
         (payload) => {
           const row = payload.new as Msg;
           if (row.organization_id !== orgId) return;
-          setMsgs((prev) =>
-            prev && prev.some((m) => m.id === row.id) ? prev : [...(prev ?? []), row],
-          );
+          // Realtime payloads can outlive a member's or taxpayer's engagement.
+          // Treat the event as an invalidation; the loader rechecks Auth,
+          // active grants and tenant-scoped reads before publishing content.
+          void load();
         },
       )
       .subscribe((status) => setLive(status === "SUBSCRIBED"));
     return () => {
       db.removeChannel(channel);
     };
-  }, [taxpayerId, side, orgId]);
+  }, [taxpayerId, side, orgId, load]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "nearest" });
