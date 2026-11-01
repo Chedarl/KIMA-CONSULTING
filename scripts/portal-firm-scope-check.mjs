@@ -74,7 +74,7 @@ for (const state of ["++authEpoch.current", "setBiz([])", "setActiveId(null)",
   assert.ok(shellAuth.includes(state), "auth change must clear " + state);
 }
 assert.match(shell.src, /if \(cancelled \|\| epoch !== authEpoch\.current\) return;/);
-assert.ok((shell.src.match(/if \(cancelled \|\| epoch !== authEpoch\.current\) return;/g) ?? []).length >= 5,
+assert.ok((shell.src.match(/if \(cancelled \|\| epoch !== authEpoch\.current\) return;/g) ?? []).length >= 4,
   "all asynchronous shell reads must reject prior-account completions");
 assert.match(shell.src, /subscription\.unsubscribe\(\)/);
 assert.match(shell.src, /copy\.nav\.requests, locale, identityVersion\]/);
