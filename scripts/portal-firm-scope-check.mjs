@@ -49,6 +49,18 @@ assert.match(thread.src, /engagementQuery\.eq\("organization_id", firmOrgId\)/);
 // separately mounted thread or a stale member identity.
 const firmThreadLoad = thread.src.split("  const load = useCallback(async () => {")[1]?.split("\n  useEffect(() => {")[0] ?? "";
 const firmThreadSend = thread.src.split("  async function send(")[1]?.split("\n  if (!taxpayerId) return")[0] ?? "";
+// Realtime events must not keep a previous tenant/grant snapshot visible while
+// the authenticated thread loader rechecks membership and active engagements.
+// Keep the firm selection across a successful refresh; only hide message data.
+const hideMessages = firmThreadLoad.indexOf("setMsgs(null);");
+const hideRequests = firmThreadLoad.indexOf("setRequests([]);");
+const verifyAuth = firmThreadLoad.indexOf("const db = supabase();");
+const generationStart = firmThreadLoad.indexOf("const generation = ++loadGeneration.current;");
+assert.ok(generationStart >= 0 && generationStart < hideMessages &&
+  hideMessages < verifyAuth && hideRequests > generationStart && hideRequests < verifyAuth,
+  "thread reload must hide old messages and requests before rechecking Auth/grants");
+assert.ok(!firmThreadLoad.slice(generationStart, verifyAuth).includes("setOrgId(null)"),
+  "refresh must preserve the selected firm until the authorized grant response");
 for (const [operation, body] of [["read", firmThreadLoad], ["send", firmThreadSend]]) {
   assert.ok(body, "firm thread " + operation + " must exist");
   const auth = body.indexOf("await db.auth.getUser()");
