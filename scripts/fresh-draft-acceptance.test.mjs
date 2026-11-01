@@ -54,3 +54,22 @@ test("acceptance rechecks all fresh-draft state predicates at write time", () =>
   assert.match(write, /\.is\("revoked_at", null\)/);
   assert.match(write, /\.select\("id"\)/);
 });
+
+
+// The services board contains taxpayer-specific records and must never show
+// a previous account's cards after sign-out or account switching.
+// These source contracts require separate authenticated browser verification.
+test("services board invalidates stale reads and clears tenant state on identity changes", () => {
+  const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
+  assert.match(board, /const loadEpoch = useRef\(0\)/);
+  assert.match(board, /const identityRef = useRef<string \| null \| undefined>\(undefined\)/);
+  assert.match(board, /const epoch = \+\+loadEpoch\.current/);
+  assert.ok((board.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length >= 2,
+    "both identity resolution and parallel case reads must reject stale completions");
+  assert.match(board, /auth\.onAuthStateChange\(\(event, session\)/);
+  assert.match(board, /if \(event === "TOKEN_REFRESHED"\) return;/);
+  assert.match(board, /if \(nextUserId === identityRef\.current\) return;/);
+  assert.match(board, /\+\+loadEpoch\.current;[\s\S]*?setCases\(null\);[\s\S]*?setRequests\(\[\]\);[\s\S]*?setEngagements\(\[\]\);[\s\S]*?setIds\(null\);/);
+  assert.match(board, /if \(active && nextUserId\) void load\(\)/);
+  assert.match(board, /subscription\.unsubscribe\(\)/);
+});
