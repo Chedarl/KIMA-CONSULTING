@@ -577,3 +577,23 @@ assert.ok(firmThreadSend.indexOf('setDraft((value) => value.trim() === body ? ""
   "clear sent draft only after insert, then reload through authenticated tenant-scoped reads");
 assert.ok(firmThreadSend.includes('if (isCurrentSend()) toast(labels.failed, "error");'),
   "a stale send failure must not report an error in the next tenant context");
+
+
+// Firm inbox realtime INSERTs are untrusted notifications, not proof that an
+// engagement is still active. Do not show payload.body using a cached tenant
+// grant set: hide the old inbox and rerun Auth/member/engagement-scoped reads.
+// These checks supplement (not replace) authenticated revocation/RLS tests.
+const firmInboxRealtime = workspace.src.split('channel = db\n          .channel(`firm-messages-')[1]
+  ?.split('          .subscribe();')[0] ?? "";
+assert.ok(firmInboxRealtime, "firm inbox realtime callback must exist");
+assert.ok(firmInboxRealtime.includes('row.organization_id !== firmOrgId') &&
+  firmInboxRealtime.includes('!allowedTaxpayers.has(row.taxpayer_id)'),
+  "firm inbox realtime events must retain organization and taxpayer guards");
+assert.ok(!firmInboxRealtime.includes('body: row.body') &&
+  !firmInboxRealtime.includes('setPreviews((prev) =>'),
+  "firm inbox must not publish an unverified realtime message body");
+for (const clear of ["setClients(null)", "setPreviews({})", "setActive(null)",
+  "setAssignments([])", "setRefreshEpoch((epoch) => epoch + 1)"]) {
+  assert.ok(firmInboxRealtime.includes(clear),
+    "realtime event must invalidate old firm inbox state before rechecking grants: " + clear);
+}
