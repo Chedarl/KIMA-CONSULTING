@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { MessageThread, type MessageLabels } from "@/components/live/message-thread";
 import {
@@ -39,6 +39,31 @@ export function MessagesWorkspace({
 }) {
   const [session, setSession] = useState<FirmSession | null>(null);
   useEffect(() => subscribeFirmSession(setSession), []);
+  const authUserId = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    // An OTP session can outlive a Supabase Auth account switch. Never keep
+    // the prior firm's inbox mounted under a different authenticated user.
+    // Routine refresh/sign-in events for the same user preserve the inbox.
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event, authSession) => {
+      const nextUserId = authSession?.user?.id ?? null;
+      if (event === "INITIAL_SESSION") {
+        authUserId.current = nextUserId;
+        if (!nextUserId) setSession(null);
+        return;
+      }
+      if (event === "SIGNED_OUT") {
+        authUserId.current = null;
+        setSession(null);
+        return;
+      }
+      if (event !== "SIGNED_IN" && event !== "USER_UPDATED") return;
+      if (authUserId.current !== undefined && nextUserId !== authUserId.current) {
+        setSession(null);
+      }
+      authUserId.current = nextUserId;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (!session) return <p role="status" className="text-sm text-fg-muted">{labels.signInRequired ?? labels.demoIdentity}</p>;
   return (

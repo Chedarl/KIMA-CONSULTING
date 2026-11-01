@@ -597,3 +597,25 @@ for (const clear of ["setClients(null)", "setPreviews({})", "setActive(null)",
   assert.ok(firmInboxRealtime.includes(clear),
     "realtime event must invalidate old firm inbox state before rechecking grants: " + clear);
 }
+
+
+// The OTP member session must also be invalidated when the Supabase Auth
+// identity changes independently of the OTP session. A routine same-user
+// SIGNED_IN/USER_UPDATED event must not blank an active inbox.
+// Source-contract coverage only: authenticated account-switch tests remain a
+// staging release gate.
+assert.match(firmMessagesEntry, /const authUserId = useRef<string \| null \| undefined>\(undefined\)/,
+  "firm inbox must track the authenticated user independently of OTP session");
+assert.ok(firmMessagesEntry.includes("auth.onAuthStateChange((event, authSession) =>"),
+  "firm inbox must subscribe to Auth identity changes");
+assert.ok(firmMessagesEntry.includes('event === "INITIAL_SESSION"') &&
+  firmMessagesEntry.includes('event === "SIGNED_OUT"') &&
+  firmMessagesEntry.includes('event !== "SIGNED_IN" && event !== "USER_UPDATED"'),
+  "firm inbox must handle initial, sign-out and account-switch events");
+assert.ok(firmMessagesEntry.includes("if (!nextUserId) setSession(null);"),
+  "an unauthenticated initial session must hide any persisted OTP inbox");
+assert.ok(firmMessagesEntry.includes("if (authUserId.current !== undefined && nextUserId !== authUserId.current)"),
+  "firm inbox must compare identities rather than clear on every token refresh");
+assert.ok(firmMessagesEntry.includes("authUserId.current = nextUserId;") &&
+  firmMessagesEntry.includes("subscription.unsubscribe();"),
+  "firm inbox must update tracked identity and clean up its auth subscription");
