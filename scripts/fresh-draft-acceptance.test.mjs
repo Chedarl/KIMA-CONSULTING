@@ -118,3 +118,21 @@ test("service request revalidates account and selected firm before insert", () =
   assert.match(board, /identityRef\.current = nextUserId;[\s\S]*?sendInFlight\.current = null;/);
   assert.match(board, /active = false;[\s\S]*?sendInFlight\.current = null;[\s\S]*?subscription\.unsubscribe\(\)/);
 });
+
+
+// If any tenant-scoped source fails, the board must not silently render
+// incomplete case actions or hide a draft engagement requiring acceptance.
+// This is a source-level regression; staging fault injection is still required.
+test("services board fails closed when any of its parallel reads fails", () => {
+  const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
+  const start = board.indexOf("const [cs, rq, eng] = await Promise.all([");
+  const end = board.indexOf("setOffline(false);", start);
+  assert.ok(start !== -1 && end > start, "parallel case, request and engagement reads must exist");
+  const loadResult = board.slice(start, end);
+  const guard = loadResult.indexOf("if (cs.error || rq.error || eng.error) throw");
+  const publish = loadResult.indexOf("setCases((cs.data ?? [])");
+  assert.ok(guard >= 0, "any failed tenant read must trigger the offline path");
+  assert.ok(publish > guard, "all three read errors must be checked before publishing case data");
+  assert.doesNotMatch(loadResult, /eng\\.error \\? \\[\\]/,
+    "engagement read errors must not be silently replaced with an empty list");
+});
