@@ -498,3 +498,29 @@ assert.match(firmRefresh, /}, \[session\.memberId, refreshEpoch\]\);/,
 assert.match(firmRefresh, /window\.clearInterval\(timer\)/);
 assert.match(firmRefresh, /window\.removeEventListener\("focus", refreshAccess\)/);
 assert.match(firmRefresh, /document\.removeEventListener\("visibilitychange", onVisibilityChange\)/);
+
+
+// A client thread must not keep a revoked firm's conversation mounted forever.
+// Recheck current Auth and active engagement grants when the browser resumes
+// and periodically, clearing the previous snapshot before each request.
+// Source contracts are supplemental to authenticated revocation/RLS testing.
+const clientRefresh = thread.src.split("  // Revalidate client message access")[1]?.split("  // A unique channel name per mount")[0] ?? "";
+assert.ok(clientRefresh, "client thread must revalidate mounted access");
+assert.match(clientRefresh, /side !== "taxpayer"/);
+assert.match(clientRefresh, /window\.setInterval\(refreshClientAccess, 60_000\)/);
+assert.match(clientRefresh, /window\.addEventListener\("focus", refreshClientAccess\)/);
+assert.match(clientRefresh, /document\.addEventListener\("visibilitychange", onVisibilityChange\)/);
+assert.match(clientRefresh, /document\.visibilityState === "visible"/);
+for (const clear of ["setMsgs(null)", "setRequests([])", "setFirms([])", "setOrgId(null)"]) {
+  assert.ok(clientRefresh.includes(clear), "client refresh must clear " + clear);
+}
+assert.match(clientRefresh, /void load\(\)/);
+assert.match(clientRefresh, /window\.clearInterval\(timer\)/);
+assert.match(clientRefresh, /window\.removeEventListener\("focus", refreshClientAccess\)/);
+assert.match(clientRefresh, /document\.removeEventListener\("visibilitychange", onVisibilityChange\)/);
+assert.match(thread.src, /const loadGeneration = useRef\(0\)/);
+assert.match(firmThreadLoad, /const generation = \+\+loadGeneration\.current/);
+assert.match(firmThreadLoad, /generation !== loadGeneration\.current/);
+assert.match(firmThreadLoad, /const allowedFirmIds = new Set\(liveIds\)/);
+assert.match(firmThreadLoad, /setMsgs\(\(\(m \?\? \[\]\) as Msg\[\]\)\.filter\(\(message\) => allowedFirmIds\.has\(message\.organization_id\)\)\)/);
+assert.match(firmThreadLoad, /setRequests\(\(\(r \?\? \[\]\) as RequestLite\[\]\)\.filter\(\(request\) => allowedFirmIds\.has\(request\.organization_id\)\)\)/);

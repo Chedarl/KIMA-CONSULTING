@@ -176,8 +176,10 @@ export function MessageThread({
   const bottom = useRef<HTMLDivElement>(null);
   const currentTaxpayer = useRef(taxpayerId);
   currentTaxpayer.current = taxpayerId;
+  const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     if (!taxpayerId) return;
     try {
       const db = supabase();
@@ -225,7 +227,7 @@ export function MessageThread({
         firmOrgId ? engagementQuery.eq("organization_id", firmOrgId) : engagementQuery,
         db.rpc("firm_directory"),
       ]);
-      if (taxpayerId !== currentTaxpayer.current) return;
+      if (generation !== loadGeneration.current || taxpayerId !== currentTaxpayer.current) return;
       if (grantError || messagesError || requestsError) {
         throw grantError ?? messagesError ?? requestsError;
       }
@@ -241,10 +243,18 @@ export function MessageThread({
       setOrgId((current) =>
         current && liveIds.includes(current)
           ? current : liveIds.length === 1 ? liveIds[0] : null);
-      setMsgs((m ?? []) as Msg[]);
-      setRequests((r ?? []) as RequestLite[]);
+      // Never retain message/request data for a firm whose engagement was
+      // revoked, even if an earlier RLS-visible response contained that row.
+      const allowedFirmIds = new Set(liveIds);
+      setMsgs(((m ?? []) as Msg[]).filter((message) => allowedFirmIds.has(message.organization_id)));
+      setRequests(((r ?? []) as RequestLite[]).filter((request) => allowedFirmIds.has(request.organization_id)));
       setError(false);
     } catch {
+      if (generation !== loadGeneration.current || taxpayerId !== currentTaxpayer.current) return;
+      setOrgId(null);
+      setFirms([]);
+      setMsgs([]);
+      setRequests([]);
       setError(true);
     }
   }, [taxpayerId, labels.firmName, side, firmMemberId]);
@@ -255,7 +265,36 @@ export function MessageThread({
     setMsgs(null);
     setRequests([]);
     void load();
+    return () => { ++loadGeneration.current; };
   }, [load]);
+
+  // Revalidate client message access after focus, tab visibility changes, and
+  // periodically. A revoked engagement must not leave a mounted conversation
+  // visible indefinitely. Clear the snapshot before checking Auth and grants;
+  // generation checks prevent an older response from restoring stale data.
+  useEffect(() => {
+    if (side !== "taxpayer" || !taxpayerId) return;
+    const refreshClientAccess = () => {
+      setMsgs(null);
+      setRequests([]);
+      setFirms([]);
+      setOrgId(null);
+      setLive(false);
+      setError(false);
+      void load();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshClientAccess();
+    };
+    const timer = window.setInterval(refreshClientAccess, 60_000);
+    window.addEventListener("focus", refreshClientAccess);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshClientAccess);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [side, taxpayerId, load]);
 
   // A unique channel name per mount: supabase-js returns the SAME channel for
   // a repeated name, and calling .on after subscribe throws, so two threads on
