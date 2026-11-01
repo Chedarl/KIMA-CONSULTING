@@ -93,3 +93,28 @@ test("acceptance verifies current identity and taxpayer before mutation", () => 
   assert.match(board, /identityRef\.current = nextUserId;[\s\S]*?acceptInFlight\.current = null;/);
   assert.match(board, /active = false;[\s\S]*?acceptInFlight\.current = null;[\s\S]*?subscription\.unsubscribe\(\)/);
 });
+
+
+// A services request is a tenant-scoped message. The selected firm must still
+// be authorized when the user sends, not merely when the board first loaded.
+// These are source contracts; authenticated multi-firm browser tests remain required.
+test("service request revalidates account and selected firm before insert", () => {
+  const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
+  const match = board.match(/async function sendRequest\(\) \{([\s\S]*?)\n  \}\n\n  const filters/);
+  assert.ok(match, "sendRequest function must be present");
+  const action = match[1];
+  assert.match(board, /const sendInFlight = useRef<string \| null>\(null\)/);
+  assert.match(action, /if \(sendInFlight\.current !== null\) return;/);
+  assert.match(action, /sendInFlight\.current = token;[\s\S]*?await db\.auth\.getUser\(\)/);
+  assert.match(action, /auth\.user\?\.id !== userId/);
+  assert.match(action, /await resolvePortalContext\(\)/);
+  assert.match(action, /context\.status !== "ready"/);
+  assert.match(action, /context\.taxpayerId !== target\.taxpayerId/);
+  assert.match(action, /context\.organizationId !== target\.organizationId/);
+  assert.ok(action.indexOf("await resolvePortalContext()") < action.indexOf('.from("messages").insert('),
+    "firm revalidation must happen before message write");
+  assert.match(action, /if \(epoch !== loadEpoch\.current \|\| userId !== identityRef\.current\) return;/);
+  assert.match(action, /if \(sendInFlight\.current === token\)/);
+  assert.match(board, /identityRef\.current = nextUserId;[\s\S]*?sendInFlight\.current = null;/);
+  assert.match(board, /active = false;[\s\S]*?sendInFlight\.current = null;[\s\S]*?subscription\.unsubscribe\(\)/);
+});

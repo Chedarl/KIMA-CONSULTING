@@ -24,7 +24,7 @@ import {
   type Engagement,
 } from "@/lib/cases";
 import { firmAskedAgain, freshDraftNeedsAcceptance } from "@/lib/engagements";
-import { audit, demoIds, supabase } from "@/lib/supabase";
+import { audit, demoIds, resolvePortalContext, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 
 type Filter = "all" | "active" | "action" | "done";
@@ -64,6 +64,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
   const loadEpoch = useRef(0);
   const identityRef = useRef<string | null | undefined>(undefined);
   const acceptInFlight = useRef<string | null>(null);
+  const sendInFlight = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -111,6 +112,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       identityRef.current = nextUserId;
       ++loadEpoch.current;
       acceptInFlight.current = null;
+      sendInFlight.current = null;
       setBusy(false);
       // Clear all previous-account taxpayer and firm data before the next read.
       setCases(null);
@@ -131,6 +133,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       active = false;
       ++loadEpoch.current;
       acceptInFlight.current = null;
+      sendInFlight.current = null;
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
     };
@@ -257,42 +260,73 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       toast(copy.requestServiceNeedText, "error");
       return;
     }
-    if (!ids) {
+    const userId = identityRef.current;
+    const target = ids;
+    if (!userId || !target?.taxpayerId || !target.organizationId) {
       toast(copy.offline, "error");
       return;
     }
+    // Do not enqueue duplicate messages before React renders the disabled button.
+    if (sendInFlight.current !== null) return;
+    const epoch = loadEpoch.current;
+    const token = `${epoch}:${userId}:${target.taxpayerId}:${target.organizationId}`;
+    sendInFlight.current = token;
     setBusy(true);
     try {
       const db = supabase();
-      const organizationId = ids.organizationId;
+      const { data: auth, error: authError } = await db.auth.getUser();
+      if (epoch !== loadEpoch.current || userId !== identityRef.current) return;
+      if (authError || auth.user?.id !== userId) {
+        toast(copy.requestServiceFailed, "error");
+        return;
+      }
+
+      // A cached firm choice is not authorization. Check the live engagement
+      // again before addressing a taxpayer message to a particular firm.
+      const context = await resolvePortalContext();
+      if (epoch !== loadEpoch.current || userId !== identityRef.current) return;
+      if (context.status !== "ready" ||
+          context.taxpayerId !== target.taxpayerId ||
+          context.organizationId !== target.organizationId) {
+        toast(copy.requestServiceFailed, "error");
+        return;
+      }
+
       const id = crypto.randomUUID();
       const { error } = await db.from("messages").insert({
         id,
-        taxpayer_id: ids.taxpayerId,
-        organization_id: organizationId,
+        taxpayer_id: target.taxpayerId,
+        organization_id: target.organizationId,
         request_id: null,
         sender: "taxpayer",
         sender_name: copy.nav.services,
         body,
         read_at: null,
       });
+      if (epoch !== loadEpoch.current || userId !== identityRef.current) return;
       if (error) throw error;
       await audit({
-        taxpayerId: ids.taxpayerId,
-        organizationId,
+        taxpayerId: target.taxpayerId,
+        organizationId: target.organizationId,
         actor: "taxpayer",
         action: "message.sent",
         resourceType: "message",
         resourceId: id,
         after: { length: body.length, kind: "service_request" },
       });
+      if (epoch !== loadEpoch.current || userId !== identityRef.current) return;
       toast(copy.requestServiceSent);
       setAskText("");
       setAskOpen(false);
     } catch {
-      toast(copy.requestServiceFailed, "error");
+      if (epoch === loadEpoch.current && userId === identityRef.current)
+        toast(copy.requestServiceFailed, "error");
     } finally {
-      setBusy(false);
+      // An old account's completion must not unlock the next account's action.
+      if (sendInFlight.current === token) {
+        sendInFlight.current = null;
+        if (userId === identityRef.current) setBusy(false);
+      }
     }
   }
 
