@@ -192,9 +192,13 @@ export function MessageThread({
       }
       let firmOrgId: string | null = null;
       if (side === "firm") {
+        // A supplied OTP member ID is not proof of the current Auth identity.
+        const { data: { user }, error: authError } = await db.auth.getUser();
+        if (authError || !user) throw new Error("Firm authentication unavailable");
         const { data: member, error: memberError } = await db.from("firm_members")
           .select("organization_id")
           .eq("id", firmMemberId!)
+          .eq("auth_user_id", user.id)
           .eq("active", true)
           .is("deactivated_at", null)
           .maybeSingle();
@@ -315,9 +319,14 @@ export function MessageThread({
       const db = supabase();
       if (side === "firm") {
         if (!firmMemberId) throw new Error("Firm session required");
+        // Rebind the member to Auth immediately before the write; a stale OTP
+        // session must not be able to send through another member's firm.
+        const { data: { user }, error: authError } = await db.auth.getUser();
+        if (authError || !user) throw new Error("Firm authentication unavailable");
         const { data: member, error: memberError } = await db.from("firm_members")
           .select("organization_id")
           .eq("id", firmMemberId)
+          .eq("auth_user_id", user.id)
           .eq("active", true)
           .is("deactivated_at", null)
           .maybeSingle();
