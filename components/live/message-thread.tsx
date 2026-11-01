@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { audit, supabase } from "@/lib/supabase";
+import { audit, sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import type { ActorRole } from "@/lib/events";
 
@@ -181,6 +181,11 @@ export function MessageThread({
     if (!taxpayerId) return;
     try {
       const db = supabase();
+      // Recheck the mounted taxpayer against Auth and RLS before any thread read.
+      // A parent wrapper may have been unmounted during an account switch.
+      if (side === "taxpayer" && (await sessionTaxpayerId()) !== taxpayerId) {
+        throw new Error("Taxpayer session unavailable");
+      }
       // Firm staff can message only through their own RLS-visible organisation.
       // Never offer a firm's staff the taxpayer's other active firms as recipients.
       if (side === "firm" && !firmMemberId) {
@@ -317,6 +322,11 @@ export function MessageThread({
 
     try {
       const db = supabase();
+      // An in-flight composer can outlive its original portal identity.
+      // Reject a stale taxpayer before querying grants or inserting a message.
+      if (side === "taxpayer" && (await sessionTaxpayerId()) !== taxpayerId) {
+        throw new Error("Taxpayer session unavailable");
+      }
       if (side === "firm") {
         if (!firmMemberId) throw new Error("Firm session required");
         // Rebind the member to Auth immediately before the write; a stale OTP
