@@ -200,23 +200,18 @@ function FirmMessagesView({
             const row = p.new as {
               taxpayer_id: string;
               organization_id: string;
-              body: string;
-              created_at: string;
-              sender: string;
             };
             if (row.organization_id !== firmOrgId || !allowedTaxpayers.has(row.taxpayer_id)) return;
-            setPreviews((prev) => ({
-              ...prev,
-              [row.taxpayer_id]: {
-                body: row.body,
-                created_at: row.created_at,
-                sender: row.sender,
-                unread:
-                  row.sender === "taxpayer"
-                    ? (prev[row.taxpayer_id]?.unread ?? 0) + 1
-                    : (prev[row.taxpayer_id]?.unread ?? 0),
-              },
-            }));
+            // The cached authorized set may have been revoked since the inbox
+            // loaded. Never display a realtime payload's body directly.
+            // Hide all existing previews and the open thread, then repeat the
+            // authenticated member and live-engagement reads.
+            setClients(null);
+            setPreviews({});
+            setActive(null);
+            setAssignments([]);
+            setOffline(false);
+            setRefreshEpoch((epoch) => epoch + 1);
           })
           .subscribe();
       } catch {
