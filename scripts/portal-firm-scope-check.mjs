@@ -533,11 +533,11 @@ assert.match(firmThreadLoad, /setRequests\(\(\(r \?\? \[\]\) as RequestLite\[\]\
 const realtimeThread = thread.src.split("  // A unique channel name per mount")[1]
   ?.split("  useEffect(() => {\n    bottom.current?.scrollIntoView")[0] ?? "";
 assert.ok(realtimeThread, "realtime message subscription must exist");
-assert.match(realtimeThread, /if \\(row\\.organization_id !== orgId\\) return;/,
+assert.match(realtimeThread, /if \(row\.organization_id !== orgId\) return;/,
   "realtime notifications must be scoped to the selected firm");
-assert.match(realtimeThread, /void load\\(\\);/,
+assert.match(realtimeThread, /void load\(\);/,
   "realtime notification must recheck Auth and engagement grants before publishing");
 assert.ok(!realtimeThread.includes("setMsgs((prev) =>"),
   "never append an unverified realtime payload directly to the thread");
-assert.match(realtimeThread, /\\}, \\[taxpayerId, side, orgId, load\\]\\);/,
+assert.match(realtimeThread, /\}, \[taxpayerId, side, orgId, load\]\);/,
   "subscription must capture the current authorization loader");
