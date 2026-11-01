@@ -44,6 +44,29 @@ assert.match(thread.src, /member\?\.organization_id !== chosenOrg/);
 assert.match(thread.src, /messageQuery\.eq\("organization_id", firmOrgId\)/);
 assert.match(thread.src, /requestQuery\.eq\("organization_id", firmOrgId\)/);
 assert.match(thread.src, /engagementQuery\.eq\("organization_id", firmOrgId\)/);
+// The thread itself must bind a supplied OTP member to the current Auth user
+// on both read and send. Parent workspace checks alone cannot protect a
+// separately mounted thread or a stale member identity.
+const firmThreadLoad = thread.src.split("  const load = useCallback(async () => {")[1]?.split("\n  useEffect(() => {")[0] ?? "";
+const firmThreadSend = thread.src.split("  async function send(")[1]?.split("\n  if (!taxpayerId) return")[0] ?? "";
+for (const [operation, body] of [["read", firmThreadLoad], ["send", firmThreadSend]]) {
+  assert.ok(body, "firm thread " + operation + " must exist");
+  const auth = body.indexOf("await db.auth.getUser()");
+  const member = body.indexOf('.from("firm_members")');
+  const binding = body.indexOf('.eq("auth_user_id", user.id)');
+  assert.ok(auth >= 0 && auth < member && member < binding,
+    "firm thread " + operation + " must authenticate before binding the member");
+  assert.ok(body.includes('if (authError || !user) throw'),
+    "firm thread " + operation + " must fail closed when authentication is unavailable");
+  assert.ok(body.includes('.eq("active", true)') && body.includes('.is("deactivated_at", null)'),
+    "firm thread " + operation + " must require an active member");
+}
+assert.ok(firmThreadLoad.indexOf('.eq("auth_user_id", user.id)') <
+  firmThreadLoad.indexOf('const messageQuery'),
+  "member identity must be verified before reading thread data");
+assert.ok(firmThreadSend.indexOf('.eq("auth_user_id", user.id)') <
+  firmThreadSend.indexOf('.from("messages").insert(optimistic)'),
+  "member identity must be verified before sending a message");
 const workspace = inspect("components/live/messages-workspace.tsx");
 assert.match(workspace.src, /memberId: session\.memberId/);
 // Firm inbox must resolve its OTP member against the authenticated user and
