@@ -71,16 +71,46 @@ export function ClientMessageThread({
 }) {
   const [tid, setTid] = useState<string | null>(null);
   const [resolved, setResolved] = useState(false);
+  const authEpoch = useRef(0);
+  const identityRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const { sessionTaxpayerId } = await import("@/lib/supabase");
-      const id = await sessionTaxpayerId();
-      if (!cancelled) { setTid(id); setResolved(true); }
-    })();
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event, session) => {
+      if (!active || (event !== "SIGNED_OUT" && event !== "SIGNED_IN" &&
+          event !== "USER_UPDATED" && event !== "INITIAL_SESSION")) return;
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      if (nextUserId === identityRef.current) return;
+      identityRef.current = nextUserId;
+      const epoch = ++authEpoch.current;
+      // Unmount the old taxpayer thread before resolving the next account.
+      setTid(null);
+      setResolved(!nextUserId);
+      if (timer) clearTimeout(timer);
+      if (!nextUserId) return;
+      // Supabase reads must run outside the auth state callback.
+      timer = setTimeout(() => {
+        void (async () => {
+          try {
+            const { sessionTaxpayerId } = await import("@/lib/supabase");
+            const id = await sessionTaxpayerId();
+            if (!active || epoch !== authEpoch.current) return;
+            setTid(id);
+            setResolved(true);
+          } catch {
+            if (!active || epoch !== authEpoch.current) return;
+            setTid(null);
+            setResolved(true);
+          }
+        })();
+      }, 0);
+    });
     return () => {
-      cancelled = true;
+      active = false;
+      ++authEpoch.current;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -96,6 +126,7 @@ export function ClientMessageThread({
   if (!tid) return <p role="status" className="text-sm text-fg-muted">{labels.signInRequired ?? labels.offline}</p>;
   return (
     <MessageThread
+      key={`${identityRef.current ?? "none"}:${tid}`}
       locale={locale}
       side="taxpayer"
       taxpayerId={tid}

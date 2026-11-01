@@ -365,3 +365,36 @@ assert.ok(shellSearchResults.includes("catalogue.current.filter("),
   "search must filter the current tenant-scoped catalogue");
 assert.ok(!shellSearchResults.includes("[query]"),
   "query-only memoization must not retain hits from an earlier firm snapshot");
+
+
+// The taxpayer message wrapper must unmount a previous account's thread as
+// soon as the authenticated identity changes. This is a source contract;
+// authenticated two-taxpayer browser switching is still a staging gate.
+const clientMessageWrapper = thread.src.split("export function ClientMessageThread(")[1]?.split("\nexport function MessageThread(")[0] ?? "";
+assert.ok(clientMessageWrapper, "taxpayer message entry point must exist");
+assert.match(clientMessageWrapper, /const authEpoch = useRef\(0\)/);
+assert.match(clientMessageWrapper, /auth\.onAuthStateChange\(\(event, session\) =>/);
+const messageAuthChange = clientMessageWrapper.split("auth.onAuthStateChange((event, session) => {")[1]?.split("\n    });")[0] ?? "";
+assert.ok(messageAuthChange, "taxpayer message entry point must subscribe to auth");
+for (const event of ['"SIGNED_OUT"', '"SIGNED_IN"', '"USER_UPDATED"', '"INITIAL_SESSION"']) {
+  assert.ok(messageAuthChange.includes(event), "message wrapper must handle " + event);
+}
+assert.ok(messageAuthChange.includes("if (nextUserId === identityRef.current) return;"),
+  "same-user token refresh and sign-in must preserve the thread");
+assert.ok(messageAuthChange.indexOf("if (nextUserId === identityRef.current) return;") <
+  messageAuthChange.indexOf("setTid(null)"),
+  "compare identity before clearing taxpayer messages");
+for (const guard of ["const epoch = ++authEpoch.current;", "setTid(null)", "setResolved(!nextUserId)"]) {
+  assert.ok(messageAuthChange.includes(guard), "account change must invalidate " + guard);
+}
+assert.ok(messageAuthChange.includes("timer = setTimeout(() => {"),
+  "resolve taxpayer outside Supabase auth callback");
+assert.ok(clientMessageWrapper.includes("await sessionTaxpayerId()"),
+  "new message thread must revalidate taxpayer for the new session");
+assert.ok(clientMessageWrapper.includes("if (!active || epoch !== authEpoch.current) return;"),
+  "old account taxpayer lookup must not restore its thread");
+assert.ok(clientMessageWrapper.includes("++authEpoch.current;") &&
+  clientMessageWrapper.includes("subscription.unsubscribe();"),
+  "unmount must invalidate pending taxpayer reads and unsubscribe");
+assert.match(clientMessageWrapper, /key=\{\`\$\{identityRef\.current \?\? "none"\}:\$\{tid\}\`\}/,
+  "message thread must remount across identities even if taxpayer ID is shared");
