@@ -67,6 +67,21 @@ assert.ok(firmThreadLoad.indexOf('.eq("auth_user_id", user.id)') <
 assert.ok(firmThreadSend.indexOf('.eq("auth_user_id", user.id)') <
   firmThreadSend.indexOf('.from("messages").insert(optimistic)'),
   "member identity must be verified before sending a message");
+// The taxpayer thread must independently revalidate its mounted taxpayer
+// against the current authenticated portal session before reading or sending.
+// The parent wrapper alone cannot protect a stale async operation or a direct
+// MessageThread mount. Database RLS remains the final authorization boundary.
+for (const [operation, body, protectedRead] of [
+  ["read", firmThreadLoad, 'const messageQuery = db.from("messages")'],
+  ["send", firmThreadSend, '.from("messages").insert(optimistic)'],
+]) {
+  const guard = body.indexOf('side === "taxpayer" && (await sessionTaxpayerId()) !== taxpayerId');
+  const query = body.indexOf(protectedRead);
+  assert.ok(guard >= 0 && query > guard,
+    "taxpayer thread " + operation + " must revalidate its Auth-bound taxpayer before message access");
+  assert.ok(body.includes('throw new Error("Taxpayer session unavailable")'),
+    "taxpayer thread " + operation + " must fail closed for a stale taxpayer session");
+}
 const workspace = inspect("components/live/messages-workspace.tsx");
 assert.match(workspace.src, /memberId: session\.memberId/);
 // Firm inbox must resolve its OTP member against the authenticated user and
