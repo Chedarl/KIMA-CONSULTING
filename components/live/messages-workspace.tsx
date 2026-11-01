@@ -22,27 +22,50 @@ import { can, denialLabel } from "@/lib/permissions";
 type Client = { id: string; legal_name: string };
 type Preview = { body: string; created_at: string; sender: string; unread: number };
 
+type WorkspaceLabels = MessageLabels & {
+  threadsTitle: string;
+  noThreads: string;
+  select: string;
+  unread: string;
+};
+
+/** A new OTP session must never inherit a prior firm's preview or thread. */
 export function MessagesWorkspace({
   locale,
   labels,
 }: {
   locale: "fr" | "en";
-  labels: MessageLabels & {
-    threadsTitle: string;
-    noThreads: string;
-    select: string;
-    unread: string;
-  };
+  labels: WorkspaceLabels;
+}) {
+  const [session, setSession] = useState<FirmSession | null>(null);
+  useEffect(() => subscribeFirmSession(setSession), []);
+
+  if (!session) return <p role="status" className="text-sm text-fg-muted">{labels.signInRequired ?? labels.demoIdentity}</p>;
+  return (
+    <FirmMessagesView
+      key={`${session.memberId}:${session.signedInAt}`}
+      locale={locale}
+      labels={labels}
+      session={session}
+    />
+  );
+}
+
+function FirmMessagesView({
+  locale,
+  labels,
+  session,
+}: {
+  locale: "fr" | "en";
+  labels: WorkspaceLabels;
+  session: FirmSession;
 }) {
   const [clients, setClients] = useState<Client[] | null>(null);
   const [previews, setPreviews] = useState<Record<string, Preview>>({});
   const [active, setActive] = useState<string | null>(null);
-  const [session, setSession] = useState<FirmSession | null>(null);
   const [assignments, setAssignments] = useState<
     { taxpayer_id: string; assigned_to: string | null }[]
   >([]);
-
-  useEffect(() => subscribeFirmSession(setSession), []);
 
   useEffect(() => {
     void supabase()
