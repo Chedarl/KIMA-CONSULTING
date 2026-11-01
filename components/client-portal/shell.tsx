@@ -201,25 +201,29 @@ export function ClientPortalShell({
           catalogue.current = [];
           return;
         }
-        const { data } = await db.from("taxpayers").select("id, legal_name").eq("id", ids.taxpayerId);
+        const { data, error: taxpayerError } = await db.from("taxpayers").select("id, legal_name").eq("id", ids.taxpayerId);
         if (cancelled || epoch !== authEpoch.current) return;
-        setBiz((data ?? []) as Business[]);
-        const tid = ids?.taxpayerId;
+        if (taxpayerError) throw taxpayerError;
+        const tid = ids.taxpayerId;
+        let count: number | null = null;
         if (tid) {
-          const { count } = await db
+          const { count: unreadCount, error: unreadError } = await db
             .from("messages")
             .select("id", { count: "exact", head: true })
             .eq("taxpayer_id", tid)
             .eq("organization_id", ids.organizationId)
             .eq("sender", "firm")
             .is("read_at", null);
-          if (!cancelled && epoch === authEpoch.current) setUnread(count ?? 0);
+          if (cancelled || epoch !== authEpoch.current) return;
+          if (unreadError) throw unreadError;
+          count = unreadCount;
         }
         const [cases, requests] = await Promise.all([
           db.from("compliance_cases").select("id, obligation_code, period_token").eq("taxpayer_id", ids.taxpayerId).eq("organization_id", ids.organizationId).order("due_on"),
           db.from("document_requests").select("id, label_fr, label_en").eq("taxpayer_id", ids.taxpayerId).eq("organization_id", ids.organizationId),
         ]);
         if (cancelled || epoch !== authEpoch.current) return;
+        if (cases.error || requests.error) throw cases.error ?? requests.error;
         const found: Hit[] = [
           ...((cases.data ?? []) as { id: string; obligation_code: string; period_token: string }[]).map((c) => ({
             href: `${base}/declarations/${c.id}`,
@@ -232,12 +236,20 @@ export function ClientPortalShell({
             detail: copy.nav.requests,
           })),
         ];
+        // Publish one consistent snapshot only after every tenant-scoped read succeeds.
+        setBiz((data ?? []) as Business[]);
+        setUnread(count ?? 0);
         catalogue.current = found;
       } catch {
         if (!cancelled && epoch === authEpoch.current) {
           setBiz([]);
+          setActiveId(null);
           setMultipleFirms(undefined);
           setFirmOptions([]);
+          setSelectedFirmId("");
+          setUnread(0);
+          catalogue.current = [];
+          setSearchOpen(false);
         }
       }
     })();
