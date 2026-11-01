@@ -60,6 +60,25 @@ assert.match(portal.src, /engagement\.accepted_at \|\| engagement\.authorized_at
 const dashboard = inspect("components/live/client-dashboard.tsx");
 assert.match(dashboard.src, /\.eq\("organization_id", resolved\.organizationId\)/);
 const shell = inspect("components/client-portal/shell.tsx");
+// Account switches must clear all previously resolved taxpayer and firm UI
+// immediately, and invalidate in-flight shell directory/case lookups.
+assert.match(shell.src, /const authEpoch = useRef\\(0\\)/);
+assert.match(shell.src, /auth\\.onAuthStateChange\\(\\(event, session\\) =>/);
+const shellAuth = shell.src.split("auth.onAuthStateChange((event, session) => {")[1]?.split("\\n    });")[0];
+assert.ok(shellAuth, "client shell must observe auth changes");
+assert.ok(shellAuth.includes("if (nextUserId === authIdentity.current) return;"),
+  "same-user token refresh must preserve the selected firm");
+for (const state of ["++authEpoch.current", "setBiz([])", "setActiveId(null)",
+  "setMultipleFirms(undefined)", "setFirmOptions([])", 'setSelectedFirmId("")',
+  "setUnread(0)", "catalogue.current = []", "setQuery(\"\")"]) {
+  assert.ok(shellAuth.includes(state), "auth change must clear " + state);
+}
+assert.match(shell.src, /if \\(cancelled \\|\\| epoch !== authEpoch\\.current\\) return;/);
+assert.ok((shell.src.match(/if \\(cancelled \\|\\| epoch !== authEpoch\\.current\\) return;/g) ?? []).length >= 5,
+  "all asynchronous shell reads must reject prior-account completions");
+assert.match(shell.src, /subscription\\.unsubscribe\\(\\)/);
+assert.match(shell.src, /copy\\.nav\\.requests, locale, identityVersion\\]/);
+
 assert.match(shell.src, /multipleFirms && !path\.startsWith/);
 assert.match(shell.src, /savePortalFirmChoice\(activeId, id\)/);
 assert.match(shell.src, /firmOptions\.some\(\(firm\) => firm\.id === id\)/);
