@@ -101,6 +101,9 @@ export function ClientPortalShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const catalogue = useRef<Hit[]>([]);
+  const authEpoch = useRef(0);
+  const authIdentity = useRef<string | null | undefined>(undefined);
+  const [identityVersion, setIdentityVersion] = useState(0);
 
   const nav: { href: string; label: string; icon: IconName; exact?: boolean }[] = [
     { href: base, label: copy.nav.dashboard, icon: "home", exact: true },
@@ -136,13 +139,43 @@ export function ClientPortalShell({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Auth changes must remove all previous-account firm and taxpayer details
+  // before the next authenticated directory/case lookup is allowed to render.
+  useEffect(() => {
+    let active = true;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event, session) => {
+      if (!active || (event !== "SIGNED_OUT" && event !== "SIGNED_IN" &&
+          event !== "USER_UPDATED" && event !== "INITIAL_SESSION")) return;
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      if (nextUserId === authIdentity.current) return;
+      authIdentity.current = nextUserId;
+      ++authEpoch.current;
+      setBiz([]);
+      setActiveId(null);
+      setMultipleFirms(undefined);
+      setFirmOptions([]);
+      setSelectedFirmId("");
+      setUnread(0);
+      catalogue.current = [];
+      setQuery("");
+      setSearchOpen(false);
+      setIdentityVersion((value) => value + 1);
+    });
+    return () => {
+      active = false;
+      ++authEpoch.current;
+      subscription.unsubscribe();
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
+    const epoch = authEpoch.current;
     void (async () => {
       try {
         const db = supabase();
         const context = await resolvePortalContext();
-        if (cancelled) return;
+        if (cancelled || epoch !== authEpoch.current) return;
         setMultipleFirms(context.status === "multiple_firms");
         const ids = context.status === "ready"
           ? { taxpayerId: context.taxpayerId, organizationId: context.organizationId }
@@ -153,7 +186,7 @@ export function ClientPortalShell({
         setFirmOptions([]);
         if (options.length > 1) {
           const { data: directory } = await db.rpc("firm_directory");
-          if (cancelled) return;
+          if (cancelled || epoch !== authEpoch.current) return;
           const names = new Map<string, string>(((directory ?? []) as { id: string; name: string }[])
             .map((firm) => [firm.id, firm.name]));
           setFirmOptions(options.map((id) => ({
@@ -169,7 +202,7 @@ export function ClientPortalShell({
           return;
         }
         const { data } = await db.from("taxpayers").select("id, legal_name").eq("id", ids.taxpayerId);
-        if (cancelled) return;
+        if (cancelled || epoch !== authEpoch.current) return;
         setBiz((data ?? []) as Business[]);
         const tid = ids?.taxpayerId;
         if (tid) {
@@ -179,13 +212,13 @@ export function ClientPortalShell({
             .eq("taxpayer_id", tid)
             .eq("sender", "firm")
             .is("read_at", null);
-          if (!cancelled) setUnread(count ?? 0);
+          if (!cancelled && epoch === authEpoch.current) setUnread(count ?? 0);
         }
         const [cases, requests] = await Promise.all([
           db.from("compliance_cases").select("id, obligation_code, period_token").eq("taxpayer_id", ids.taxpayerId).order("due_on"),
           db.from("document_requests").select("id, label_fr, label_en").eq("taxpayer_id", ids.taxpayerId),
         ]);
-        if (cancelled) return;
+        if (cancelled || epoch !== authEpoch.current) return;
         const found: Hit[] = [
           ...((cases.data ?? []) as { id: string; obligation_code: string; period_token: string }[]).map((c) => ({
             href: `${base}/declarations/${c.id}`,
@@ -200,7 +233,7 @@ export function ClientPortalShell({
         ];
         catalogue.current = found;
       } catch {
-        if (!cancelled) {
+        if (!cancelled && epoch === authEpoch.current) {
           setBiz([]);
           setMultipleFirms(undefined);
           setFirmOptions([]);
@@ -210,7 +243,7 @@ export function ClientPortalShell({
     return () => {
       cancelled = true;
     };
-  }, [base, copy.nav.requests, locale]);
+  }, [base, copy.nav.requests, locale, identityVersion]);
 
   const name = biz.find((b) => b.id === activeId)?.legal_name ?? biz[0]?.legal_name ?? "—";
   const initial = name.trim().charAt(0).toUpperCase() || "K";
