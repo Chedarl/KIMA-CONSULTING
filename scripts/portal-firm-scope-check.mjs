@@ -522,5 +522,5 @@ assert.match(thread.src, /const loadGeneration = useRef\(0\)/);
 assert.match(firmThreadLoad, /const generation = \+\+loadGeneration\.current/);
 assert.match(firmThreadLoad, /generation !== loadGeneration\.current/);
 assert.match(firmThreadLoad, /const allowedFirmIds = new Set\(liveIds\)/);
-assert.match(firmThreadLoad, /setMsgs\(\(m \?\? \[\]\)\.filter\(\(message\) => allowedFirmIds\.has\(message\.organization_id\)\)\)/);
-assert.match(firmThreadLoad, /setRequests\(\(r \?\? \[\]\)\.filter\(\(request\) => allowedFirmIds\.has\(request\.organization_id\)\)\)/);
+assert.match(firmThreadLoad, /setMsgs\(\(\(m \?\? \[\]\) as Msg\[\]\)\.filter\(\(message\) => allowedFirmIds\.has\(message\.organization_id\)\)\)/);
+assert.match(firmThreadLoad, /setRequests\(\(\(r \?\? \[\]\) as RequestLite\[\]\)\.filter\(\(request\) => allowedFirmIds\.has\(request\.organization_id\)\)\)/);
