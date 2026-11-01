@@ -353,3 +353,15 @@ for (const cleared of ["setBiz([])", "setActiveId(null)", 'setSelectedFirmId("")
   "setUnread(0)", "catalogue.current = []"]) {
   assert.ok(shellFailure.includes(cleared), "failed tenant reads must clear " + cleared);
 }
+
+// A tenant-scoped search catalogue is populated and cleared asynchronously.
+// Recompute hits from the current catalogue on each render: memoizing only by
+// query would retain old firm/case hits after a failed read or context reload.
+// Authenticated browser switching remains a separate staging release gate.
+const shellSearchResults = shell.src.split("const results = ")[1]?.split("\n\n  function active(")[0] ?? "";
+assert.ok(shellSearchResults.startsWith("(() => {"),
+  "shell search results must read the live catalogue on every render");
+assert.ok(shellSearchResults.includes("catalogue.current.filter("),
+  "search must filter the current tenant-scoped catalogue");
+assert.ok(!shellSearchResults.includes("[query]"),
+  "query-only memoization must not retain hits from an earlier firm snapshot");
