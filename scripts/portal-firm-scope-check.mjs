@@ -46,6 +46,18 @@ assert.match(thread.src, /requestQuery\.eq\("organization_id", firmOrgId\)/);
 assert.match(thread.src, /engagementQuery\.eq\("organization_id", firmOrgId\)/);
 const workspace = inspect("components/live/messages-workspace.tsx");
 assert.match(workspace.src, /memberId: session\.memberId/);
+// Firm inbox must resolve its OTP member against the authenticated user and
+// only load authorized engagements, taxpayer names, and messages for that firm.
+// These source contracts supplement, not replace, two-firm browser/RLS tests.
+assert.match(workspace.src, /db\.auth\.getUser\(\)/);
+assert.match(workspace.src, /\.from\("firm_members"\)[\s\S]*?\.eq\("id", session\.memberId\)[\s\S]*?\.eq\("auth_user_id", user\.id\)[\s\S]*?\.eq\("active", true\)[\s\S]*?\.is\("deactivated_at", null\)/);
+assert.match(workspace.src, /\.from\("engagements"\)[\s\S]*?\.eq\("organization_id", firmOrgId\)[\s\S]*?\.is\("revoked_at", null\)/);
+assert.match(workspace.src, /\.from\("taxpayers"\)[\s\S]*?\.in\("id", taxpayerIds\)/);
+assert.match(workspace.src, /\.from\("messages"\)[\s\S]*?\.eq\("organization_id", firmOrgId\)[\s\S]*?\.in\("taxpayer_id", taxpayerIds\)/);
+assert.match(workspace.src, /if \(row\.organization_id !== firmOrgId \|\| !allowedTaxpayers\.has\(row\.taxpayer_id\)\) return;/);
+assert.match(workspace.src, /if \(engagementsError\) throw/);
+assert.match(workspace.src, /if \(taxpayersError \|\| messagesError\) throw/);
+assert.match(workspace.src, /if \(offline\) return/);
 assert.ok(!thread.src.includes(".limit(2)"), "do not truncate active firm choices");
 const records = inspect("components/live/client-records.tsx");
 assert.match(records.src, /sessionTaxpayerId/);
