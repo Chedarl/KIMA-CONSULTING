@@ -398,3 +398,27 @@ assert.ok(clientMessageWrapper.includes("++authEpoch.current;") &&
   "unmount must invalidate pending taxpayer reads and unsubscribe");
 assert.match(clientMessageWrapper, /key=\{\`\$\{identityRef\.current \?\? "none"\}:\$\{tid\}\`\}/,
   "message thread must remount across identities even if taxpayer ID is shared");
+
+
+// Firm messaging is mounted only for the current OTP member. Reusing the
+// previous member's preview list or open thread across a session switch can
+// disclose another firm's conversation before asynchronous reads finish.
+// This source contract supplements authenticated two-firm browser acceptance.
+const firmMessages = inspect("components/live/messages-workspace.tsx").src;
+const firmMessagesEntry = firmMessages.split("export function MessagesWorkspace(")[1]?.split("\nfunction FirmMessagesView(")[0] ?? "";
+const firmMessagesView = firmMessages.split("\nfunction FirmMessagesView(")[1] ?? "";
+assert.ok(firmMessagesEntry && firmMessagesView,
+  "firm messaging must separate the session boundary from the data-bearing view");
+assert.ok(firmMessagesEntry.includes("subscribeFirmSession(setSession)"),
+  "firm session changes must update the parent boundary");
+assert.ok(firmMessagesEntry.includes("if (!session) return"),
+  "signed-out users must not retain firm message previews");
+assert.ok(firmMessagesEntry.includes('key={`${session.memberId}:${session.signedInAt}`}'),
+  "new OTP sessions must remount previews and open threads even for the same member");
+assert.ok(firmMessagesEntry.includes("session={session}"),
+  "the child view must receive only the current firm session");
+assert.ok(firmMessagesView.includes('db.from("taxpayers")') &&
+  firmMessagesView.includes('.from("messages")'),
+  "all firm message data reads must live inside the session-keyed child");
+assert.ok(!firmMessagesView.includes("subscribeFirmSession("),
+  "data-bearing child must not own an independent stale session subscription");
