@@ -133,6 +133,6 @@ test("services board fails closed when any of its parallel reads fails", () => {
   const publish = loadResult.indexOf("setCases((cs.data ?? [])");
   assert.ok(guard >= 0, "any failed tenant read must trigger the offline path");
   assert.ok(publish > guard, "all three read errors must be checked before publishing case data");
-  assert.doesNotMatch(loadResult, /eng\\.error \\? \\[\\]/,
+  assert.ok(!loadResult.includes("eng.error ? []"),
     "engagement read errors must not be silently replaced with an empty list");
 });
