@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(4);
+select plan(6);
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-e500-0000000000a1', 'stamp-partner@example.test'),
@@ -61,6 +61,29 @@ select is(
   (select status::text from engagements where id = '00000000-0000-4000-e500-0000000000e2'),
   'draft',
   'T-363 rejected firm acceptance leaves the independent taxpayer draft unchanged'
+);
+
+-- The linked client for taxpayer b0 must not accept taxpayer b1's draft.
+-- A zero-row update is the RLS refusal; no trigger may stamp the other client.
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-e500-0000000000c1","role":"authenticated"}', true);
+with attempted as (
+  update engagements set status = 'accepted'
+   where id = '00000000-0000-4000-e500-0000000000e2'
+     and status = 'draft'
+  returning id
+)
+select is(
+  (select count(*)::integer from attempted),
+  0,
+  'T-364 client linked only to taxpayer b0 cannot accept taxpayer b1 engagement'
+);
+reset role;
+select ok(
+  (select status = 'draft' and accepted_at is null
+     from engagements where id = '00000000-0000-4000-e500-0000000000e2'),
+  'T-365 cross-taxpayer refusal preserves the independent draft and consent clock'
 );
 
 select * from finish();
