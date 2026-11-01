@@ -180,6 +180,11 @@ export function MessageThread({
 
   const load = useCallback(async () => {
     const generation = ++loadGeneration.current;
+    // A realtime invalidation may arrive after engagement or member revocation.
+    // Hide the previous tenant snapshot before any asynchronous Auth/grant read.
+    // Preserve orgId so a still-authorized multi-firm choice survives refresh.
+    setMsgs(null);
+    setRequests([]);
     if (!taxpayerId) return;
     try {
       const db = supabase();
