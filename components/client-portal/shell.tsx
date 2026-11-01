@@ -210,13 +210,14 @@ export function ClientPortalShell({
             .from("messages")
             .select("id", { count: "exact", head: true })
             .eq("taxpayer_id", tid)
+            .eq("organization_id", ids.organizationId)
             .eq("sender", "firm")
             .is("read_at", null);
           if (!cancelled && epoch === authEpoch.current) setUnread(count ?? 0);
         }
         const [cases, requests] = await Promise.all([
-          db.from("compliance_cases").select("id, obligation_code, period_token").eq("taxpayer_id", ids.taxpayerId).order("due_on"),
-          db.from("document_requests").select("id, label_fr, label_en").eq("taxpayer_id", ids.taxpayerId),
+          db.from("compliance_cases").select("id, obligation_code, period_token").eq("taxpayer_id", ids.taxpayerId).eq("organization_id", ids.organizationId).order("due_on"),
+          db.from("document_requests").select("id, label_fr, label_en").eq("taxpayer_id", ids.taxpayerId).eq("organization_id", ids.organizationId),
         ]);
         if (cancelled || epoch !== authEpoch.current) return;
         const found: Hit[] = [
