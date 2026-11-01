@@ -344,7 +344,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       <PageHeading
         title={copy.servicesTitle}
         action={
-          <PrimaryButton onClick={() => setAskOpen(true)}>{copy.requestService}</PrimaryButton>
+          <PrimaryButton disabled={!ids || offline || cases === null} onClick={() => setAskOpen(true)}>{copy.requestService}</PrimaryButton>
         }
       />
       {offline && <OfflineNote>{copy.offline}</OfflineNote>}
@@ -370,7 +370,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
 
       {cases === null ? (
         <LoadingRows label={copy.loading} />
-      ) : visible.length === 0 ? (
+      ) : offline || !ids ? null : visible.length === 0 ? (
         <EmptyState
           title={cards.length === 0 ? copy.servicesEmpty : copy.servicesNoMatch}
           hint={cards.length === 0 ? undefined : copy.servicesNoMatchHint}
