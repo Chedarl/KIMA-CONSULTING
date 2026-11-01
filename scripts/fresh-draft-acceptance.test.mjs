@@ -147,3 +147,29 @@ test("offline or unresolved board never renders a false empty state or enables n
   assert.match(board, /\) : offline \|\| !ids \? null : visible\.length === 0 \? \(/);
   assert.match(board, /\{offline && <OfflineNote>\{copy\.offline\}<\/OfflineNote>\}/);
 });
+
+
+// A taxpayer may be engaged with two independent firms. The selected firm's
+// services board must not display the other firm's cases, requests, or draft
+// engagements. These source checks require authenticated staging follow-up.
+test("services board scopes every tenant read to selected taxpayer and firm", () => {
+  const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
+  for (const table of ["compliance_cases", "document_requests", "engagements"]) {
+    const query = board.split('db.from("' + table + '")')[1]?.split("\n")[0] ?? "";
+    assert.ok(query.includes('.eq("taxpayer_id", resolved.taxpayerId)'),
+      table + " must retain the verified taxpayer filter");
+    assert.ok(query.includes('.eq("organization_id", resolved.organizationId)'),
+      table + " must restrict results to the selected authorized firm");
+  }
+});
+
+test("draft acceptance cannot update an engagement from another selected firm", () => {
+  const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
+  const action = board.split("async function acceptDraft(id: string) {")[1]?.split("\n  async function sendRequest")[0] ?? "";
+  assert.ok(action.includes("const organizationId = ids?.organizationId;"),
+    "acceptance must capture the selected verified firm");
+  assert.ok(action.includes("!organizationId"),
+    "acceptance must refuse an unresolved firm");
+  assert.ok(action.includes('.eq("organization_id", organizationId)'),
+    "acceptance must constrain the update to the selected firm");
+});
