@@ -73,3 +73,23 @@ test("services board invalidates stale reads and clears tenant state on identity
   assert.match(board, /if \(active && nextUserId\) void load\(\)/);
   assert.match(board, /subscription\.unsubscribe\(\)/);
 });
+
+
+// Source-level defense in depth: never submit a stale engagement approval
+// after the client account changes; RLS remains the final authority.
+test("acceptance verifies current identity and taxpayer before mutation", () => {
+  const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
+  const match = board.match(/async function acceptDraft\(id: string\) \{([\s\S]*?)\n  \}\n\n  async function sendRequest/);
+  assert.ok(match, "acceptDraft function must be present");
+  const action = match[1];
+  assert.match(board, /const acceptInFlight = useRef<string \| null>\(null\)/);
+  assert.match(action, /if \(!userId \|\| !taxpayerId \|\| acceptInFlight\.current !== null\) return;/);
+  assert.match(action, /acceptInFlight\.current = token;[\s\S]*?await db\.auth\.getUser\(\)/);
+  assert.match(action, /auth\.user\?\.id !== userId/);
+  assert.match(action, /\.eq\("taxpayer_id", taxpayerId\)/);
+  assert.ok((action.match(/epoch !== loadEpoch\.current \|\| userId !== identityRef\.current/g) ?? []).length >= 2,
+    "check identity both before the write and after its asynchronous completion");
+  assert.match(action, /if \(acceptInFlight\.current === token\)/);
+  assert.match(board, /identityRef\.current = nextUserId;[\s\S]*?acceptInFlight\.current = null;/);
+  assert.match(board, /active = false;[\s\S]*?acceptInFlight\.current = null;[\s\S]*?subscription\.unsubscribe\(\)/);
+});
