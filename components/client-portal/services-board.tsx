@@ -86,10 +86,12 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
         db.from("engagements").select("id, taxpayer_id, organization_id, status, service_code, scope_note, fee_xaf, assigned_to, authorized_at, accepted_at, revoked_at").eq("taxpayer_id", resolved.taxpayerId),
       ]);
       if (epoch !== loadEpoch.current) return;
-      if (cs.error) throw cs.error;
+      // Do not render a partial tenant snapshot as a valid case stage or hide
+      // an engagement that requires the client's action.
+      if (cs.error || rq.error || eng.error) throw cs.error ?? rq.error ?? eng.error;
       setCases((cs.data ?? []) as ComplianceCase[]);
       setRequests((rq.data ?? []) as CaseRequest[]);
-      setEngagements(eng.error ? [] : ((eng.data ?? []) as (Engagement & { organization_id: string | null })[]));
+      setEngagements((eng.data ?? []) as (Engagement & { organization_id: string | null })[]);
       setOffline(false);
     } catch {
       if (epoch !== loadEpoch.current) return;
