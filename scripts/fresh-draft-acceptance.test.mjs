@@ -83,7 +83,7 @@ test("acceptance verifies current identity and taxpayer before mutation", () => 
   assert.ok(match, "acceptDraft function must be present");
   const action = match[1];
   assert.match(board, /const acceptInFlight = useRef<string \| null>\(null\)/);
-  assert.match(action, /if \(!userId \|\| !taxpayerId \|\| acceptInFlight\.current !== null\) return;/);
+  assert.match(action, /if \(!userId \|\| !taxpayerId \|\| !organizationId \|\| acceptInFlight\.current !== null\) return;/);
   assert.match(action, /acceptInFlight\.current = token;[\s\S]*?await db\.auth\.getUser\(\)/);
   assert.match(action, /auth\.user\?\.id !== userId/);
   assert.match(action, /\.eq\("taxpayer_id", taxpayerId\)/);
