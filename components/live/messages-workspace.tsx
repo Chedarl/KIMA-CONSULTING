@@ -63,85 +63,150 @@ function FirmMessagesView({
   const [clients, setClients] = useState<Client[] | null>(null);
   const [previews, setPreviews] = useState<Record<string, Preview>>({});
   const [active, setActive] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
   const [assignments, setAssignments] = useState<
     { taxpayer_id: string; assigned_to: string | null }[]
   >([]);
 
   useEffect(() => {
-    void supabase()
-      .from("engagements")
-      .select("taxpayer_id, assigned_to")
-      .then(({ data }) =>
-        setAssignments((data ?? []) as { taxpayer_id: string; assigned_to: string | null }[]),
-      );
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     const db = supabase();
+    let channel: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
 
     void (async () => {
-      const [{ data: tp }, { data: msgs }] = await Promise.all([
-        db.from("taxpayers").select("id, legal_name").order("legal_name"),
-        db
-          .from("messages")
-          .select("taxpayer_id, body, created_at, sender, read_at")
-          .order("created_at", { ascending: false })
-          .limit(400),
-      ]);
-      if (cancelled) return;
+      try {
+        // The OTP member ID is client-side state. Bind it to the current
+        // authenticated user before using it to select a firm's records.
+        const { data: { user }, error: authError } = await db.auth.getUser();
+        if (cancelled) return;
+        if (authError || !user) throw new Error("Firm authentication unavailable");
+        const { data: member, error: memberError } = await db
+          .from("firm_members")
+          .select("organization_id")
+          .eq("id", session.memberId)
+          .eq("auth_user_id", user.id)
+          .eq("active", true)
+          .is("deactivated_at", null)
+          .maybeSingle();
+        if (cancelled) return;
+        if (memberError || !member?.organization_id) throw new Error("Firm member unavailable");
+        const firmOrgId = member.organization_id as string;
 
-      const map: Record<string, Preview> = {};
-      for (const m of (msgs ?? []) as {
-        taxpayer_id: string;
-        body: string;
-        created_at: string;
-        sender: string;
-        read_at: string | null;
-      }[]) {
-        const slot = (map[m.taxpayer_id] ??= {
-          body: m.body,
-          created_at: m.created_at,
-          sender: m.sender,
-          unread: 0,
-        });
-        if (m.sender === "taxpayer" && !m.read_at) slot.unread += 1;
-      }
-      setPreviews(map);
-      const list = (tp ?? []) as Client[];
-      setClients(list);
-      if (list.length > 0) setActive(list[0].id);
-    })();
-
-    const channel = db
-      .channel(`firm-messages-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => {
-        const row = p.new as {
+        // A taxpayer may have multiple firms. Only active grants belonging to
+        // this member's firm may contribute a name, assignment or preview.
+        const { data: engagements, error: engagementsError } = await db
+          .from("engagements")
+          .select("taxpayer_id, assigned_to, authorized_at, accepted_at")
+          .eq("organization_id", firmOrgId)
+          .in("status", ["accepted", "authorized"])
+          .is("revoked_at", null);
+        if (cancelled) return;
+        if (engagementsError) throw engagementsError;
+        const activeEngagements = ((engagements ?? []) as {
           taxpayer_id: string;
+          assigned_to: string | null;
+          authorized_at: string | null;
+          accepted_at: string | null;
+        }[]).filter((e) => e.authorized_at || e.accepted_at);
+        const taxpayerIds = [...new Set(activeEngagements.map((e) => e.taxpayer_id))];
+        if (taxpayerIds.length === 0) {
+          setAssignments([]);
+          setPreviews({});
+          setClients([]);
+          setActive(null);
+          setOffline(false);
+          return;
+        }
+
+        const [{ data: tp, error: taxpayersError }, { data: msgs, error: messagesError }] =
+          await Promise.all([
+            db.from("taxpayers")
+              .select("id, legal_name")
+              .in("id", taxpayerIds)
+              .order("legal_name"),
+            db.from("messages")
+              .select("taxpayer_id, organization_id, body, created_at, sender, read_at")
+              .eq("organization_id", firmOrgId)
+              .in("taxpayer_id", taxpayerIds)
+              .order("created_at", { ascending: false })
+              .limit(400),
+          ]);
+        if (cancelled) return;
+        if (taxpayersError || messagesError) throw taxpayersError ?? messagesError;
+        const allowedTaxpayers = new Set(taxpayerIds);
+        const map: Record<string, Preview> = {};
+        for (const m of (msgs ?? []) as {
+          taxpayer_id: string;
+          organization_id: string;
           body: string;
           created_at: string;
           sender: string;
-        };
-        setPreviews((prev) => ({
-          ...prev,
-          [row.taxpayer_id]: {
-            body: row.body,
-            created_at: row.created_at,
-            sender: row.sender,
-            unread:
-              row.sender === "taxpayer"
-                ? (prev[row.taxpayer_id]?.unread ?? 0) + 1
-                : (prev[row.taxpayer_id]?.unread ?? 0),
-          },
-        }));
-      })
-      .subscribe();
+          read_at: string | null;
+        }[]) {
+          if (m.organization_id !== firmOrgId || !allowedTaxpayers.has(m.taxpayer_id)) continue;
+          const slot = (map[m.taxpayer_id] ??= {
+            body: m.body,
+            created_at: m.created_at,
+            sender: m.sender,
+            unread: 0,
+          });
+          if (m.sender === "taxpayer" && !m.read_at) slot.unread += 1;
+        }
+        const list = ((tp ?? []) as Client[]).filter((c) => allowedTaxpayers.has(c.id));
+        setAssignments(activeEngagements.map(({ taxpayer_id, assigned_to }) => ({ taxpayer_id, assigned_to })));
+        setPreviews(map);
+        setClients(list);
+        setActive(list[0]?.id ?? null);
+        setOffline(false);
+
+        // Realtime events are not trusted as a tenant selector. Check both
+        // organization and the authorized taxpayer set before updating UI.
+        channel = db
+          .channel(`firm-messages-${Math.random().toString(36).slice(2)}`)
+          .on("postgres_changes", {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+            filter: `organization_id=eq.${firmOrgId}`,
+          }, (p) => {
+            if (cancelled) return;
+            const row = p.new as {
+              taxpayer_id: string;
+              organization_id: string;
+              body: string;
+              created_at: string;
+              sender: string;
+            };
+            if (row.organization_id !== firmOrgId || !allowedTaxpayers.has(row.taxpayer_id)) return;
+            setPreviews((prev) => ({
+              ...prev,
+              [row.taxpayer_id]: {
+                body: row.body,
+                created_at: row.created_at,
+                sender: row.sender,
+                unread:
+                  row.sender === "taxpayer"
+                    ? (prev[row.taxpayer_id]?.unread ?? 0) + 1
+                    : (prev[row.taxpayer_id]?.unread ?? 0),
+              },
+            }));
+          })
+          .subscribe();
+      } catch {
+        if (cancelled) return;
+        setAssignments([]);
+        setPreviews({});
+        setClients([]);
+        setActive(null);
+        setOffline(true);
+      }
+    })();
 
     return () => {
       cancelled = true;
-      db.removeChannel(channel);
+      if (channel) void db.removeChannel(channel);
     };
-  }, []);
+  }, [session.memberId]);
 
   const sorted = useMemo(() => {
     if (!clients) return null;
@@ -167,6 +232,8 @@ function FirmMessagesView({
     );
     return verdict.ok ? null : denialLabel(verdict.reason, locale);
   }, [session, active, assignments, labels.signInRequired, labels.demoIdentity, locale]);
+
+  if (offline) return <p role="alert" className="text-sm text-fg-muted">{labels.offline}</p>;
 
   if (sorted === null) {
     return (
