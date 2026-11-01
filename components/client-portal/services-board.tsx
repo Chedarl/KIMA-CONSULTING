@@ -63,6 +63,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
   const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
   const loadEpoch = useRef(0);
   const identityRef = useRef<string | null | undefined>(undefined);
+  const acceptInFlight = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -109,6 +110,8 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       if (nextUserId === identityRef.current) return;
       identityRef.current = nextUserId;
       ++loadEpoch.current;
+      acceptInFlight.current = null;
+      setBusy(false);
       // Clear all previous-account taxpayer and firm data before the next read.
       setCases(null);
       setRequests([]);
@@ -127,6 +130,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
     return () => {
       active = false;
       ++loadEpoch.current;
+      acceptInFlight.current = null;
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
     };
@@ -201,23 +205,50 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
   }
 
   async function acceptDraft(id: string) {
+    const userId = identityRef.current;
+    const taxpayerId = ids?.taxpayerId;
+    // React's disabled state is not a synchronous double-tap lock.
+    if (!userId || !taxpayerId || acceptInFlight.current !== null) return;
+    const epoch = loadEpoch.current;
+    const token = `${epoch}:${userId}:${id}`;
+    acceptInFlight.current = token;
     setBusy(true);
-    const { data, error } = await supabase()
-      .from("engagements")
-      .update({ status: "accepted" })
-      .eq("id", id)
-      .eq("status", "draft")
-      .is("accepted_at", null)
-      .is("authorized_at", null)
-      .is("revoked_at", null)
-      .select("id");
-    setBusy(false);
-    if (error || !data || data.length === 0) {
-      toast(copy.acceptDraftFailed, "error");
-      return;
+    try {
+      const db = supabase();
+      const { data: auth, error: authError } = await db.auth.getUser();
+      // An account switch or refresh of the board invalidates this action.
+      if (epoch !== loadEpoch.current || userId !== identityRef.current) return;
+      if (authError || auth.user?.id !== userId) {
+        toast(copy.acceptDraftFailed, "error");
+        return;
+      }
+      const { data, error } = await db
+        .from("engagements")
+        .update({ status: "accepted" })
+        .eq("id", id)
+        .eq("taxpayer_id", taxpayerId)
+        .eq("status", "draft")
+        .is("accepted_at", null)
+        .is("authorized_at", null)
+        .is("revoked_at", null)
+        .select("id");
+      if (epoch !== loadEpoch.current || userId !== identityRef.current) return;
+      if (error || !data || data.length === 0) {
+        toast(copy.acceptDraftFailed, "error");
+        return;
+      }
+      toast(copy.acceptDraftDone);
+      void load();
+    } catch {
+      if (epoch === loadEpoch.current && userId === identityRef.current)
+        toast(copy.acceptDraftFailed, "error");
+    } finally {
+      // An old action must not release a newer account's approval lock.
+      if (acceptInFlight.current === token) {
+        acceptInFlight.current = null;
+        if (userId === identityRef.current) setBusy(false);
+      }
     }
-    toast(copy.acceptDraftDone);
-    void load();
   }
 
   async function sendRequest() {
