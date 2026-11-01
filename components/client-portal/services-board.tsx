@@ -170,6 +170,8 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
       .eq("id", id)
       .eq("status", "draft")
       .is("accepted_at", null)
+      .is("authorized_at", null)
+      .is("revoked_at", null)
       .select("id");
     setBusy(false);
     if (error || !data || data.length === 0) {
