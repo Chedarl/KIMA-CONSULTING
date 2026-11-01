@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import {
@@ -61,11 +61,15 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
   const [askText, setAskText] = useState("");
   const [busy, setBusy] = useState(false);
   const [ids, setIds] = useState<{ taxpayerId: string; organizationId: string } | null>(null);
+  const loadEpoch = useRef(0);
+  const identityRef = useRef<string | null | undefined>(undefined);
 
   const load = useCallback(async () => {
+    const epoch = ++loadEpoch.current;
     try {
       const db = supabase();
       const resolved = await demoIds();
+      if (epoch !== loadEpoch.current) return;
       setIds(resolved);
       if (!resolved) {
         setCases([]);
@@ -79,19 +83,53 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
         db.from("document_requests").select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count").eq("taxpayer_id", resolved.taxpayerId),
         db.from("engagements").select("id, taxpayer_id, organization_id, status, service_code, scope_note, fee_xaf, assigned_to, authorized_at, accepted_at, revoked_at").eq("taxpayer_id", resolved.taxpayerId),
       ]);
+      if (epoch !== loadEpoch.current) return;
       if (cs.error) throw cs.error;
       setCases((cs.data ?? []) as ComplianceCase[]);
       setRequests((rq.data ?? []) as CaseRequest[]);
       setEngagements(eng.error ? [] : ((eng.data ?? []) as (Engagement & { organization_id: string | null })[]));
       setOffline(false);
     } catch {
+      if (epoch !== loadEpoch.current) return;
       setOffline(true);
       setCases([]);
+      setRequests([]);
+      setEngagements([]);
+      setIds(null);
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if (event === "TOKEN_REFRESHED") return;
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      if (nextUserId === identityRef.current) return;
+      identityRef.current = nextUserId;
+      ++loadEpoch.current;
+      // Clear all previous-account taxpayer and firm data before the next read.
+      setCases(null);
+      setRequests([]);
+      setEngagements([]);
+      setIds(null);
+      setOffline(false);
+      setAskOpen(false);
+      setAskText("");
+      if (timer) clearTimeout(timer);
+      // Supabase calls must run outside the auth callback.
+      timer = setTimeout(() => {
+        if (active && nextUserId) void load();
+        else if (active) setCases([]);
+      }, 0);
+    });
+    return () => {
+      active = false;
+      ++loadEpoch.current;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, [load]);
 
   const cards = useMemo(() => {
