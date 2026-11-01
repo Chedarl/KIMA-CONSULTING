@@ -330,3 +330,26 @@ assert.ok(unreadRead.includes('.eq("taxpayer_id", tid)') &&
   "unread badge must be scoped to the selected firm and taxpayer");
 
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
+
+
+// The shell must not publish a partial tenant snapshot if any taxpayer,
+// unread-message, case or request query fails. This is a source contract;
+// authenticated fault-injection in staging remains a separate release gate.
+const shellReads = shell.src.split("const { data, error: taxpayerError } = await db.from(\"taxpayers\")")[1]?.split("\n      } catch {")[0] ?? "";
+assert.ok(shellReads, "taxpayer query must expose its error");
+assert.ok(shellReads.includes("if (taxpayerError) throw taxpayerError;"),
+  "a failed taxpayer lookup must not become an empty account");
+assert.ok(shellReads.includes("error: unreadError") && shellReads.includes("if (unreadError) throw unreadError;"),
+  "a failed unread count must not become zero");
+assert.ok(shellReads.includes("if (cases.error || requests.error) throw cases.error ?? requests.error;"),
+  "a failed case or request read must not produce an incomplete search catalogue");
+const shellPublish = shellReads.indexOf("setBiz((data ?? []) as Business[]);");
+assert.ok(shellPublish > shellReads.indexOf("if (cases.error || requests.error) throw"),
+  "publish taxpayer identity only after all tenant reads succeed");
+assert.ok(shellReads.indexOf("setUnread(count ?? 0);") > shellReads.indexOf("if (cases.error || requests.error) throw"),
+  "publish unread badge only after all tenant reads succeed");
+const shellFailure = shell.src.split("\n      } catch {")[1]?.split("\n      }\n    })();")[0] ?? "";
+for (const cleared of ["setBiz([])", "setActiveId(null)", 'setSelectedFirmId("")',
+  "setUnread(0)", "catalogue.current = []"]) {
+  assert.ok(shellFailure.includes(cleared), "failed tenant reads must clear " + cleared);
+}
