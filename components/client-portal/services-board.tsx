@@ -81,9 +81,9 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
         return;
       }
       const [cs, rq, eng] = await Promise.all([
-        db.from("compliance_cases").select(CASE_COLUMNS).eq("taxpayer_id", resolved.taxpayerId).order("due_on", { ascending: true }),
-        db.from("document_requests").select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count").eq("taxpayer_id", resolved.taxpayerId),
-        db.from("engagements").select("id, taxpayer_id, organization_id, status, service_code, scope_note, fee_xaf, assigned_to, authorized_at, accepted_at, revoked_at").eq("taxpayer_id", resolved.taxpayerId),
+        db.from("compliance_cases").select(CASE_COLUMNS).eq("taxpayer_id", resolved.taxpayerId).eq("organization_id", resolved.organizationId).order("due_on", { ascending: true }),
+        db.from("document_requests").select("id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count").eq("taxpayer_id", resolved.taxpayerId).eq("organization_id", resolved.organizationId),
+        db.from("engagements").select("id, taxpayer_id, organization_id, status, service_code, scope_note, fee_xaf, assigned_to, authorized_at, accepted_at, revoked_at").eq("taxpayer_id", resolved.taxpayerId).eq("organization_id", resolved.organizationId),
       ]);
       if (epoch !== loadEpoch.current) return;
       // Do not render a partial tenant snapshot as a valid case stage or hide
@@ -212,8 +212,9 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
   async function acceptDraft(id: string) {
     const userId = identityRef.current;
     const taxpayerId = ids?.taxpayerId;
+    const organizationId = ids?.organizationId;
     // React's disabled state is not a synchronous double-tap lock.
-    if (!userId || !taxpayerId || acceptInFlight.current !== null) return;
+    if (!userId || !taxpayerId || !organizationId || acceptInFlight.current !== null) return;
     const epoch = loadEpoch.current;
     const token = `${epoch}:${userId}:${id}`;
     acceptInFlight.current = token;
@@ -232,6 +233,7 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
         .update({ status: "accepted" })
         .eq("id", id)
         .eq("taxpayer_id", taxpayerId)
+        .eq("organization_id", organizationId)
         .eq("status", "draft")
         .is("accepted_at", null)
         .is("authorized_at", null)
