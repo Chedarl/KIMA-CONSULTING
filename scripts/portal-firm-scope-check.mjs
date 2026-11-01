@@ -524,3 +524,20 @@ assert.match(firmThreadLoad, /generation !== loadGeneration\.current/);
 assert.match(firmThreadLoad, /const allowedFirmIds = new Set\(liveIds\)/);
 assert.match(firmThreadLoad, /setMsgs\(\(\(m \?\? \[\]\) as Msg\[\]\)\.filter\(\(message\) => allowedFirmIds\.has\(message\.organization_id\)\)\)/);
 assert.match(firmThreadLoad, /setRequests\(\(\(r \?\? \[\]\) as RequestLite\[\]\)\.filter\(\(request\) => allowedFirmIds\.has\(request\.organization_id\)\)\)/);
+
+
+// A realtime INSERT payload is a notification, not proof that the currently
+// mounted taxpayer/member still has an active engagement. Re-read through the
+// authenticated tenant-scoped loader before publishing message content.
+// This source-contract check supplements real two-firm/two-taxpayer RLS tests.
+const realtimeThread = thread.src.split("  // A unique channel name per mount")[1]
+  ?.split("  useEffect(() => {\n    bottom.current?.scrollIntoView")[0] ?? "";
+assert.ok(realtimeThread, "realtime message subscription must exist");
+assert.match(realtimeThread, /if \\(row\\.organization_id !== orgId\\) return;/,
+  "realtime notifications must be scoped to the selected firm");
+assert.match(realtimeThread, /void load\\(\\);/,
+  "realtime notification must recheck Auth and engagement grants before publishing");
+assert.ok(!realtimeThread.includes("setMsgs((prev) =>"),
+  "never append an unverified realtime payload directly to the thread");
+assert.match(realtimeThread, /\\}, \\[taxpayerId, side, orgId, load\\]\\);/,
+  "subscription must capture the current authorization loader");
