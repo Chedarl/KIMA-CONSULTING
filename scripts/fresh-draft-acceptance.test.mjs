@@ -40,3 +40,17 @@ test("the services board accepts only a still-open draft and does not send the c
   assert.match(copy, /acceptDraftHintAgain: "Votre cabinet vous redemande/);
   assert.match(copy, /acceptDraftHint: "Accept this engagement so the firm can begin/);
 });
+
+// A stale card must not accept a draft that gained firm authorization or was revoked.
+// Request-shape contracts; database RLS and triggers remain authoritative.
+test("acceptance rechecks all fresh-draft state predicates at write time", () => {
+  const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
+  const match = board.match(/async function acceptDraft\(id: string\) \{([\s\S]*?)\n  \}\n\n  async function sendRequest/);
+  assert.ok(match, "acceptDraft function must be present");
+  const write = match[1];
+  assert.match(write, /\.eq\("status", "draft"\)/);
+  assert.match(write, /\.is\("accepted_at", null\)/);
+  assert.match(write, /\.is\("authorized_at", null\)/);
+  assert.match(write, /\.is\("revoked_at", null\)/);
+  assert.match(write, /\.select\("id"\)/);
+});
