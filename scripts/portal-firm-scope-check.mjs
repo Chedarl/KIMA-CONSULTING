@@ -358,7 +358,7 @@ for (const guard of [
 ]) {
   assert.ok(serviceUpload?.includes(guard), "document upload missing live grant guard: " + guard);
 }
-assert.ok((serviceUpload?.match(/epoch !== authEpoch\\.current \\|\\| actionCaseId !== activeCaseId\\.current/g) ?? []).length >= 4,
+assert.ok((serviceUpload?.match(/epoch !== authEpoch\.current \|\| actionCaseId !== activeCaseId\.current/g) ?? []).length >= 4,
   "document upload must reject stale auth and route after asynchronous reads");
 assert.ok(serviceUpload?.includes("if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed(requestId);"),
   "refused live upload authorization must surface an error only on the originating session/case");
