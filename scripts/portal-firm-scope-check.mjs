@@ -329,6 +329,24 @@ assert.match(serviceUpload ?? "", /if \(loadedCaseId !== caseId \|\| row\.id !==
 assert.match(serviceApproval ?? "", /if \(loadedCaseId !== caseId \|\| row\.id !== caseId\) return;/,
   "client approval must reject a stale route before inserting consent");
 
+// React busy state is asynchronous: two rapid clicks can enter the approval
+// handler before a re-render. A synchronous, per-component lock must serialize
+// consent attempts, and an older completion must not release a newer attempt.
+assert.match(service.src,
+  /const approvalInFlight = useRef<\\{ caseId: string; epoch: number \\} \\| null>\\(null\\)/);
+const approvalLockGuard = serviceApproval.indexOf("if (approvalInFlight.current) return;");
+const approvalLockAcquire = serviceApproval.indexOf("approvalInFlight.current = action;");
+const approvalAuthRead = serviceApproval.indexOf("await db.auth.getUser()");
+assert.ok(approvalLockGuard >= 0 && approvalLockAcquire > approvalLockGuard &&
+  approvalAuthRead > approvalLockAcquire,
+  "approval must synchronously acquire its lock before any asynchronous authorization read");
+assert.ok(serviceApproval.includes("if (approvalInFlight.current === action) approvalInFlight.current = null;"),
+  "only the originating approval attempt may release its lock");
+assert.match(service.src, /if \\(caseStamp !== caseId\\) \\{[\\s\\S]*?approvalInFlight\\.current = null;/,
+  "case switches must reset the previous case approval lock");
+assert.ok(serviceAuthChange?.includes("approvalInFlight.current = null;"),
+  "authenticated identity changes must reset the previous approval lock");
+
 // An approval must not be submitted or offered before filing evidence is verified.
 // This is a UI contract; database enforcement still requires independent testing.
 assert.match(serviceApproval ?? "",
