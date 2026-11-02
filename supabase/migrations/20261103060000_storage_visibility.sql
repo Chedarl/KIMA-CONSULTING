@@ -14,10 +14,12 @@ create policy "kima_objects_read" on storage.objects
     and private.can_see_taxpayer(storage_path_taxpayer(name))
     and (
       private.member_has('case.view', storage_path_taxpayer(name))
-      or exists (
+      -- An untracked object stays readable, as it was before this migration;
+      -- what is refused is an object explicitly marked internal.
+      or not exists (
         select 1 from public.documents d
          where d.storage_path = storage.objects.name
-           and d.visibility = 'client'
+           and d.visibility = 'internal'
       )
     )
   );
