@@ -1027,3 +1027,29 @@ assert.ok(contactInvitationBody.includes("liveDraft.organization_id !== selected
 assert.ok(contactInvitationBody.includes("await rejectStale();") &&
   contactInvitationBody.includes('.eq("organization_id", liveDraft.organization_id)'),
   "changed firm must fail closed while preserving live membership verification");
+
+
+// Phase 4: an upload can outlive the request's authorization snapshot.
+// A stale upload must never move a reviewed/accepted or reassigned request
+// backwards to "submitted", nor update a different tenant's request by ID.
+// Source contract only; staging race/RLS tests remain required.
+const uploadWriter = inspect("lib/submit-request.ts").src;
+const uploadStatusWrite = uploadWriter.split('db.from("document_requests")')[1]
+  ?.split("if (statusError")[0] ?? "";
+assert.ok(uploadStatusWrite, "document upload must use a conditional status write");
+for (const guard of [
+  '.eq("id", input.requestId)',
+  '.eq("taxpayer_id", input.taxpayerId)',
+  '.eq("organization_id", input.organizationId)',
+  '.eq("status", input.previousStatus)',
+  '.eq("responsible", "taxpayer")',
+  '.select("id")',
+]) {
+  assert.ok(uploadStatusWrite.includes(guard), "upload status CAS missing: " + guard);
+}
+assert.ok(uploadStatusWrite.includes('status: "submitted"'),
+  "a client upload must only submit, never accept, its request");
+assert.ok(uploadWriter.includes("if (!changed?.length)"),
+  "a zero-row conditional update must fail closed");
+assert.ok(!uploadWriter.includes('updateById("document_requests"'),
+  "upload must not use an ID-only update that can overwrite later review decisions");
