@@ -251,6 +251,27 @@ export function InvitationsPanel({ locale, side }: {
       }
     }
 
+    // A user can change the selected taxpayer without changing Auth identity.
+    // Re-resolve the currently RLS-visible taxpayer immediately before the
+    // decision RPC rather than trusting the previously rendered invitation.
+    if (side === "taxpayer") {
+      const liveTaxpayerId = await sessionTaxpayerId();
+      if (epoch !== authEpoch.current) return;
+      if (!liveTaxpayerId ||
+          liveTaxpayerId !== taxpayerId ||
+          liveTaxpayerId !== liveInvite.taxpayer_id) {
+        setTaxpayerId(null);
+        setInvites([]);
+        setFirms([]);
+        setFirm("");
+        setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
+        await load({ keepError: true });
+        if (epoch !== authEpoch.current) return;
+        setBusy(false);
+        return;
+      }
+    }
+
     const { error: failure } = await db.rpc("decide_invitation", {
       p_invitation_id: id, p_action: action,
     });
