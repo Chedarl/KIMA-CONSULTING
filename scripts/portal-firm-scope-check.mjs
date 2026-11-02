@@ -1099,3 +1099,49 @@ for (const [previousStatus, expectedReason] of [
 }
 assert.equal(uploadStatusGuardDbCalls, 1,
   "only an eligible status may reach the storage/database boundary");
+
+
+// Phase 4 tenant-isolation regression: the requests board must not keep a
+// previous taxpayer's rows after an Auth account switch, nor allow an
+// in-flight load/upload to populate or submit against the prior identity.
+// Source-contract coverage; authenticated two-taxpayer acceptance is required.
+const requestsBoardAuth = inspect("components/client-portal/requests-board.tsx").src;
+for (const guard of [
+  "const loadEpoch = useRef(0);",
+  "const authEpoch = useRef(0);",
+  "const identityRef = useRef<string | null | undefined>(undefined);",
+  "auth.onAuthStateChange(",
+  "if (nextUserId === identityRef.current) return;",
+  "++authEpoch.current;",
+  "++loadEpoch.current;",
+  "setIds(null);",
+  "setRows(null);",
+  "setCases([]);",
+  "setName(\"\");",
+  "pending.current = null;",
+  "subscription.unsubscribe();",
+]) {
+  assert.ok(requestsBoardAuth.includes(guard), "requests board account isolation missing: " + guard);
+}
+const requestsBoardLoad = requestsBoardAuth.split("const load = useCallback(async () => {")[1]
+  ?.split("}, []);")[0] ?? "";
+assert.ok(requestsBoardLoad.includes("const epoch = ++loadEpoch.current;"),
+  "requests board must epoch-tag every load");
+assert.ok((requestsBoardLoad.match(/epoch !== loadEpoch\.current/g) ?? []).length >= 3,
+  "requests board must discard stale taxpayer, request and error results");
+assert.ok(requestsBoardLoad.includes("if (rq.error || cs.error || tp.error)"),
+  "requests board must not silently treat denied tenant queries as empty data");
+const requestsBoardSend = requestsBoardAuth.split("async function send(id: string, file: File) {")[1]
+  ?.split("\n  const filters:")[0] ?? "";
+assert.ok(requestsBoardSend.includes("const epoch = authEpoch.current;"),
+  "requests board upload must bind to the current identity epoch");
+assert.ok(requestsBoardSend.includes("const liveTaxpayerId = await sessionTaxpayerId();"),
+  "requests board upload must re-resolve the live taxpayer before storage");
+assert.ok(requestsBoardSend.includes("user.id !== identityRef.current") &&
+  requestsBoardSend.includes("liveTaxpayerId !== ids.taxpayerId"),
+  "requests board must refuse a changed Auth user or taxpayer");
+assert.ok(requestsBoardSend.indexOf("liveTaxpayerId !== ids.taxpayerId") <
+  requestsBoardSend.indexOf("await submitRequestFile("),
+  "requests board must refuse a stale tenant before storage");
+assert.ok((requestsBoardSend.match(/epoch !== authEpoch\.current/g) ?? []).length >= 2,
+  "requests board must discard stale upload preflight and completion");
