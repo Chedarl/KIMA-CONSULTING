@@ -374,6 +374,34 @@ assert.ok(invitationDecision.indexOf("Invitation unavailable or expired.") <
   "stale-click feedback must precede the decision RPC");
 
 
+// Before accepting, declining or revoking an invitation, refresh the
+// authenticated caller and invitation row. A cached button is not proof that
+// the recipient, status, expiry or tenant is still authorized.
+const liveDecision = invitationDecision.split("const db = supabase();")[1]?.split(
+  '.rpc("decide_invitation"'
+)[0] ?? "";
+assert.ok(liveDecision.includes("await db.auth.getUser()"),
+  "decision must verify the live authenticated user");
+assert.ok(liveDecision.includes('.from("engagement_invitations")') &&
+  liveDecision.includes('.eq("id", id).maybeSingle()'),
+  "decision must fetch the current invitation before RPC");
+for (const check of [
+  "liveAuth.user.id !== userId",
+  "liveInvite.organization_id !== invitation.organization_id",
+  "liveInvite.taxpayer_id !== invitation.taxpayer_id",
+  "liveInvite.initiated_by !== invitation.initiated_by",
+  "liveInvite.recipient_user_id !== invitation.recipient_user_id",
+  'liveInvite.status !== "pending"',
+  "liveInvite.initiated_by !== userId",
+  "liveInvite.recipient_user_id !== userId",
+  "liveInvite.taxpayer_id !== taxpayerId",
+  "epoch !== authEpoch.current",
+]) {
+  assert.ok(liveDecision.includes(check), "live invitation decision missing: " + check);
+}
+assert.ok(liveDecision.includes("await load({ keepError: true })"),
+  "stale or unauthorized invitation must refresh without issuing a decision");
+
 // A failed invitation, firm-directory or draft-engagement read must never
 // retain the previous authorized snapshot or pretend no pending drafts exist.
 // This source contract complements authenticated fault-injection in staging.
