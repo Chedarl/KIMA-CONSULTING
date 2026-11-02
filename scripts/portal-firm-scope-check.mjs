@@ -329,6 +329,40 @@ assert.match(serviceUpload ?? "", /if \(loadedCaseId !== caseId \|\| row\.id !==
 assert.match(serviceApproval ?? "", /if \(loadedCaseId !== caseId \|\| row\.id !== caseId\) return;/,
   "client approval must reject a stale route before inserting consent");
 
+// A stale document-request button must not upload a file after the user's
+// taxpayer, firm engagement, case or request grant changes. These are
+// source-contract guards, not authenticated storage/RLS acceptance tests.
+const uploadAuthRead = serviceUpload?.indexOf("await db.auth.getUser()") ?? -1;
+const uploadTaxpayerRead = serviceUpload?.indexOf("await sessionTaxpayerId()") ?? -1;
+const uploadCaseRead = serviceUpload?.indexOf('.from("compliance_cases")') ?? -1;
+const uploadGrantRead = serviceUpload?.indexOf('.from("engagements")') ?? -1;
+const uploadRequestRead = serviceUpload?.indexOf('.from("document_requests")') ?? -1;
+const uploadStorageWrite = serviceUpload?.indexOf("await submitRequestFile(") ?? -1;
+assert.ok(uploadAuthRead >= 0 && uploadTaxpayerRead > uploadAuthRead &&
+  uploadCaseRead > uploadTaxpayerRead && uploadGrantRead > uploadCaseRead &&
+  uploadRequestRead > uploadGrantRead && uploadStorageWrite > uploadRequestRead,
+  "document upload must revalidate live Auth, taxpayer, case, engagement and request before storage");
+for (const guard of [
+  "auth.user.id !== identityRef.current",
+  "liveTaxpayerId !== ids.taxpayerId",
+  "liveCase.engagement_id !== row.engagement_id",
+  "liveGrant.organization_id !== ids.organizationId",
+  "liveGrant.taxpayer_id !== ids.taxpayerId",
+  "liveGrant.revoked_at",
+  '["accepted", "authorized"].includes(liveGrant.status)',
+  "liveRequest.case_id !== actionCaseId",
+  "liveRequest.taxpayer_id !== ids.taxpayerId",
+  "liveRequest.organization_id !== ids.organizationId",
+  "liveRequest.status !== req.status",
+  "waitsOn(liveRequest) !== \"client\"",
+]) {
+  assert.ok(serviceUpload?.includes(guard), "document upload missing live grant guard: " + guard);
+}
+assert.ok((serviceUpload?.match(/epoch !== authEpoch\\.current \\|\\| actionCaseId !== activeCaseId\\.current/g) ?? []).length >= 4,
+  "document upload must reject stale auth and route after asynchronous reads");
+assert.ok(serviceUpload?.includes("if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed(requestId);"),
+  "refused live upload authorization must surface an error only on the originating session/case");
+
 // React busy state is asynchronous: two rapid clicks can enter the approval
 // handler before a re-render. A synchronous, per-component lock must serialize
 // consent attempts, and an older completion must not release a newer attempt.
