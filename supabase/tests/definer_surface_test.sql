@@ -45,18 +45,40 @@ select is(
       and p.proname in ('can_see_taxpayer', 'client_taxpayer_ids', 'member_has',
                         'member_has_in_org', 'firm_member_has', 'current_firm_role',
                         'current_member_label', 'demo_taxpayer_id', 'flag_enabled',
-                        'auth_identity_is_single, can_see_taxpayer, case_client_approval_guard, ',
-  'case_stage_guard, claim_reminders, client_taxpayer_ids, ',
-  'create_invitation_for_contact_internal, create_invitation_internal, current_firm_role, ',
-  'current_member_id, current_member_label, current_member_org, ',
-  'decide_invitation_internal, delivered_evidence_lock, demo_taxpayer_id, ',
-  'document_version_number, document_version_path_guard, ',
-  'engagement_authorized_at_is_permanent, engagements_grant_guard, enqueue_due_reminders, ',
-  'firm_member_has, firm_name_key, firm_previously_granted, flag_enabled, ',
-  'guard_client_invite_authorization, incident_timeline_guard, incident_verify_guard, ',
-  'mark_reminder_failed, mark_reminder_sent, member_has, member_has_in_org, ',
-  'portal_request_code, serialize_taxpayer_grant, signal_firm_intake_document_change, ',
-  'taxpayer_held_by_another_firm, taxpayer_id_for_niu'
+                        'auth_identity_is_single', 'portal_request_code')),
+  0::bigint,
+  'T-51 no policy helper is left in the schema PostgREST publishes'
+);
+
+-- T-52 all private helpers and the two trigger guards are accounted for. A new
+-- helper has to be added here deliberately, which is the point: this is the
+-- census, and it is the test that notices a definer function appearing.
+-- engagements_grant_guard arrived with
+-- 20261030070000 (F-01), current_member_id with 20261030080000 and
+-- current_member_org with 20261030090000 (R-53), and
+-- taxpayer_id_for_niu and taxpayer_held_by_another_firm with 20261030120000
+-- (R-56); the latter replaced taxpayer_engaged_elsewhere, which asked only
+-- about live engagements. engagement_authorized_at_is_permanent arrived with
+-- the R-56 historical authorization safeguard and runs as SECURITY INVOKER.
+-- The reminder, incident and document-version helpers arrived on 2 Nov 2026
+-- (20261102200000 .. 20261102230000); each is a trigger body or a service-role-only
+-- entry point, so none is reachable through PostgREST.
+select is(
+  (select string_agg(distinct p.proname, ', ' order by p.proname)
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'private'),
+  'auth_identity_is_single, can_see_taxpayer, case_client_approval_guard, '
+  'case_stage_guard, claim_reminders, client_taxpayer_ids, '
+  'create_invitation_for_contact_internal, create_invitation_internal, current_firm_role, '
+  'current_member_id, current_member_label, current_member_org, '
+  'decide_invitation_internal, delivered_evidence_lock, demo_taxpayer_id, '
+  'document_version_number, document_version_path_guard, '
+  'engagement_authorized_at_is_permanent, engagements_grant_guard, enqueue_due_reminders, '
+  'firm_member_has, firm_name_key, firm_previously_granted, flag_enabled, '
+  'guard_client_invite_authorization, incident_timeline_guard, incident_verify_guard, '
+  'mark_reminder_failed, mark_reminder_sent, member_has, member_has_in_org, '
+  'portal_request_code, serialize_taxpayer_grant, signal_firm_intake_document_change, '
+  'taxpayer_held_by_another_firm, taxpayer_id_for_niu',
   'T-52 every moved helper is in private, and nothing else is'
 );
 
