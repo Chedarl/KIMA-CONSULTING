@@ -29,6 +29,9 @@ export function InvitationsPanel({ locale, side }: {
   const [error, setError] = useState("");
   const loadEpoch = useRef(0);
   const authEpoch = useRef(0);
+  // A synchronous lock prevents rapid cross-action invitation RPC replay
+  // before React commits the busy-state render.
+  const mutationInFlight = useRef(false);
   const identityRef = useRef<string | null | undefined>(undefined);
 
   const load = useCallback(async (options?: { keepError?: boolean }) => {
@@ -139,6 +142,7 @@ export function InvitationsPanel({ locale, side }: {
       if (nextUserId === identityRef.current) return;
       identityRef.current = nextUserId;
       ++authEpoch.current; // Invalidate mutation completions from the old identity.
+      mutationInFlight.current = false;
       ++loadEpoch.current; // Invalidate requests issued under the old identity.
       setUserId(null);
       setTaxpayerId(null);
@@ -156,11 +160,27 @@ export function InvitationsPanel({ locale, side }: {
     });
     return () => {
       ++authEpoch.current;
+      mutationInFlight.current = false;
       ++loadEpoch.current;
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, [load]);
+
+  function beginMutation() {
+    if (mutationInFlight.current) return false;
+    mutationInFlight.current = true;
+    setBusy(true);
+    return true;
+  }
+
+  function finishMutation(epoch: number) {
+    // A completion from a previous account must never unlock the new user's
+    // request. Auth identity changes reset the old lock in the listener.
+    if (epoch !== authEpoch.current) return;
+    mutationInFlight.current = false;
+    setBusy(false);
+  }
 
   async function decide(id: string, action: "accepted" | "declined" | "revoked") {
     if (!userId || busy) return;
@@ -182,7 +202,7 @@ export function InvitationsPanel({ locale, side }: {
     }
 
     const epoch = authEpoch.current;
-    setBusy(true);
+    if (!beginMutation()) return;
     setError("");
     const db = supabase();
     // A session switch can precede the Auth event callback. Do not use the
@@ -193,7 +213,7 @@ export function InvitationsPanel({ locale, side }: {
       setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
       await load({ keepError: true });
       if (epoch !== authEpoch.current) return;
-      setBusy(false);
+      finishMutation(epoch);
       return;
     }
 
@@ -220,7 +240,7 @@ export function InvitationsPanel({ locale, side }: {
       setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
       await load({ keepError: true });
       if (epoch !== authEpoch.current) return;
-      setBusy(false);
+      finishMutation(epoch);
       return;
     }
 
@@ -246,7 +266,7 @@ export function InvitationsPanel({ locale, side }: {
         setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
         await load({ keepError: true });
         if (epoch !== authEpoch.current) return;
-        setBusy(false);
+        finishMutation(epoch);
         return;
       }
     }
@@ -267,7 +287,7 @@ export function InvitationsPanel({ locale, side }: {
         setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
         await load({ keepError: true });
         if (epoch !== authEpoch.current) return;
-        setBusy(false);
+        finishMutation(epoch);
         return;
       }
     }
@@ -279,7 +299,7 @@ export function InvitationsPanel({ locale, side }: {
     await load();
     if (epoch !== authEpoch.current) return;
     if (failure) setError(fr ? "Action refusée ou invitation expirée." : "Action refused or invitation expired.");
-    setBusy(false);
+    finishMutation(epoch);
   }
 
   async function requestFirm() {
@@ -290,7 +310,7 @@ export function InvitationsPanel({ locale, side }: {
     const requestedFirm = firm;
     const requestedTaxpayer = taxpayerId;
     const epoch = authEpoch.current;
-    setBusy(true);
+    if (!beginMutation()) return;
     setError("");
     const db = supabase();
     const rejectStale = async () => {
@@ -300,7 +320,7 @@ export function InvitationsPanel({ locale, side }: {
       setFirm("");
       setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
       await load({ keepError: true });
-      if (epoch === authEpoch.current) setBusy(false);
+      finishMutation(epoch);
     };
 
     const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
@@ -337,7 +357,7 @@ export function InvitationsPanel({ locale, side }: {
     await load();
     if (epoch !== authEpoch.current) return;
     if (failure) setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
-    setBusy(false);
+    finishMutation(epoch);
   }
 
   async function inviteContact() {
@@ -348,7 +368,7 @@ export function InvitationsPanel({ locale, side }: {
     const selectedDraft = drafts.find((candidate) => candidate.id === engagement);
     if (!selectedDraft) return;
     const epoch = authEpoch.current;
-    setBusy(true);
+    if (!beginMutation()) return;
     setError("");
     const db = supabase();
     const rejectStale = async () => {
@@ -362,7 +382,7 @@ export function InvitationsPanel({ locale, side }: {
         ? "Destinataire indisponible. Vérifiez le compte client et l'adresse."
         : "Recipient unavailable. Check the client account and email.");
       await load({ keepError: true });
-      if (epoch === authEpoch.current) setBusy(false);
+      finishMutation(epoch);
     };
 
     const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
@@ -412,7 +432,7 @@ export function InvitationsPanel({ locale, side }: {
     if (failure) setError(fr
       ? "Destinataire indisponible. Vérifiez le compte client et l'adresse."
       : "Recipient unavailable. Check the client account and email.");
-    setBusy(false);
+    finishMutation(epoch);
   }
 
   return (
