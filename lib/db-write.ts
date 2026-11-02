@@ -38,9 +38,12 @@ export async function updateById(
   table: string,
   id: string,
   patch: Record<string, unknown>,
+  expected?: Record<string, string | number>,
 ): Promise<WriteOutcome> {
   try {
-    const { data, error } = await supabase().from(table).update(patch).eq("id", id).select("id");
+    const update = supabase().from(table).update(patch).eq("id", id);
+    // Match the original stage/round/tenant in the same PATCH, not a stale read.
+    const { data, error } = await (expected ? update.match(expected) : update).select("id");
     if (error) return { ok: false, reason: "error", detail: error.message };
     if (!data || data.length === 0) return { ok: false, reason: "not_permitted" };
     return { ok: true };
