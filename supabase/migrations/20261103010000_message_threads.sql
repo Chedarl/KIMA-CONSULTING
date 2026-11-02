@@ -44,7 +44,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   found_id uuid;
 begin
@@ -68,7 +68,7 @@ begin
   new.thread_id := found_id;
   return new;
 end;
-$;
+$$;
 
 create trigger messages_autolink_thread
   before insert on public.messages
