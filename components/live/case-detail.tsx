@@ -426,7 +426,9 @@ export function CaseDetail({
   );
 
   async function move(to: CaseStage) {
-    if (!row || !member || !actor) return;
+    if (!row || !member || !actor || !engagement ||
+        engagement.id !== row.engagement_id ||
+        engagement.taxpayer_id !== row.taxpayer_id) return;
     const result = commandAdvanceCase({
       current: row,
       advance: moveInput(to),
@@ -444,7 +446,16 @@ export function CaseDetail({
     setFailed(null);
     setRefusedBy(null);
     try {
-      const written = await updateById("compliance_cases", row.id, result.patch);
+      // A stage decision was computed from this exact case snapshot. Refuse a
+      // replay if its stage, approval round or tenant/engagement changed.
+      // Database RLS and transition triggers remain the final authority.
+      const written = await updateById("compliance_cases", row.id, result.patch, {
+        taxpayer_id: row.taxpayer_id,
+        organization_id: engagement.organization_id,
+        engagement_id: engagement.id,
+        stage: row.stage,
+        approval_round: row.approval_round,
+      });
       if (!written.ok) {
         setFailed(to);
         setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
