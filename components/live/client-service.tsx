@@ -239,24 +239,93 @@ export function ClientService({
     const actionCaseId = caseId;
     setBusy(requestId);
     setFailed(null);
-    const result = await submitRequestFile({
-      requestId,
-      file,
-      taxpayerId: ids.taxpayerId,
-      organizationId: ids.organizationId,
-      caseId: row.id,
-      label: locale === "fr" ? req.label_fr : req.label_en,
-      actorLabel: name || "Client",
-      previousStatus: req.status,
-    });
-    if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
-    setBusy(null);
-    if (!result.ok) {
-      setFailed(requestId);
-      return;
+    try {
+      const db = supabase();
+      const { data: auth, error: authError } = await db.auth.getUser();
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (authError || !auth.user || auth.user.id !== identityRef.current) {
+        throw new Error("Document upload session changed");
+      }
+      // A cached request is not authority to write to storage. Recheck the
+      // current RLS-visible taxpayer, case, firm grant and request first.
+      const liveTaxpayerId = await sessionTaxpayerId();
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (!liveTaxpayerId || liveTaxpayerId !== ids.taxpayerId) {
+        throw new Error("Document upload taxpayer changed");
+      }
+      const { data: liveCase, error: caseError } = await db
+        .from("compliance_cases")
+        .select("id,taxpayer_id,organization_id,engagement_id")
+        .eq("id", actionCaseId)
+        .eq("taxpayer_id", ids.taxpayerId)
+        .eq("organization_id", ids.organizationId)
+        .maybeSingle();
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (caseError || !liveCase ||
+          liveCase.taxpayer_id !== ids.taxpayerId ||
+          liveCase.organization_id !== ids.organizationId ||
+          liveCase.engagement_id !== row.engagement_id) {
+        throw new Error("Document upload case changed");
+      }
+      const { data: liveGrant, error: grantError } = await db
+        .from("engagements")
+        .select("organization_id,taxpayer_id,status,accepted_at,authorized_at,revoked_at")
+        .eq("id", liveCase.engagement_id)
+        .eq("taxpayer_id", ids.taxpayerId)
+        .maybeSingle();
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (grantError || !liveGrant ||
+          liveGrant.organization_id !== ids.organizationId ||
+          liveGrant.taxpayer_id !== ids.taxpayerId ||
+          liveGrant.revoked_at ||
+          !["accepted", "authorized"].includes(liveGrant.status) ||
+          !(liveGrant.accepted_at || liveGrant.authorized_at)) {
+        throw new Error("Document upload engagement revoked");
+      }
+      const { data: freshRequest, error: requestError } = await db
+        .from("document_requests")
+        .select("id,case_id,taxpayer_id,organization_id,status,responsible")
+        .eq("id", requestId)
+        .eq("case_id", actionCaseId)
+        .eq("taxpayer_id", ids.taxpayerId)
+        .eq("organization_id", ids.organizationId)
+        .maybeSingle();
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      const liveRequest = freshRequest as (Pick<CaseRequest,
+        "id" | "case_id" | "taxpayer_id" | "status" | "responsible"> & { organization_id: string }) | null;
+      if (requestError || !liveRequest ||
+          liveRequest.case_id !== actionCaseId ||
+          liveRequest.taxpayer_id !== ids.taxpayerId ||
+          liveRequest.organization_id !== ids.organizationId ||
+          liveRequest.status !== req.status ||
+          !requestIsOutstanding(liveRequest.status) ||
+          waitsOn(liveRequest) !== "client") {
+        throw new Error("Document upload request no longer available");
+      }
+      // This preflight narrows stale UI writes; storage and database RLS must
+      // still enforce authorization if a grant changes during the upload.
+      const result = await submitRequestFile({
+        requestId,
+        file,
+        taxpayerId: ids.taxpayerId,
+        organizationId: ids.organizationId,
+        caseId: liveCase.id,
+        label: locale === "fr" ? req.label_fr : req.label_en,
+        actorLabel: name || "Client",
+        previousStatus: liveRequest.status,
+      });
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (!result.ok) {
+        setFailed(requestId);
+        return;
+      }
+      setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: "submitted" } : r)));
+      void load();
+    } catch {
+      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed(requestId);
+    } finally {
+      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
     }
-    setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: "submitted" } : r)));
-    void load();
   }
 
   async function approveCase() {
