@@ -1380,3 +1380,54 @@ const staleReplay = await writerModule.exports.updateById("compliance_cases", "c
   { stage: "evidence" }, original);
 assert.deepEqual(JSON.parse(JSON.stringify(staleReplay)), { ok: false, reason: "not_permitted" });
 assert.equal(stored.stage, "filing");
+
+// Document review must compare-and-swap the exact submitted request and tenant.
+// A stale accepted/returned decision cannot overwrite a later review, and a
+// returned-then-resubmitted request must not be mistaken for the old submission.
+const settle = detail.src.split('async function settleRequest(r: CaseRequest, to: "accepted" | "returned") {')[1]?.split("\n  async function createRequest()")[0] ?? "";
+assert.ok(settle.includes('r.status !== "submitted"'),
+  "firm document review must refuse non-submitted requests");
+assert.ok(settle.includes('engagement.id !== row.engagement_id') &&
+  settle.includes('engagement.taxpayer_id !== row.taxpayer_id') &&
+  settle.includes('engagement.revoked_at'),
+  "document review must require the current case engagement and reject revocation");
+assert.ok(settle.includes('allowed(to === "accepted" ? "document.review" : "request.return")'),
+  "document review must recheck the requested capability in the handler");
+assert.ok(settle.includes('updateById("document_requests", r.id, patch, {'),
+  "document review must use a conditional PATCH, not an ID-only update");
+for (const guard of [
+  "case_id: row.id", "taxpayer_id: row.taxpayer_id",
+  "organization_id: engagement.organization_id", 'status: "submitted"',
+  "returned_count: r.returned_count", "responsible: r.responsible",
+]) assert.ok(settle.includes(guard), "document review CAS missing " + guard);
+
+Object.assign(stored, {
+  id: "request-1", case_id: "case-1", taxpayer_id: "taxpayer-A",
+  organization_id: "firm-A", status: "submitted", returned_count: 0,
+  responsible: "taxpayer",
+});
+const originalRequest = {
+  case_id: "case-1", taxpayer_id: "taxpayer-A", organization_id: "firm-A",
+  status: "submitted", returned_count: 0, responsible: "taxpayer",
+};
+const wrongRequestTenant = await writerModule.exports.updateById(
+  "document_requests", "request-1", { status: "accepted" },
+  { ...originalRequest, organization_id: "firm-B" });
+assert.deepEqual(JSON.parse(JSON.stringify(wrongRequestTenant)),
+  { ok: false, reason: "not_permitted" });
+assert.equal(stored.status, "submitted");
+const firstReview = await writerModule.exports.updateById(
+  "document_requests", "request-1", { status: "returned", returned_count: 1 },
+  originalRequest);
+assert.deepEqual(JSON.parse(JSON.stringify(firstReview)), { ok: true });
+const staleReview = await writerModule.exports.updateById(
+  "document_requests", "request-1", { status: "accepted" }, originalRequest);
+assert.deepEqual(JSON.parse(JSON.stringify(staleReview)),
+  { ok: false, reason: "not_permitted" });
+stored.status = "submitted"; // Client resubmits; old review must still be refused.
+const staleResubmissionReview = await writerModule.exports.updateById(
+  "document_requests", "request-1", { status: "accepted" }, originalRequest);
+assert.deepEqual(JSON.parse(JSON.stringify(staleResubmissionReview)),
+  { ok: false, reason: "not_permitted" });
+assert.equal(stored.status, "submitted");
+
