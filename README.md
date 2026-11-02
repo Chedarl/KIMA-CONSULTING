@@ -1140,3 +1140,24 @@ A visitor may write only the message fields (`contact_name`, `contact_email`, `c
 **Release gate: direct Data API writes are OFF.** `app_flags.allow_public_contact_inquiries` defaults to `false`; the INSERT RLS policy refuses anonymous and authenticated submissions until this separate flag is explicitly enabled. This matters because PostgREST exposes the table independently of any Next.js route, so a route-only throttle or captcha cannot secure direct REST writes. Keep the flag OFF until abuse protection covers the Data API path and the owner approves activation. The synthetic pgTAP test temporarily enables the flag inside a rolled-back transaction; it does not activate production.
 
 KIMA administrator safeguard (review branch): `admin_review_firm(firm_uuid, 'verify'|'suspend'|'unsuspend', reason)` is an audited privileged RPC limited to an active Auth-bound `kima_admin` of a `kind='kima'` organization. It changes only accounting firms, requires a documented reason, and never certifies professional qualifications. No public organization UPDATE permission is granted; operator provisioning and live activation require explicit owner approval. Synthetic pgTAP covers denied callers and the two-firm signup isolation path.
+
+
+---
+
+## Backend surfaces added 2 November 2026 (Agent C)
+
+Four tables and two protocols, each applied to staging (`usrnjhuwmhxelkpqgyox`)
+and probed as real identities before merge. None invents a regulatory rule.
+
+| Surface | What it adds | Enforced in the database |
+|---|---|---|
+| `time_entries` | professional time against a taxpayer file | a member records only their own time, in their own organisation, on a taxpayer their firm is engaged with |
+| `notification_outbox` + `private.enqueue_due_reminders()` | the queue a reminder leaves from, deduplicated per case and due date | firms read their own queue; only the service role may enqueue |
+| `private.claim_reminders()` / `mark_reminder_sent` / `mark_reminder_failed` | a ten-minute lease, five attempts, and no silent loss when a worker dies mid-send | lease and attempt count are columns, not conventions |
+| `tax_attestations` | ACF / ANR / NIU with the expiry **stated on the document** | expiry is recorded, never derived — there is no sourced validity duration in the rule corpus, and this table must not become one |
+| `payment_incidents` + `incident_evidence` / `incident_contacts` / `incident_events` | the Phase 6 incident model, with a timeline | a debit never reaches `verified` without a named reviewer **and** an official evidence row; a verification is not rewritten; the timeline is append-only |
+
+Proven on staging, not asserted: firm B reading firm A's rows returns 0 in every
+table above; a firm recording time as another member is refused (`42501`);
+verification without `official_receipt` or `administration_response` raises; and
+re-running the reminder enqueue changes nothing.
