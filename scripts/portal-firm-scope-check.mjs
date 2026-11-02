@@ -1256,3 +1256,27 @@ assert.deepEqual(matchingRequest.result, { ok: false, reason: "error" },
   "matching live request may reach the mocked storage boundary");
 assert.ok(matchingRequest.calls.some(([op]) => op === "storage"),
   "matching live request must pass preflight before storage");
+
+
+// Phase 3 invitation decisions: a rejected Auth, RLS, or RPC promise must
+// not leave the synchronous mutation lock stuck until an account switch.
+// The error must be localized, and the originating epoch alone may release
+// the lock. Source contract only; authenticated network-failure acceptance
+// remains required in staging.
+const decisionNetworkBody = invitations.src.split("  async function decide(")[1]
+  ?.split("\n  async function requestFirm(")[0] ?? "";
+const decisionMutationStart = decisionNetworkBody.indexOf("if (!beginMutation()) return;");
+const decisionTry = decisionNetworkBody.indexOf("try {", decisionMutationStart);
+const decisionDb = decisionNetworkBody.indexOf("const db = supabase();", decisionMutationStart);
+const decisionCatch = decisionNetworkBody.lastIndexOf("} catch {");
+const decisionFinally = decisionNetworkBody.lastIndexOf("} finally {");
+assert.ok(decisionMutationStart >= 0 && decisionTry > decisionMutationStart &&
+  decisionDb > decisionTry && decisionCatch > decisionDb && decisionFinally > decisionCatch,
+  "invitation decision must protect Auth/RLS/RPC awaits with try/catch/finally");
+assert.ok(decisionNetworkBody.slice(decisionCatch, decisionFinally).includes(
+  'if (epoch === authEpoch.current) setError(fr ? "Impossible de vérifier les invitations. Actualisez la page." : "Unable to verify invitations. Refresh the page.");'),
+  "rejected invitation decision must show FR/EN failure only to its originating account");
+assert.ok(decisionNetworkBody.slice(decisionFinally).includes("finishMutation(epoch);"),
+  "invitation decision must release its single-flight lock in finally");
+assert.equal((decisionNetworkBody.match(/finishMutation\(epoch\);/g) ?? []).length, 1,
+  "invitation decision must release its lock exactly once, in finally");
