@@ -36,7 +36,43 @@ update public.messages m
    and t.organization_id is not distinct from m.organization_id
    and m.thread_id is null;
 
-alter table public.messages alter column thread_id set not null;
+-- Threads are linked automatically rather than required from the caller: the
+-- existing writers (portal, firm screens) predate the column, and a NOT NULL
+-- constraint would refuse a message the product can still legitimately send.
+create or replace function private.message_thread_autolink()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  found_id uuid;
+begin
+  if new.thread_id is not null then
+    return new;
+  end if;
+
+  select t.id into found_id
+    from public.message_threads t
+   where t.taxpayer_id = new.taxpayer_id
+     and t.organization_id is not distinct from new.organization_id
+   order by t.last_message_at desc
+   limit 1;
+
+  if found_id is null then
+    insert into public.message_threads (taxpayer_id, organization_id, subject)
+    values (new.taxpayer_id, new.organization_id, 'Conversation')
+    returning id into found_id;
+  end if;
+
+  new.thread_id := found_id;
+  return new;
+end;
+$;
+
+create trigger messages_autolink_thread
+  before insert on public.messages
+  for each row execute function private.message_thread_autolink();
 
 create index messages_thread_idx on public.messages (thread_id, created_at);
 
