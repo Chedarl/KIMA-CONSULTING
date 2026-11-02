@@ -19,6 +19,13 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
+  -- Only a client-originated write is refused. A SECURITY DEFINER path runs as
+  -- its owner (admin_review_firm), and migrations run as postgres, so both keep
+  -- working; what a partner can never do is certify their own practice.
+  if current_user not in ('anon', 'authenticated') then
+    return new;
+  end if;
+
   if new.kind is distinct from old.kind
      or new.verification_status is distinct from old.verification_status
      or new.suspended_at is distinct from old.suspended_at
