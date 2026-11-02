@@ -124,8 +124,8 @@ export function InvitationsPanel({ locale, side }: {
 
   async function decide(id: string, action: "accepted" | "declined" | "revoked") {
     if (!userId || busy) return;
-    // A stale button, expired invitation, or another account's invitation
-    // must never initiate an RPC. The database remains the authority.
+    // The displayed row is only an initial eligibility check; it may have
+    // been superseded or revoked since the last inbox refresh.
     const invitation = invites.find((item) => item.id === id);
     if (!invitation || invitation.status !== "pending" ||
         (side === "taxpayer" && invitation.taxpayer_id !== taxpayerId) ||
@@ -134,18 +134,57 @@ export function InvitationsPanel({ locale, side }: {
         (action === "revoked"
           ? invitation.initiated_by !== userId
           : invitation.recipient_user_id !== userId)) {
-      // The row can stay on screen, marked expired. Say why the click did
-      // nothing, then reload without wiping that message.
       setError(fr
         ? "Invitation indisponible ou expirée."
         : "Invitation unavailable or expired.");
       void load({ keepError: true });
       return;
     }
+
     const epoch = authEpoch.current;
     setBusy(true);
     setError("");
-    const { error: failure } = await supabase().rpc("decide_invitation", {
+    const db = supabase();
+    // A session switch can precede the Auth event callback. Do not use the
+    // cached userId as authority to submit a decision under a different user.
+    const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
+    if (epoch !== authEpoch.current) return;
+    if (liveAuthError || !liveAuth.user || liveAuth.user.id !== userId) {
+      setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
+      await load({ keepError: true });
+      if (epoch !== authEpoch.current) return;
+      setBusy(false);
+      return;
+    }
+
+    // RLS still restricts reads; the RPC is the final transactional authority.
+    // A stale or replaced invitation must not reach that RPC from the UI.
+    const { data: liveInvite, error: liveReadError } = await db
+      .from("engagement_invitations")
+      .select("id,organization_id,taxpayer_id,direction,initiated_by,recipient_user_id,status,expires_at")
+      .eq("id", id).maybeSingle();
+    if (epoch !== authEpoch.current) return;
+    const liveExpiry = liveInvite ? new Date(liveInvite.expires_at).getTime() : NaN;
+    if (liveReadError || !liveInvite ||
+        liveInvite.organization_id !== invitation.organization_id ||
+        liveInvite.taxpayer_id !== invitation.taxpayer_id ||
+        liveInvite.direction !== invitation.direction ||
+        liveInvite.initiated_by !== invitation.initiated_by ||
+        liveInvite.recipient_user_id !== invitation.recipient_user_id ||
+        liveInvite.status !== "pending" ||
+        !Number.isFinite(liveExpiry) || liveExpiry <= Date.now() ||
+        (side === "taxpayer" && liveInvite.taxpayer_id !== taxpayerId) ||
+        (action === "revoked"
+          ? liveInvite.initiated_by !== userId
+          : liveInvite.recipient_user_id !== userId)) {
+      setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
+      await load({ keepError: true });
+      if (epoch !== authEpoch.current) return;
+      setBusy(false);
+      return;
+    }
+
+    const { error: failure } = await db.rpc("decide_invitation", {
       p_invitation_id: id, p_action: action,
     });
     if (epoch !== authEpoch.current) return;
