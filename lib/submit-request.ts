@@ -29,6 +29,21 @@ export async function submitRequestFile(input: {
       return { ok: false, reason: "status" };
     }
     const db = supabase();
+    // Fail closed on a missing, reassigned, reviewed or RLS-invisible request
+    // BEFORE creating an orphaned storage object or document row. The final
+    // compare-and-swap below is still required for changes during upload.
+    const liveQuery = db.from("document_requests")
+      .select("id")
+      .eq("id", input.requestId)
+      .eq("taxpayer_id", input.taxpayerId)
+      .eq("organization_id", input.organizationId)
+      .eq("status", input.previousStatus)
+      .eq("responsible", "taxpayer");
+    const { data: liveRequest, error: liveError } = await (
+      input.caseId ? liveQuery.eq("case_id", input.caseId) : liveQuery.is("case_id", null)
+    ).maybeSingle();
+    if (liveError || !liveRequest) return { ok: false, reason: "status" };
+
     const safe = input.file.name.replace(/[^\w.\-]/g, "_");
     const path = `${input.taxpayerId}/${input.requestId}/${Date.now()}-${safe}`;
 
