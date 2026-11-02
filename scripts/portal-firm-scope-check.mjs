@@ -1145,3 +1145,34 @@ assert.ok(requestsBoardSend.indexOf("liveTaxpayerId !== ids.taxpayerId") <
   "requests board must refuse a stale tenant before storage");
 assert.ok((requestsBoardSend.match(/epoch !== authEpoch\.current/g) ?? []).length >= 2,
   "requests board must discard stale upload preflight and completion");
+
+
+// Phase 4 RequestsBoard upload replay: React busy state is asynchronous and
+// does not prevent rapid file-change events or parallel uploads on other rows.
+// A synchronous component-wide guard must serialize all request submissions.
+// Source-contract coverage only: staging must still exercise real replay/RLS.
+const requestsBoardSingleFlight = inspect("components/client-portal/requests-board.tsx").src;
+assert.ok(requestsBoardSingleFlight.includes("const uploadInFlight = useRef(false);"),
+  "RequestsBoard must maintain a synchronous upload-in-flight lock");
+const boardSingleFlightSend = requestsBoardSingleFlight.split("async function send(id: string, file: File) {")[1]
+  ?.split("\n  const filters:")[0] ?? "";
+const boardLockCheck = boardSingleFlightSend.indexOf("if (uploadInFlight.current) return;");
+const boardLockAcquire = boardSingleFlightSend.indexOf("uploadInFlight.current = true;");
+const boardFirstAuthRead = boardSingleFlightSend.indexOf("await supabase().auth.getUser()");
+assert.ok(boardLockCheck >= 0 && boardLockCheck < boardLockAcquire &&
+  boardLockAcquire < boardFirstAuthRead,
+  "RequestsBoard must acquire the single-flight lock before async authorization");
+const boardSingleFlightFinally = boardSingleFlightSend.split("} finally {")[1] ?? "";
+assert.ok(boardSingleFlightFinally.includes("if (epoch === authEpoch.current)") &&
+  boardSingleFlightFinally.includes("uploadInFlight.current = false;"),
+  "only the originating Auth epoch may release its upload lock");
+const boardAuthChange = requestsBoardSingleFlight.split("auth.onAuthStateChange((event, session) => {")[1]
+  ?.split("\n    });")[0] ?? "";
+assert.ok(boardAuthChange.includes("uploadInFlight.current = false;"),
+  "an actual Auth identity change must release the prior upload lock");
+const boardUnmount = requestsBoardSingleFlight.split("    return () => {")[1]
+  ?.split("subscription.unsubscribe();")[0] ?? "";
+assert.ok(boardUnmount.includes("uploadInFlight.current = false;"),
+  "RequestsBoard must release the lock on unmount");
+assert.ok(requestsBoardSingleFlight.includes("disabled={busy !== null}"),
+  "disable every request upload button while any upload is in progress");
