@@ -224,6 +224,33 @@ export function InvitationsPanel({ locale, side }: {
       return;
     }
 
+    // A pending invitation may outlive the firm's authorization to act on
+    // it. Recheck active membership for this invitation's organization
+    // immediately before the decision RPC; the RPC remains the transactional
+    // authority if membership changes again between this read and the write.
+    if (side === "firm") {
+      const { data: activeMembers, error: activeMemberError } = await db
+        .from("firm_members")
+        .select("id")
+        .eq("organization_id", liveInvite.organization_id)
+        .eq("auth_user_id", liveAuth.user.id)
+        .eq("active", true)
+        .is("deactivated_at", null)
+        .limit(1);
+      if (epoch !== authEpoch.current) return;
+      if (activeMemberError || !activeMembers?.length) {
+        setInvites([]);
+        setDrafts([]);
+        setEngagement("");
+        setRecipientEmail("");
+        setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
+        await load({ keepError: true });
+        if (epoch !== authEpoch.current) return;
+        setBusy(false);
+        return;
+      }
+    }
+
     const { error: failure } = await db.rpc("decide_invitation", {
       p_invitation_id: id, p_action: action,
     });
