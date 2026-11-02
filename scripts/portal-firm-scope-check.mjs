@@ -363,6 +363,28 @@ assert.ok((serviceUpload?.match(/epoch !== authEpoch\.current \|\| actionCaseId 
 assert.ok(serviceUpload?.includes("if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed(requestId);"),
   "refused live upload authorization must surface an error only on the originating session/case");
 
+// File picker changes can fire twice before React renders busy state. An
+// upload lock must be acquired synchronously, survive awaits, and be released
+// only by its originating request. Auth and route switches must invalidate it.
+assert.match(service.src,
+  /const uploadInFlight = useRef<\{ caseId: string; epoch: number; requestId: string \} \| null>\(null\)/);
+const uploadLockGuard = serviceUpload.indexOf("if (uploadInFlight.current) return;");
+const uploadLockAcquire = serviceUpload.indexOf("uploadInFlight.current = action;");
+const uploadAuthStart = serviceUpload.indexOf("await db.auth.getUser()");
+assert.ok(uploadLockGuard >= 0 && uploadLockAcquire > uploadLockGuard &&
+  uploadAuthStart > uploadLockAcquire,
+  "upload must acquire a synchronous single-flight lock before authorization reads");
+assert.ok(serviceUpload.indexOf("try {") < serviceUpload.indexOf("const db = supabase();"),
+  "upload must initialize Supabase inside try to release lock on synchronous failure");
+assert.ok(serviceUpload.includes("if (uploadInFlight.current === action) uploadInFlight.current = null;"),
+  "only the originating upload may release its lock");
+assert.match(service.src, /if \(caseStamp !== caseId\) \{[\s\S]*?uploadInFlight\.current = null;/,
+  "case changes must clear an old upload lock");
+assert.ok(serviceAuthChange?.includes("uploadInFlight.current = null;"),
+  "account changes must clear an old upload lock");
+assert.match(service.src, /return \(\) => \{[\s\S]*?uploadInFlight\.current = null;[\s\S]*?subscription\.unsubscribe\(\);/,
+  "unmount must invalidate the pending upload lock");
+
 // React busy state is asynchronous: two rapid clicks can enter the approval
 // handler before a re-render. A synchronous, per-component lock must serialize
 // consent attempts, and an older completion must not release a newer attempt.
