@@ -40,11 +40,16 @@ export function InvitationsPanel({ locale, side }: {
     const { data: auth, error: authError } = await db.auth.getUser();
     if (epoch !== loadEpoch.current) return;
     if (authError || !auth.user) {
+      // An unavailable Auth session invalidates all previously displayed
+      // tenant data and choices, not just the invitation rows.
       setUserId(null);
       setTaxpayerId(null);
       setInvites([]);
       setDrafts([]);
       setFirms([]);
+      setFirm("");
+      setEngagement("");
+      setRecipientEmail("");
       setError(fr ? "Connexion requise." : "Sign-in required.");
       return;
     }
@@ -53,6 +58,14 @@ export function InvitationsPanel({ locale, side }: {
     if (epoch !== loadEpoch.current) return;
     setTaxpayerId(tp);
     if (side === "taxpayer" && !tp) {
+      // No RLS-visible taxpayer means the previous account's invitation
+      // list and firm selection cannot remain on screen or be reused.
+      setInvites([]);
+      setDrafts([]);
+      setFirms([]);
+      setFirm("");
+      setEngagement("");
+      setRecipientEmail("");
       setError(fr ? "Compte client requis." : "A client account is required.");
       return;
     }
