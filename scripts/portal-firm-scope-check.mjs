@@ -367,6 +367,18 @@ for (const guard of [
 }
 assert.ok(serviceApproval.indexOf("if (liveCaseError || !liveCase") < approvalInsert,
   "failed or absent live case must prevent client consent");
+const approvalGrantRead = serviceApproval.indexOf('.from("engagements")');
+assert.ok(approvalGrantRead > approvalCaseRead && approvalGrantRead < approvalInsert,
+  "client consent must recheck the live engagement before inserting");
+for (const guard of [
+  'liveGrant.organization_id !== ids.organizationId',
+  'liveGrant.taxpayer_id !== ids.taxpayerId',
+  'liveGrant.revoked_at',
+  '["accepted", "authorized"].includes(liveGrant.status)',
+]) {
+  assert.ok(serviceApproval.includes(guard), "live consent engagement guard missing: " + guard);
+}
+
 assert.ok((serviceApproval.match(/if \(epoch !== authEpoch\.current \|\| actionCaseId !== activeCaseId\.current\) return;/g) ?? []).length >= 4,
   "live taxpayer and case reads must preserve account/route race guards");
 
