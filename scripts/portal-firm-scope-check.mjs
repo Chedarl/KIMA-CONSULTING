@@ -875,7 +875,7 @@ assert.ok(finishInvitationMutation.includes("epoch !== authEpoch.current") &&
 for (const [name, start, end, rpc] of [
   ["decision", "async function decide(", "async function requestFirm()", 'db.rpc("decide_invitation"'],
   ["firm request", "async function requestFirm()", "async function inviteContact()", 'db.rpc("create_invitation"'],
-  ["contact invitation", "async function inviteContact()", "\\n  return (", 'db.rpc("create_invitation_for_contact"'],
+  ["contact invitation", "async function inviteContact()", "  return (", 'db.rpc("create_invitation_for_contact"'],
 ]) {
   const body = invitations.src.split(start)[1]?.split(end)[0] ?? "";
   const acquire = body.indexOf("if (!beginMutation()) return;");
