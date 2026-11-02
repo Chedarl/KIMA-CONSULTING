@@ -69,6 +69,8 @@ export function ClientService({
   const pending = useRef<string | null>(null);
   const loadEpoch = useRef(0);
   const authEpoch = useRef(0);
+  // A second file-picker change must not start a parallel storage write.
+  const uploadInFlight = useRef<{ caseId: string; epoch: number; requestId: string } | null>(null);
   // React busy state is not synchronous; prevent rapid duplicate consent inserts.
   const approvalInFlight = useRef<{ caseId: string; epoch: number } | null>(null);
   const identityRef = useRef<string | null | undefined>(undefined);
@@ -81,6 +83,7 @@ export function ClientService({
     setBusy(null);
     setFailed(null);
     pending.current = null;
+    uploadInFlight.current = null;
     approvalInFlight.current = null;
   }
   const today = todayInDouala();
@@ -195,6 +198,7 @@ export function ClientService({
       setBusy(null);
       setFailed(null);
       pending.current = null;
+      uploadInFlight.current = null;
       approvalInFlight.current = null;
       if (fileRef.current) fileRef.current.value = "";
       if (timer) clearTimeout(timer);
@@ -204,6 +208,7 @@ export function ClientService({
     return () => {
       ++authEpoch.current;
       ++loadEpoch.current;
+      uploadInFlight.current = null;
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
     };
@@ -237,6 +242,10 @@ export function ClientService({
     if (!(requestIsOutstanding(req.status) && waitsOn(req) === "client")) return;
     const epoch = authEpoch.current;
     const actionCaseId = caseId;
+    // React busy state is delayed: acquire synchronously before any await.
+    if (uploadInFlight.current) return;
+    const action = { caseId: actionCaseId, epoch, requestId };
+    uploadInFlight.current = action;
     setBusy(requestId);
     setFailed(null);
     try {
@@ -324,7 +333,10 @@ export function ClientService({
     } catch {
       if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed(requestId);
     } finally {
-      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
+      // A previous account/case completion must not unlock a newer upload.
+      const ownsUpload = uploadInFlight.current === action;
+      if (uploadInFlight.current === action) uploadInFlight.current = null;
+      if (ownsUpload && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
     }
   }
 
