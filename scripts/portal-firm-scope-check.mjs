@@ -374,6 +374,20 @@ assert.ok(invitationDecision.indexOf("Invitation unavailable or expired.") <
   "stale-click feedback must precede the decision RPC");
 
 
+// A failed invitation, firm-directory or draft-engagement read must never
+// retain the previous authorized snapshot or pretend no pending drafts exist.
+// This source contract complements authenticated fault-injection in staging.
+const invitationReadFailure = invitationLoad.split("if (rows.error ||")[1]?.split("\n    setInvites((rows.data")[0] ?? "";
+assert.ok(invitationReadFailure.includes('side === "firm" && "error" in engagements && engagements.error'),
+  "firm draft-engagement read errors must fail closed");
+for (const cleared of ["setInvites([])", "setFirms([])", "setDrafts([])",
+  'setFirm("")', 'setEngagement("")']) {
+  assert.ok(invitationReadFailure.includes(cleared),
+    "failed invitation refresh must clear stale " + cleared);
+}
+assert.ok(invitationReadFailure.indexOf("setInvites([])") < invitationReadFailure.indexOf("setError("),
+  "hide stale invitations before reporting a tenant read failure");
+
 // A taxpayer may have multiple active accounting firms. The shell's search
 // catalogue and unread badge must use the selected, verified firm as well as
 // the taxpayer; otherwise one firm's cases/messages appear in another view.
