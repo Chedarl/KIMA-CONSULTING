@@ -25,37 +25,82 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
   const [ids, setIds] = useState<{ taxpayerId: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<string | null>(null);
+  const loadEpoch = useRef(0);
+  const authEpoch = useRef(0);
+  const identityRef = useRef<string | null | undefined>(undefined);
 
   const load = useCallback(async () => {
+    const epoch = ++loadEpoch.current;
     try {
       const db = supabase();
-      // The session's own taxpayer — never the oldest rows (demoIds). Uploads
-      // below are filed against it, under each request's own firm.
+      // Resolve the authenticated taxpayer for each load. Never reuse a
+      // previous account's ID or allow an older response to repopulate state.
       const taxpayerId = await sessionTaxpayerId();
+      if (epoch !== loadEpoch.current) return;
       const resolved = taxpayerId ? { taxpayerId } : null;
       if (!resolved) {
-        setOffline(true);
+        setIds(null);
         setRows([]);
+        setCases([]);
+        setName("");
+        setOffline(true);
         return;
       }
-      setIds(resolved);
       const [rq, cs, tp] = await Promise.all([
         db.from("document_requests").select("*").eq("taxpayer_id", resolved.taxpayerId).order("due_on"),
         db.from("compliance_cases").select("id, obligation_code, period_token").eq("taxpayer_id", resolved.taxpayerId),
         db.from("taxpayers").select("legal_name").eq("id", resolved.taxpayerId).maybeSingle(),
       ]);
+      if (epoch !== loadEpoch.current) return;
+      if (rq.error || cs.error || tp.error) throw rq.error ?? cs.error ?? tp.error;
+      setIds(resolved);
       setRows((rq.data ?? []) as DocumentRequestRow[]);
       setCases((cs.data ?? []) as Pick<ComplianceCase, "id" | "obligation_code" | "period_token">[]);
       setName((tp.data as { legal_name?: string } | null)?.legal_name ?? "");
       setOffline(false);
     } catch {
-      setOffline(true);
+      if (epoch !== loadEpoch.current) return;
+      setIds(null);
       setRows([]);
+      setCases([]);
+      setName("");
+      setOffline(true);
     }
   }, []);
 
   useEffect(() => {
+    const auth = supabase().auth;
+    void auth.getUser().then(({ data }) => {
+      if (identityRef.current === undefined) identityRef.current = data.user?.id ?? null;
+    }).catch(() => {});
     void load();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED") return;
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      // Token refresh and same-user SIGNED_IN must not erase a live upload.
+      if (nextUserId === identityRef.current) return;
+      identityRef.current = nextUserId;
+      ++authEpoch.current;
+      ++loadEpoch.current;
+      setIds(null);
+      setRows(null);
+      setCases([]);
+      setName("");
+      setOffline(false);
+      setBusy(null);
+      pending.current = null;
+      if (fileRef.current) fileRef.current.value = "";
+      if (timer) clearTimeout(timer);
+      // Auth callbacks must not synchronously issue Supabase queries.
+      timer = setTimeout(() => { void load(); }, 0);
+    });
+    return () => {
+      ++authEpoch.current;
+      ++loadEpoch.current;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, [load]);
 
   const bucket = (r: DocumentRequestRow): Filter => {
@@ -75,29 +120,48 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
 
   async function send(id: string, file: File) {
     const req = rows?.find((r) => r.id === id);
-    // A request is filed under its own taxpayer and firm. One that is not this
-    // session's taxpayer is not ours to answer.
     if (!req || !ids || req.taxpayer_id !== ids.taxpayerId) return;
     if (!(requestIsOutstanding(req.status) && waitsOn(req) === "client")) return;
+    const epoch = authEpoch.current;
     setBusy(id);
-    const result = await submitRequestFile({
-      requestId: id,
-      file,
-      taxpayerId: ids.taxpayerId,
-      organizationId: req.organization_id,
-      caseId: req.case_id ?? null,
-      label: locale === "fr" ? req.label_fr : req.label_en,
-      actorLabel: name || "Client",
-      previousStatus: req.status,
-    });
-    setBusy(null);
-    if (!result.ok) {
-      toast(copy.requestServiceFailed, "error");
-      return;
+    try {
+      // The file picker may have been opened before the account changed.
+      // Re-resolve Auth and taxpayer ownership before any storage operation.
+      const { data: { user }, error } = await supabase().auth.getUser();
+      if (epoch !== authEpoch.current) return;
+      const liveTaxpayerId = await sessionTaxpayerId();
+      if (epoch !== authEpoch.current) return;
+      if (error || !user || user.id !== identityRef.current || liveTaxpayerId !== ids.taxpayerId) {
+        setIds(null);
+        setRows([]);
+        setCases([]);
+        setName("");
+        setOffline(true);
+        return;
+      }
+      const result = await submitRequestFile({
+        requestId: id,
+        file,
+        taxpayerId: ids.taxpayerId,
+        organizationId: req.organization_id,
+        caseId: req.case_id ?? null,
+        label: locale === "fr" ? req.label_fr : req.label_en,
+        actorLabel: name || "Client",
+        previousStatus: req.status,
+      });
+      if (epoch !== authEpoch.current) return;
+      if (!result.ok) {
+        toast(copy.requestServiceFailed, "error");
+        return;
+      }
+      toast(`${copy.statusReceived} — ${locale === "fr" ? req.label_fr : req.label_en}`);
+      setRows((prev) => prev?.map((r) => (r.id === id ? { ...r, status: "submitted" } : r)) ?? prev);
+      void load();
+    } catch {
+      if (epoch === authEpoch.current) toast(copy.requestServiceFailed, "error");
+    } finally {
+      if (epoch === authEpoch.current) setBusy(null);
     }
-    toast(`${copy.statusReceived} — ${locale === "fr" ? req.label_fr : req.label_en}`);
-    setRows((prev) => prev?.map((r) => (r.id === id ? { ...r, status: "submitted" } : r)) ?? prev);
-    void load();
   }
 
   const filters: { id: Filter; label: string }[] = [
