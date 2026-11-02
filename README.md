@@ -1156,6 +1156,7 @@ and probed as real identities before merge. None invents a regulatory rule.
 | `private.claim_reminders()` / `mark_reminder_sent` / `mark_reminder_failed` | a ten-minute lease, five attempts, and no silent loss when a worker dies mid-send | lease and attempt count are columns, not conventions |
 | `tax_attestations` | ACF / ANR / NIU with the expiry **stated on the document** | expiry is recorded, never derived — there is no sourced validity duration in the rule corpus, and this table must not become one |
 | `payment_incidents` + `incident_evidence` / `incident_contacts` / `incident_events` | the Phase 6 incident model, with a timeline | a debit never reaches `verified` without a named reviewer **and** an official evidence row; a verification is not rewritten; the timeline is append-only |
+| `document_versions` + `document_access_log` | the version chain and the "who opened what" trail | the path's first segment must be the owning taxpayer id (trigger), and the log is append-only |
 
 Proven on staging, not asserted: firm B reading firm A's rows returns 0 in every
 table above; a firm recording time as another member is refused (`42501`);
