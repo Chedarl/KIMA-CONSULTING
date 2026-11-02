@@ -438,6 +438,39 @@ assert.ok(inviteContactAction.indexOf("await db.auth.getUser()") <
   inviteContactAction.indexOf('.rpc("create_invitation_for_contact"'),
   "live auth and engagement checks must precede invitation creation");
 
+// A taxpayer-side request must not rely on a cached taxpayer session or
+// directory choice after an account switch or firm directory change.
+// This is a source-contract check; RLS/RPC and authenticated staging negative
+// tests remain the final authorization and replay gates.
+const liveRequest = requestFirmAction.split("const db = supabase();")[1]?.split(
+  '.rpc("create_invitation"'
+)[0] ?? "";
+assert.ok(liveRequest.includes("await db.auth.getUser()"),
+  "taxpayer firm request must verify current Auth identity");
+assert.ok(liveRequest.includes("await sessionTaxpayerId()"),
+  "taxpayer firm request must verify current RLS-visible taxpayer");
+assert.ok(liveRequest.includes('await db.rpc("firm_directory")'),
+  "taxpayer firm request must recheck the live firm directory");
+for (const check of [
+  "liveAuth.user.id !== userId",
+  "liveTaxpayerId !== requestedTaxpayer",
+  "!Array.isArray(liveDirectory)",
+  "liveDirectory.some((candidate) => candidate.id === requestedFirm)",
+  "epoch !== authEpoch.current",
+  "setInvites([])",
+  "setFirms([])",
+  'setFirm("")',
+  "await load({ keepError: true })",
+]) {
+  assert.ok(liveRequest.includes(check), "taxpayer firm request guard missing: " + check);
+}
+assert.ok(requestFirmAction.indexOf("await db.auth.getUser()") <
+  requestFirmAction.indexOf('.rpc("create_invitation"'),
+  "live taxpayer and firm checks must precede invitation RPC");
+assert.ok(requestFirmAction.includes("p_organization_id: requestedFirm") &&
+  requestFirmAction.includes("p_taxpayer_id: requestedTaxpayer"),
+  "request RPC must use the exact prevalidated tenant and firm selection");
+
 // A failed invitation, firm-directory or draft-engagement read must never
 // retain the previous authorized snapshot or pretend no pending drafts exist.
 // This source contract complements authenticated fault-injection in staging.
