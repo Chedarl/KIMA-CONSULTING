@@ -1327,3 +1327,56 @@ assert.ok(contactInviteNetworkBody.slice(contactFinally).includes("finishMutatio
   "contact invitation must release its single-flight lock in finally");
 assert.equal((contactInviteNetworkBody.match(/finishMutation\(epoch\);/g) ?? []).length, 1,
   "contact invitation must release its lock exactly once, in finally");
+
+
+// Stage-control CAS: a cached firm screen cannot advance another tenant's
+// case, or replay a stage transition after a concurrent change.
+// Synthetic database-boundary regression; authenticated staging remains open.
+const stageMove = detail.src.split("async function move(to: CaseStage) {")[1]?.split("\n  /**")[0] ?? "";
+assert.ok(stageMove.includes('updateById("compliance_cases", row.id, result.patch, {'),
+  "stage advance must use conditional, not ID-only, PATCH");
+for (const guard of [
+  "stage: row.stage", "approval_round: row.approval_round",
+  "taxpayer_id: row.taxpayer_id", "engagement_id: engagement.id",
+  "organization_id: engagement.organization_id",
+]) assert.ok(stageMove.includes(guard), "stage CAS missing " + guard);
+const writerSource = inspect("lib/db-write.ts").src;
+assert.ok(writerSource.includes(".match(expected)"), "DB writer must match original case fields");
+const writerCjs = ts.transpileModule(writerSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const writerModule = { exports: {} };
+const stored = { id: "case-1", taxpayer_id: "taxpayer-A", organization_id: "firm-A",
+  engagement_id: "engagement-A", stage: "review", approval_round: 2 };
+runInNewContext(writerCjs, {
+  module: writerModule, exports: writerModule.exports,
+  require: (id) => {
+    if (id !== "./supabase") throw new Error("Unexpected writer dependency: " + id);
+    return { supabase: () => ({ from: () => ({ update: (patch) => {
+      const filters = {};
+      return {
+        eq(key, value) { filters[key] = value; return this; },
+        match(expected) { Object.assign(filters, expected); return this; },
+        async select() {
+          if (!Object.entries(filters).every(([key, value]) => stored[key] === value))
+            return { data: [], error: null };
+          Object.assign(stored, patch);
+          return { data: [{ id: stored.id }], error: null };
+        },
+      };
+    } }) }) };
+  },
+});
+const original = { taxpayer_id: "taxpayer-A", organization_id: "firm-A",
+  engagement_id: "engagement-A", stage: "review", approval_round: 2 };
+const wrongFirm = await writerModule.exports.updateById("compliance_cases", "case-1",
+  { stage: "filing" }, { ...original, organization_id: "firm-B" });
+assert.deepEqual(JSON.parse(JSON.stringify(wrongFirm)), { ok: false, reason: "not_permitted" });
+assert.equal(stored.stage, "review");
+const firstMove = await writerModule.exports.updateById("compliance_cases", "case-1",
+  { stage: "filing" }, original);
+assert.deepEqual(JSON.parse(JSON.stringify(firstMove)), { ok: true });
+const staleReplay = await writerModule.exports.updateById("compliance_cases", "case-1",
+  { stage: "evidence" }, original);
+assert.deepEqual(JSON.parse(JSON.stringify(staleReplay)), { ok: false, reason: "not_permitted" });
+assert.equal(stored.stage, "filing");
