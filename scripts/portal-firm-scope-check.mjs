@@ -153,8 +153,8 @@ assert.match(detail.src, /organization_id: orgId/);
 const invitations = inspect("components/live/invitations-panel.tsx");
 assert.match(invitations.src, /auth\.onAuthStateChange\(/);
 assert.match(invitations.src, /const epoch = \+\+loadEpoch\.current;/);
-assert.equal((invitations.src.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length, 3,
-  "guard every asynchronous invitation load boundary");
+assert.equal((invitations.src.match(/if \(epoch !== loadEpoch\.current\) return;/g) ?? []).length, 4,
+  "guard Auth, taxpayer, firm-membership and tenant-query load boundaries");
 const authChange = invitations.src.split("auth.onAuthStateChange((event, session) => {")[1]?.split("\n    });")[0];
 assert.ok(authChange, "auth state changes must invalidate prior session state");
 // Token refresh is not an identity change. Keep the pending invitation action
