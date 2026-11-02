@@ -179,14 +179,18 @@ for (const action of ["decide", "requestFirm", "inviteContact"]) {
   const body = invitations.src.split("  async function " + action + "(")[1]?.split("\n  }")[0];
   assert.ok(body, action + " must exist");
   assert.ok(body.includes("const epoch = authEpoch.current;"), action + " must capture auth identity");
-  assert.equal((body.match(/if \(epoch !== authEpoch\.current\) return;/g) ?? []).length, 2,
+  assert.ok((body.match(/if \\(epoch !== authEpoch\\.current\\) return;/g) ?? []).length >= 2,
     action + " must ignore stale RPC results and stale reload completions");
-  const rpcIndex = body.indexOf("await supabase().rpc(");
-  const firstGuard = body.indexOf("if (epoch !== authEpoch.current) return;");
-  const reload = body.indexOf("await load();");
-  const secondGuard = body.lastIndexOf("if (epoch !== authEpoch.current) return;");
+  const rpcIndex = Math.max(body.indexOf("await supabase().rpc("), body.indexOf("await db.rpc("));
+  const firstGuard = body.indexOf("if (epoch !== authEpoch.current) return;", rpcIndex);
+  const reload = body.indexOf("await load();", rpcIndex);
+  const secondGuard = body.indexOf("if (epoch !== authEpoch.current) return;", reload);
   assert.ok(rpcIndex >= 0 && rpcIndex < firstGuard && firstGuard < reload && reload < secondGuard,
-    action + " must guard both asynchronous boundaries in order");
+    action + " must guard both asynchronous post-RPC boundaries in order");
+  if (action === "decide") {
+    assert.ok(body.indexOf("if (epoch !== authEpoch.current) return;") < rpcIndex,
+      "decision must also invalidate pre-RPC live authorization reads");
+  }
 }
 assert.ok((invitations.src.match(/\+\+authEpoch\.current;/g) ?? []).length >= 2,
   "auth epoch must invalidate on account change and unmount");
