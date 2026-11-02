@@ -1302,5 +1302,5 @@ assert.ok(firmRequestNetworkBody.slice(firmRequestCatch, firmRequestFinally).inc
   "rejected firm request must show FR/EN failure only for the originating account");
 assert.ok(firmRequestNetworkBody.slice(firmRequestFinally).includes("finishMutation(epoch);"),
   "firm request must release its synchronous mutation lock in finally");
-assert.equal((firmRequestNetworkBody.match(/finishMutation\\(epoch\\);/g) ?? []).length, 1,
+assert.equal((firmRequestNetworkBody.match(/finishMutation\(epoch\);/g) ?? []).length, 1,
   "firm request must release its lock exactly once in finally");
