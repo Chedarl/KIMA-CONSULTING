@@ -618,6 +618,21 @@ export function CaseDetail({
   }
 
   async function toggleTask(task: CaseTask) {
+    // A disabled button is not authorization. The task must still belong to
+    // this case, the firm must retain its engagement, and the member must
+    // retain the ability to advance work. RLS remains the write authority.
+    if (!row || !member || !engagement || task.case_id !== row.id ||
+        engagement.id !== row.engagement_id ||
+        engagement.taxpayer_id !== row.taxpayer_id ||
+        engagement.revoked_at ||
+        !["authorized", "accepted"].includes(engagement.status) ||
+        !(engagement.authorized_at || engagement.accepted_at) ||
+        !allowed("case.advance").ok ||
+        !["open", "done"].includes(task.state)) {
+      setFailed(task.id);
+      setRefusedBy(t.notPermitted);
+      return;
+    }
     setBusy(task.id);
     setFailed(null);
     setRefusedBy(null);
@@ -627,6 +642,11 @@ export function CaseDetail({
         state: done ? "open" : "done",
         // The database refuses a done task with no time against it.
         completed_at: done ? null : new Date().toISOString(),
+      }, {
+        // Compare the original state in the same PATCH. A stale click cannot
+        // overwrite a task that another reviewer has already changed.
+        case_id: row.id,
+        state: task.state,
       });
       if (!written.ok) {
         setFailed(task.id);
