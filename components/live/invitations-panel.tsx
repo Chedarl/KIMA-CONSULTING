@@ -69,13 +69,38 @@ export function InvitationsPanel({ locale, side }: {
       setError(fr ? "Compte client requis." : "A client account is required.");
       return;
     }
+    // A firm operator may belong to several firms. Resolve the complete
+    // *current* active membership set before reading either tenant collection;
+    // never rely on a cached organization or the broad invitation query.
+    let memberOrgIds: string[] = [];
+    if (side === "firm") {
+      const members = await db.from("firm_members")
+        .select("organization_id")
+        .eq("auth_user_id", auth.user.id)
+        .eq("active", true)
+        .is("deactivated_at", null);
+      if (epoch !== loadEpoch.current) return;
+      memberOrgIds = [...new Set((members.data ?? []).map((member) => member.organization_id))];
+      if (members.error || !memberOrgIds.length) {
+        setInvites([]);
+        setDrafts([]);
+        setFirms([]);
+        setFirm("");
+        setEngagement("");
+        setRecipientEmail("");
+        setError(fr ? "Invitations indisponibles." : "Invitations unavailable.");
+        return;
+      }
+    }
+    const invitationQuery = db.from("engagement_invitations")
+      .select("id,organization_id,taxpayer_id,direction,initiated_by,recipient_user_id,status,expires_at")
+      .order("created_at", { ascending: false }).limit(100);
     const [rows, directory, engagements] = await Promise.all([
-      db.from("engagement_invitations")
-        .select("id,organization_id,taxpayer_id,direction,initiated_by,recipient_user_id,status,expires_at")
-        .order("created_at", { ascending: false }).limit(100),
+      side === "firm" ? invitationQuery.in("organization_id", memberOrgIds) : invitationQuery,
       side === "taxpayer" ? db.rpc("firm_directory") : Promise.resolve({ data: [] }),
       side === "firm" ? db.from("engagements")
-        .select("id,taxpayer_id").in("status", ["draft", "invited"])
+        .select("id,taxpayer_id").in("organization_id", memberOrgIds)
+        .in("status", ["draft", "invited"])
         .is("revoked_at", null) : Promise.resolve({ data: [] }),
     ]);
     if (epoch !== loadEpoch.current) return;
