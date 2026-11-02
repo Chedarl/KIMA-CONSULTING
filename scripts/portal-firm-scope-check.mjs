@@ -798,3 +798,36 @@ assert.ok(firmInvitationLoad.indexOf('if (side === "taxpayer" && !tp) {') <
   "reject missing taxpayer before issuing a scoped invitation query");
 assert.ok(firmInvitationLoad.includes('scopedInvitationQuery.order("created_at"'),
   "rendered invitation rows must come from the tenant-scoped query");
+
+
+// A firm-side invitation decision must recheck current live membership
+// before calling the transactional decision RPC. A pending invitation visible
+// before deactivation is not sufficient authority to accept/revoke it.
+// Source-contract regression only; authenticated revocation and RLS tests
+// remain required for staging release.
+const liveFirmDecision = invitations.src.split("  async function decide(")[1]
+  ?.split("  async function requestFirm()")[0] ?? "";
+const firmDecisionMembership = liveFirmDecision.indexOf('.from("firm_members")');
+const firmDecisionRpc = liveFirmDecision.indexOf('db.rpc("decide_invitation"');
+assert.ok(firmDecisionMembership > 0 && firmDecisionMembership < firmDecisionRpc,
+  "firm invitation decision must recheck membership before its RPC");
+assert.ok(liveFirmDecision.includes('if (side === "firm") {'),
+  "firm decision membership recheck must be side-specific");
+for (const constraint of [
+  '.eq("organization_id", liveInvite.organization_id)',
+  '.eq("auth_user_id", liveAuth.user.id)',
+  '.eq("active", true)',
+  '.is("deactivated_at", null)',
+]) {
+  assert.ok(liveFirmDecision.includes(constraint),
+    "firm decision must validate current organization/user membership: " + constraint);
+}
+assert.ok(liveFirmDecision.includes("if (activeMemberError || !activeMembers?.length) {"),
+  "failed or revoked firm membership must reject invitation decision");
+const rejectedFirmDecision = liveFirmDecision.split("if (activeMemberError || !activeMembers?.length) {")[1]
+  ?.split("\n      }")[0] ?? "";
+assert.ok(rejectedFirmDecision.includes("setInvites([])") &&
+  rejectedFirmDecision.includes("setDrafts([])") &&
+  rejectedFirmDecision.includes("await load({ keepError: true });") &&
+  rejectedFirmDecision.includes("return;"),
+  "rejected firm decision must hide stale tenant data and fail closed");
