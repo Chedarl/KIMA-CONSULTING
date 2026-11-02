@@ -375,72 +375,76 @@ export function InvitationsPanel({ locale, side }: {
     const epoch = authEpoch.current;
     if (!beginMutation()) return;
     setError("");
-    const db = supabase();
-    const rejectStale = async () => {
-      // Hide the prior authorized snapshot before any asynchronous refresh.
-      setInvites([]);
-      setDrafts([]);
-      setFirms([]);
-      setEngagement("");
-      setRecipientEmail("");
-      setError(fr
+    try {
+      const db = supabase();
+      const rejectStale = async () => {
+        // Hide the prior authorized snapshot before any asynchronous refresh.
+        setInvites([]);
+        setDrafts([]);
+        setFirms([]);
+        setEngagement("");
+        setRecipientEmail("");
+        setError(fr
+          ? "Destinataire indisponible. Vérifiez le compte client et l'adresse."
+          : "Recipient unavailable. Check the client account and email.");
+        await load({ keepError: true });
+      };
+
+      const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
+      if (epoch !== authEpoch.current) return;
+      if (liveAuthError || !liveAuth.user || liveAuth.user.id !== userId) {
+        await rejectStale();
+        return;
+      }
+
+      const { data: liveDraft, error: liveDraftError } = await db
+        .from("engagements")
+        .select("id,taxpayer_id,organization_id,status,revoked_at")
+        .eq("id", engagement).maybeSingle();
+      if (epoch !== authEpoch.current) return;
+      if (liveDraftError || !liveDraft ||
+          liveDraft.taxpayer_id !== selectedDraft.taxpayer_id ||
+          // A multi-firm operator must not silently invite through a different
+          // firm if this engagement was reassigned after the form loaded.
+          liveDraft.organization_id !== selectedDraft.organization_id ||
+          liveDraft.revoked_at ||
+          (liveDraft.status !== "draft" && liveDraft.status !== "invited")) {
+        await rejectStale();
+        return;
+      }
+
+      // The RLS-visible engagement alone does not prove that this user still
+      // belongs to the receiving firm. Recheck active membership as well.
+      const { data: liveMembers, error: liveMemberError } = await db
+        .from("firm_members")
+        .select("id")
+        .eq("organization_id", liveDraft.organization_id)
+        .eq("auth_user_id", userId)
+        .eq("active", true)
+        .is("deactivated_at", null)
+        .limit(1);
+      if (epoch !== authEpoch.current) return;
+      if (liveMemberError || !liveMembers?.length) {
+        await rejectStale();
+        return;
+      }
+
+      // The database RPC remains the transactional authorization authority.
+      const { error: failure } = await db.rpc("create_invitation_for_contact", {
+        p_engagement_id: engagement, p_email: recipientEmail.trim(),
+      });
+      if (epoch !== authEpoch.current) return;
+      if (!failure) setRecipientEmail("");
+      await load();
+      if (epoch !== authEpoch.current) return;
+      if (failure) setError(fr
         ? "Destinataire indisponible. Vérifiez le compte client et l'adresse."
         : "Recipient unavailable. Check the client account and email.");
-      await load({ keepError: true });
+    } catch {
+      if (epoch === authEpoch.current) setError(fr ? "Impossible de vérifier le destinataire. Actualisez la page." : "Unable to verify the recipient. Refresh the page.");
+    } finally {
       finishMutation(epoch);
-    };
-
-    const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
-    if (epoch !== authEpoch.current) return;
-    if (liveAuthError || !liveAuth.user || liveAuth.user.id !== userId) {
-      await rejectStale();
-      return;
     }
-
-    const { data: liveDraft, error: liveDraftError } = await db
-      .from("engagements")
-      .select("id,taxpayer_id,organization_id,status,revoked_at")
-      .eq("id", engagement).maybeSingle();
-    if (epoch !== authEpoch.current) return;
-    if (liveDraftError || !liveDraft ||
-        liveDraft.taxpayer_id !== selectedDraft.taxpayer_id ||
-        // A multi-firm operator must not silently invite through a different
-        // firm if this engagement was reassigned after the form loaded.
-        liveDraft.organization_id !== selectedDraft.organization_id ||
-        liveDraft.revoked_at ||
-        (liveDraft.status !== "draft" && liveDraft.status !== "invited")) {
-      await rejectStale();
-      return;
-    }
-
-    // The RLS-visible engagement alone does not prove that this user still
-    // belongs to the receiving firm. Recheck active membership as well.
-    const { data: liveMembers, error: liveMemberError } = await db
-      .from("firm_members")
-      .select("id")
-      .eq("organization_id", liveDraft.organization_id)
-      .eq("auth_user_id", userId)
-      .eq("active", true)
-      .is("deactivated_at", null)
-      .limit(1);
-    if (epoch !== authEpoch.current) return;
-    if (liveMemberError || !liveMembers?.length) {
-      await rejectStale();
-      return;
-    }
-
-    // The database RPC remains the transactional authorization authority.
-    const { error: failure } = await db.rpc("create_invitation_for_contact", {
-      p_engagement_id: engagement, p_email: recipientEmail.trim(),
-    });
-    if (epoch !== authEpoch.current) return;
-    if (!failure) setRecipientEmail("");
-    await load();
-    if (epoch !== authEpoch.current) return;
-    if (failure) setError(fr
-      ? "Destinataire indisponible. Vérifiez le compte client et l'adresse."
-      : "Recipient unavailable. Check the client account and email.");
-    finishMutation(epoch);
   }
 
   return (
