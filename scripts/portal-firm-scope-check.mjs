@@ -1035,7 +1035,7 @@ assert.ok(contactInvitationBody.includes("await rejectStale();") &&
 // backwards to "submitted", nor update a different tenant's request by ID.
 // Source contract only; staging race/RLS tests remain required.
 const uploadWriter = inspect("lib/submit-request.ts").src;
-const uploadStatusWrite = uploadWriter.split('db.from("document_requests")')[1]
+const uploadStatusWrite = uploadWriter.split('const statusQuery = db.from("document_requests")')[1]
   ?.split("if (statusError")[0] ?? "";
 assert.ok(uploadStatusWrite, "document upload must use a conditional status write");
 for (const guard of [
