@@ -1325,5 +1325,5 @@ assert.ok(contactInviteNetworkBody.slice(contactCatch, contactFinally).includes(
   "rejected contact invitation must show localized failure only to its originating identity");
 assert.ok(contactInviteNetworkBody.slice(contactFinally).includes("finishMutation(epoch);"),
   "contact invitation must release its single-flight lock in finally");
-assert.equal((contactInviteNetworkBody.match(/finishMutation\\(epoch\\);/g) ?? []).length, 1,
+assert.equal((contactInviteNetworkBody.match(/finishMutation\(epoch\);/g) ?? []).length, 1,
   "contact invitation must release its lock exactly once, in finally");
