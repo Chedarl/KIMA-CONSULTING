@@ -93,10 +93,11 @@ export function InvitationsPanel({ locale, side }: {
       }
     }
     const invitationQuery = db.from("engagement_invitations")
-      .select("id,organization_id,taxpayer_id,direction,initiated_by,recipient_user_id,status,expires_at")
-      .order("created_at", { ascending: false }).limit(100);
+      .select("id,organization_id,taxpayer_id,direction,initiated_by,recipient_user_id,status,expires_at");
+    const scopedInvitationQuery = side === "firm"
+      ? invitationQuery.in("organization_id", memberOrgIds) : invitationQuery;
     const [rows, directory, engagements] = await Promise.all([
-      side === "firm" ? invitationQuery.in("organization_id", memberOrgIds) : invitationQuery,
+      scopedInvitationQuery.order("created_at", { ascending: false }).limit(100),
       side === "taxpayer" ? db.rpc("firm_directory") : Promise.resolve({ data: [] }),
       side === "firm" ? db.from("engagements")
         .select("id,taxpayer_id").in("organization_id", memberOrgIds)
