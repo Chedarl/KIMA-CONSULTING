@@ -751,3 +751,32 @@ for (const [scenario, body] of [
   assert.ok(body.indexOf("setInvites([])") < body.indexOf("setError("),
     scenario + ": hide prior-tenant rows before reporting the failure");
 }
+
+
+// Firm invitation reads must be restricted to live active memberships, not
+// only the broad RLS-visible invitation collection. A member of two firms may
+// see both, but must never receive a third firm's invitation or draft rows.
+// These source contracts supplement authenticated two-firm RLS acceptance.
+const firmInvitationLoad = invitations.src.split("  const load = useCallback(async (options?")[1]
+  ?.split("\n  useEffect(() => {")[0] ?? "";
+assert.ok(firmInvitationLoad, "invitation loader must exist");
+const memberLookup = firmInvitationLoad.indexOf('.from("firm_members")');
+const invitationLookup = firmInvitationLoad.indexOf('.from("engagement_invitations")');
+assert.ok(memberLookup >= 0 && memberLookup < invitationLookup,
+  "read live firm memberships before loading invitations");
+for (const constraint of [
+  '.eq("auth_user_id", auth.user.id)', '.eq("active", true)',
+  '.is("deactivated_at", null)',
+]) {
+  assert.ok(firmInvitationLoad.includes(constraint),
+    "firm membership must be bound to current authenticated user: " + constraint);
+}
+assert.ok(firmInvitationLoad.includes("if (members.error || !memberOrgIds.length) {"),
+  "missing or failed active firm membership must fail closed");
+assert.ok(firmInvitationLoad.includes('setInvites([])') &&
+  firmInvitationLoad.includes('setDrafts([])'),
+  "failed membership must clear previously visible invitation and draft data");
+assert.ok(firmInvitationLoad.includes('.in("organization_id", memberOrgIds)'),
+  "firm invitation queries must filter organization IDs to live memberships");
+assert.ok((firmInvitationLoad.match(/\.in\("organization_id", memberOrgIds\)/g) ?? []).length >= 2,
+  "both invitations and draft engagements must be scoped to live firm memberships");
