@@ -77,8 +77,8 @@ select is(
   'firm_member_has, firm_name_key, firm_previously_granted, flag_enabled, '
   'guard_client_invite_authorization, incident_timeline_guard, incident_verify_guard, '
   'mark_reminder_failed, mark_reminder_sent, member_has, member_has_in_org, '
-  'portal_request_code, serialize_taxpayer_grant, signal_firm_intake_document_change, '
-  'taxpayer_held_by_another_firm, taxpayer_id_for_niu',
+  'message_thread_autolink, portal_request_code, serialize_taxpayer_grant, '
+  'signal_firm_intake_document_change, taxpayer_held_by_another_firm, taxpayer_id_for_niu',
   'T-52 every moved helper is in private, and nothing else is'
 );
 
