@@ -195,15 +195,55 @@ export function InvitationsPanel({ locale, side }: {
   }
 
   async function requestFirm() {
-    // A previously selected firm must still be present in the current directory.
+    // Cached session and directory choices are only initial UI eligibility,
+    // not authorization after a taxpayer account switch or directory change.
     if (side !== "taxpayer" || !userId || !taxpayerId || !firm || busy ||
         !firms.some((candidate) => candidate.id === firm)) return;
+    const requestedFirm = firm;
+    const requestedTaxpayer = taxpayerId;
     const epoch = authEpoch.current;
     setBusy(true);
     setError("");
-    const { error: failure } = await supabase().rpc("create_invitation", {
-      p_direction: "taxpayer_to_firm", p_organization_id: firm,
-      p_taxpayer_id: taxpayerId, p_contact_id: null,
+    const db = supabase();
+    const rejectStale = async () => {
+      // Hide a no-longer-authorized directory and its prior invitation rows.
+      setInvites([]);
+      setFirms([]);
+      setFirm("");
+      setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
+      await load({ keepError: true });
+      if (epoch === authEpoch.current) setBusy(false);
+    };
+
+    const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
+    if (epoch !== authEpoch.current) return;
+    if (liveAuthError || !liveAuth.user || liveAuth.user.id !== userId) {
+      await rejectStale();
+      return;
+    }
+
+    // sessionTaxpayerId verifies the selected taxpayer through current RLS,
+    // rather than trusting the value cached in browser session storage.
+    const liveTaxpayerId = await sessionTaxpayerId();
+    if (epoch !== authEpoch.current) return;
+    if (liveTaxpayerId !== requestedTaxpayer) {
+      await rejectStale();
+      return;
+    }
+
+    // A firm removed from the directory must not be requested using an
+    // obsolete dropdown option. The RPC still enforces transactional grants.
+    const { data: liveDirectory, error: liveDirectoryError } = await db.rpc("firm_directory");
+    if (epoch !== authEpoch.current) return;
+    if (liveDirectoryError || !Array.isArray(liveDirectory) ||
+        !liveDirectory.some((candidate) => candidate.id === requestedFirm)) {
+      await rejectStale();
+      return;
+    }
+
+    const { error: failure } = await db.rpc("create_invitation", {
+      p_direction: "taxpayer_to_firm", p_organization_id: requestedFirm,
+      p_taxpayer_id: requestedTaxpayer, p_contact_id: null,
     });
     if (epoch !== authEpoch.current) return;
     await load();
