@@ -854,3 +854,37 @@ assert.ok(rejectedTaxpayerDecision.includes("setInvites([])") &&
   rejectedTaxpayerDecision.includes("await load({ keepError: true });") &&
   rejectedTaxpayerDecision.includes("return;"),
   "changed taxpayer context must clear stale invitation data and reject the decision");
+
+
+// Invitation decisions, firm requests and contact invitations share one
+// synchronous single-flight guard. React state alone may not prevent two
+// rapid clicks (or different actions) before the busy render commits.
+// These source-contract checks complement authenticated replay testing.
+assert.ok(invitations.src.includes("const mutationInFlight = useRef(false);"),
+  "invitation panel must track synchronous mutation in-flight state");
+const beginInvitationMutation = invitations.src.split("function beginMutation()")[1]
+  ?.split("function finishMutation(")[0] ?? "";
+assert.ok(beginInvitationMutation.includes("if (mutationInFlight.current) return false;") &&
+  beginInvitationMutation.includes("mutationInFlight.current = true;"),
+  "single-flight guard must acquire synchronously before async work");
+const finishInvitationMutation = invitations.src.split("function finishMutation(")[1]
+  ?.split("async function decide(")[0] ?? "";
+assert.ok(finishInvitationMutation.includes("epoch !== authEpoch.current") &&
+  finishInvitationMutation.includes("mutationInFlight.current = false;"),
+  "release must be scoped to the original Auth epoch");
+for (const [name, start, end, rpc] of [
+  ["decision", "async function decide(", "async function requestFirm()", 'db.rpc("decide_invitation"'],
+  ["firm request", "async function requestFirm()", "async function inviteContact()", 'db.rpc("create_invitation"'],
+  ["contact invitation", "async function inviteContact()", "\\n  return (", 'db.rpc("create_invitation_for_contact"'],
+]) {
+  const body = invitations.src.split(start)[1]?.split(end)[0] ?? "";
+  const acquire = body.indexOf("if (!beginMutation()) return;");
+  assert.ok(acquire >= 0 && acquire < body.indexOf(rpc),
+    name + ": acquire single-flight guard before RPC");
+  assert.ok(body.includes("finishMutation(epoch)"),
+    name + ": release single-flight guard on completion");
+}
+const invitationAuthReset = invitations.src.split("auth.onAuthStateChange(")[1]
+  ?.split("subscription.unsubscribe();")[0] ?? "";
+assert.ok(invitationAuthReset.includes("mutationInFlight.current = false;"),
+  "Auth identity changes must release the prior user's mutation lock");
