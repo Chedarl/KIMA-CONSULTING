@@ -318,7 +318,7 @@ assert.match(serviceApproval ?? "",
   /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setFailed/);
 assert.match(serviceApproval ?? "",
   /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setBusy/);
-assert.match(service.src, /if \(caseStamp !== caseId\) \{\n    setCaseStamp\(caseId\);\n    setBusy\(null\);\n    setFailed\(null\);\n    pending\.current = null;\n  \}/,
+assert.match(service.src, /if \(caseStamp !== caseId\) \{\n    setCaseStamp\(caseId\);\n    setBusy\(null\);\n    setFailed\(null\);\n    pending\.current = null;\n    approvalInFlight\.current = null;\n  \}/,
   "switching cases must clear approval busy, failure, and pending state before paint");
 
 // A route switch can happen while the previous case's file picker remains open.
@@ -333,7 +333,7 @@ assert.match(serviceApproval ?? "", /if \(loadedCaseId !== caseId \|\| row\.id !
 // handler before a re-render. A synchronous, per-component lock must serialize
 // consent attempts, and an older completion must not release a newer attempt.
 assert.match(service.src,
-  /const approvalInFlight = useRef<\\{ caseId: string; epoch: number \\} \\| null>\\(null\\)/);
+  /const approvalInFlight = useRef<\{ caseId: string; epoch: number \} \| null>\(null\)/);
 const approvalLockGuard = serviceApproval.indexOf("if (approvalInFlight.current) return;");
 const approvalLockAcquire = serviceApproval.indexOf("approvalInFlight.current = action;");
 const approvalAuthRead = serviceApproval.indexOf("await db.auth.getUser()");
@@ -342,7 +342,7 @@ assert.ok(approvalLockGuard >= 0 && approvalLockAcquire > approvalLockGuard &&
   "approval must synchronously acquire its lock before any asynchronous authorization read");
 assert.ok(serviceApproval.includes("if (approvalInFlight.current === action) approvalInFlight.current = null;"),
   "only the originating approval attempt may release its lock");
-assert.match(service.src, /if \\(caseStamp !== caseId\\) \\{[\\s\\S]*?approvalInFlight\\.current = null;/,
+assert.match(service.src, /if \(caseStamp !== caseId\) \{[\s\S]*?approvalInFlight\.current = null;/,
   "case switches must reset the previous case approval lock");
 assert.ok(serviceAuthChange?.includes("approvalInFlight.current = null;"),
   "authenticated identity changes must reset the previous approval lock");
