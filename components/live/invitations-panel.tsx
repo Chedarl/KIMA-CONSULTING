@@ -66,7 +66,16 @@ export function InvitationsPanel({ locale, side }: {
         .is("revoked_at", null) : Promise.resolve({ data: [] }),
     ]);
     if (epoch !== loadEpoch.current) return;
-    if (rows.error || (side === "taxpayer" && "error" in directory && directory.error)) {
+    if (rows.error || (side === "taxpayer" && "error" in directory && directory.error) ||
+        (side === "firm" && "error" in engagements && engagements.error)) {
+      // A failed tenant-scoped refresh is not an empty or still-authorized
+      // snapshot. Hide previously loaded invitations and recipient choices.
+      setInvites([]);
+      setFirms([]);
+      setDrafts([]);
+      setFirm("");
+      setEngagement("");
+      setRecipientEmail("");
       setError(fr ? "Invitations indisponibles." : "Invitations unavailable.");
       return;
     }
