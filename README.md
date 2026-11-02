@@ -91,6 +91,49 @@ working, not a gap to paper over — and it means an IGS taxpayer currently sees
 
 ---
 
+
+## 2 November 2026: CEMAC TaxFlow proposal decisions
+
+The owner supplied three new design briefs on 2 November 2026: a regional
+practice-management/integration architecture with sample PostgreSQL tables, a
+four-zone senior accountant dashboard, and a TaxDome-style market thesis.
+They are **requirements input**, not evidence of implemented or authorized
+features. The product remains **KIMA OS**. See the
+[full integration and change/no-change report](docs/strategy/2026-11-02-cemac-taxflow-integration-review/report.md).
+
+| Decision | Scope |
+|---|---|
+| **Retain** | Firm and taxpayer shared workspace, multi-client dashboard, source-based compliance engine, secure document requests/review, SYSCOHADA-to-DSF preparation, audit/evidence vault, FR/EN |
+| **Adapt** | Senior review drawer, safe bulk actions, ACF tracking, deadline KPIs, offline **preparation**, payment reconciliation, permission-scoped search, region/country service catalog |
+| **Defer pending evidence and approval** | WhatsApp/USSD, direct Mobile Money and banking connections, Sage/QuickBooks/Xero APIs, government API access, automatic portal submissions, official receipt retrieval, e-invoicing relays |
+| **Reject as written** | Replacing KIMA's schema with `firms/users/clients` tables; universal monthly 15th deadline; accepting a debit as tax-payment proof; accepting a filing attempt as DGI confirmation; one-click approve-and-submit; invented “portal online” or productivity metrics |
+
+**Canonical data stays canonical.** Taxpayers are independent of firms and firms
+access them through accepted/authorized engagements. Supabase Auth and existing
+membership rules remain the identity layer. Extend existing `compliance_cases`,
+`documents`, `case_events`, payment/evidence and DSF models only after a schema
+diff confirms a gap. The illustrative SQL in the proposal is **not a migration**.
+
+**Government integrations are not active.** KIMA currently claims no DGI
+authorization, partnership, official receipt harvester, automatic filing, or
+real-time portal-health API. When no audited connection exists, display
+“Not connected” or “Manual recording,” not a green availability badge.
+A filing stays attempted/pending until official evidence is verified, and a
+payment debit is not a confirmed government quittance. ACF tracking may begin
+with user-supplied certificates and verified expiry data; issuing or fetching
+ACFs automatically is not established.
+
+**Release order:** (1) finish existing Phase 3/4 permission, identity-refresh
+and duplicate-action defects plus document exchange and Phase 7 tests; (2)
+integrate the four-zone dashboard and reviewed-version drawer; (3) deliver
+source-traceable SYSCOHADA/DSF, verified deadlines and ACF tracking; (4) pilot
+consent-based communication/payment services; (5) consider each government
+adapter and additional CEMAC jurisdiction independently after verification.
+Use real pilot baselines before claiming time or collection improvements.
+This is a **documentation plan**, not a production-readiness sign-off.
+
+---
+
 ## Routes
 
 Every route is locale-prefixed; `/` redirects to `/fr`.
