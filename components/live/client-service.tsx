@@ -269,10 +269,55 @@ export function ClientService({
     try {
       const { data: auth, error: authError } = await db.auth.getUser();
       if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
-      if (authError || !auth.user) throw new Error("Sign-in required");
+      if (authError || !auth.user || auth.user.id !== identityRef.current) {
+        throw new Error("Authenticated client changed");
+      }
+      // The case, filing evidence, consent round and engagement can change
+      // after this screen loaded. A cached row is never consent authority.
+      const liveTaxpayerId = await sessionTaxpayerId();
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (!liveTaxpayerId || liveTaxpayerId !== ids.taxpayerId) {
+        throw new Error("Client taxpayer context changed");
+      }
+      const { data: liveCase, error: liveCaseError } = await db
+        .from("compliance_cases")
+        .select("id,taxpayer_id,organization_id,engagement_id,stage,approval_round,filing_status,filing_evidence_ref")
+        .eq("id", actionCaseId)
+        .eq("taxpayer_id", ids.taxpayerId)
+        .eq("organization_id", ids.organizationId)
+        .maybeSingle();
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (liveCaseError || !liveCase ||
+          liveCase.taxpayer_id !== ids.taxpayerId ||
+          liveCase.organization_id !== ids.organizationId ||
+          liveCase.engagement_id !== row.engagement_id ||
+          liveCase.stage !== "client_approval" ||
+          liveCase.approval_round !== row.approval_round ||
+          liveCase.filing_status !== "verified" ||
+          !liveCase.filing_evidence_ref?.trim() ||
+          liveCase.filing_evidence_ref !== row.filing_evidence_ref) {
+        throw new Error("Client approval case or evidence changed");
+      }
+      const { data: liveGrant, error: liveGrantError } = await db
+        .from("engagements")
+        .select("organization_id,taxpayer_id,status,accepted_at,authorized_at,revoked_at")
+        .eq("id", liveCase.engagement_id)
+        .eq("taxpayer_id", ids.taxpayerId)
+        .maybeSingle();
+      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (liveGrantError || !liveGrant ||
+          liveGrant.organization_id !== ids.organizationId ||
+          liveGrant.taxpayer_id !== ids.taxpayerId ||
+          liveGrant.revoked_at ||
+          !["accepted", "authorized"].includes(liveGrant.status) ||
+          !(liveGrant.accepted_at || liveGrant.authorized_at)) {
+        throw new Error("Client engagement no longer active");
+      }
+      // RLS and the database approval constraints remain final authority;
+      // this preflight narrows stale UI writes but cannot eliminate TOCTOU.
       const { error } = await db.from("case_client_approvals").insert({
-        case_id: row.id, approval_round: row.approval_round,
-        taxpayer_id: ids.taxpayerId, filing_evidence_ref: row.filing_evidence_ref,
+        case_id: liveCase.id, approval_round: liveCase.approval_round,
+        taxpayer_id: ids.taxpayerId, filing_evidence_ref: liveCase.filing_evidence_ref,
         approved_by: auth.user.id,
       });
       if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
