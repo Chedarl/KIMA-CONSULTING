@@ -179,7 +179,7 @@ for (const action of ["decide", "requestFirm", "inviteContact"]) {
   const body = invitations.src.split("  async function " + action + "(")[1]?.split("\n  }")[0];
   assert.ok(body, action + " must exist");
   assert.ok(body.includes("const epoch = authEpoch.current;"), action + " must capture auth identity");
-  assert.ok((body.match(/if \\(epoch !== authEpoch\\.current\\) return;/g) ?? []).length >= 2,
+  assert.ok((body.match(/if \(epoch !== authEpoch\.current\) return;/g) ?? []).length >= 2,
     action + " must ignore stale RPC results and stale reload completions");
   const rpcIndex = Math.max(body.indexOf("await supabase().rpc("), body.indexOf("await db.rpc("));
   const firstGuard = body.indexOf("if (epoch !== authEpoch.current) return;", rpcIndex);
