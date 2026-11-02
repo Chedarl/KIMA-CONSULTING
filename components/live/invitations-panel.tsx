@@ -204,102 +204,103 @@ export function InvitationsPanel({ locale, side }: {
     const epoch = authEpoch.current;
     if (!beginMutation()) return;
     setError("");
-    const db = supabase();
-    // A session switch can precede the Auth event callback. Do not use the
-    // cached userId as authority to submit a decision under a different user.
-    const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
-    if (epoch !== authEpoch.current) return;
-    if (liveAuthError || !liveAuth.user || liveAuth.user.id !== userId) {
-      setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
-      await load({ keepError: true });
+    try {
+      const db = supabase();
+      // A session switch can precede the Auth event callback. Do not use the
+      // cached userId as authority to submit a decision under a different user.
+      const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
       if (epoch !== authEpoch.current) return;
-      finishMutation(epoch);
-      return;
-    }
-
-    // RLS still restricts reads; the RPC is the final transactional authority.
-    // A stale or replaced invitation must not reach that RPC from the UI.
-    const { data: liveInvite, error: liveReadError } = await db
-      .from("engagement_invitations")
-      .select("id,organization_id,taxpayer_id,direction,initiated_by,recipient_user_id,status,expires_at")
-      .eq("id", id).maybeSingle();
-    if (epoch !== authEpoch.current) return;
-    const liveExpiry = liveInvite ? new Date(liveInvite.expires_at).getTime() : NaN;
-    if (liveReadError || !liveInvite ||
-        liveInvite.organization_id !== invitation.organization_id ||
-        liveInvite.taxpayer_id !== invitation.taxpayer_id ||
-        liveInvite.direction !== invitation.direction ||
-        liveInvite.initiated_by !== invitation.initiated_by ||
-        liveInvite.recipient_user_id !== invitation.recipient_user_id ||
-        liveInvite.status !== "pending" ||
-        !Number.isFinite(liveExpiry) || liveExpiry <= Date.now() ||
-        (side === "taxpayer" && liveInvite.taxpayer_id !== taxpayerId) ||
-        (action === "revoked"
-          ? liveInvite.initiated_by !== userId
-          : liveInvite.recipient_user_id !== userId)) {
-      setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
-      await load({ keepError: true });
-      if (epoch !== authEpoch.current) return;
-      finishMutation(epoch);
-      return;
-    }
-
-    // A pending invitation may outlive the firm's authorization to act on
-    // it. Recheck active membership for this invitation's organization
-    // immediately before the decision RPC; the RPC remains the transactional
-    // authority if membership changes again between this read and the write.
-    if (side === "firm") {
-      const { data: activeMembers, error: activeMemberError } = await db
-        .from("firm_members")
-        .select("id")
-        .eq("organization_id", liveInvite.organization_id)
-        .eq("auth_user_id", liveAuth.user.id)
-        .eq("active", true)
-        .is("deactivated_at", null)
-        .limit(1);
-      if (epoch !== authEpoch.current) return;
-      if (activeMemberError || !activeMembers?.length) {
-        setInvites([]);
-        setDrafts([]);
-        setEngagement("");
-        setRecipientEmail("");
+      if (liveAuthError || !liveAuth.user || liveAuth.user.id !== userId) {
         setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
         await load({ keepError: true });
         if (epoch !== authEpoch.current) return;
-        finishMutation(epoch);
         return;
       }
-    }
 
-    // A user can change the selected taxpayer without changing Auth identity.
-    // Re-resolve the currently RLS-visible taxpayer immediately before the
-    // decision RPC rather than trusting the previously rendered invitation.
-    if (side === "taxpayer") {
-      const liveTaxpayerId = await sessionTaxpayerId();
+      // RLS still restricts reads; the RPC is the final transactional authority.
+      // A stale or replaced invitation must not reach that RPC from the UI.
+      const { data: liveInvite, error: liveReadError } = await db
+        .from("engagement_invitations")
+        .select("id,organization_id,taxpayer_id,direction,initiated_by,recipient_user_id,status,expires_at")
+        .eq("id", id).maybeSingle();
       if (epoch !== authEpoch.current) return;
-      if (!liveTaxpayerId ||
-          liveTaxpayerId !== taxpayerId ||
-          liveTaxpayerId !== liveInvite.taxpayer_id) {
-        setTaxpayerId(null);
-        setInvites([]);
-        setFirms([]);
-        setFirm("");
+      const liveExpiry = liveInvite ? new Date(liveInvite.expires_at).getTime() : NaN;
+      if (liveReadError || !liveInvite ||
+          liveInvite.organization_id !== invitation.organization_id ||
+          liveInvite.taxpayer_id !== invitation.taxpayer_id ||
+          liveInvite.direction !== invitation.direction ||
+          liveInvite.initiated_by !== invitation.initiated_by ||
+          liveInvite.recipient_user_id !== invitation.recipient_user_id ||
+          liveInvite.status !== "pending" ||
+          !Number.isFinite(liveExpiry) || liveExpiry <= Date.now() ||
+          (side === "taxpayer" && liveInvite.taxpayer_id !== taxpayerId) ||
+          (action === "revoked"
+            ? liveInvite.initiated_by !== userId
+            : liveInvite.recipient_user_id !== userId)) {
         setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
         await load({ keepError: true });
         if (epoch !== authEpoch.current) return;
-        finishMutation(epoch);
         return;
       }
-    }
 
-    const { error: failure } = await db.rpc("decide_invitation", {
-      p_invitation_id: id, p_action: action,
-    });
-    if (epoch !== authEpoch.current) return;
-    await load();
-    if (epoch !== authEpoch.current) return;
-    if (failure) setError(fr ? "Action refusée ou invitation expirée." : "Action refused or invitation expired.");
-    finishMutation(epoch);
+      // A pending invitation may outlive the firm's authorization to act on
+      // it. Recheck active membership for this invitation's organization
+      // immediately before the decision RPC; the RPC remains the transactional
+      // authority if membership changes again between this read and the write.
+      if (side === "firm") {
+        const { data: activeMembers, error: activeMemberError } = await db
+          .from("firm_members")
+          .select("id")
+          .eq("organization_id", liveInvite.organization_id)
+          .eq("auth_user_id", liveAuth.user.id)
+          .eq("active", true)
+          .is("deactivated_at", null)
+          .limit(1);
+        if (epoch !== authEpoch.current) return;
+        if (activeMemberError || !activeMembers?.length) {
+          setInvites([]);
+          setDrafts([]);
+          setEngagement("");
+          setRecipientEmail("");
+          setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
+          await load({ keepError: true });
+          if (epoch !== authEpoch.current) return;
+          return;
+        }
+      }
+
+      // A user can change the selected taxpayer without changing Auth identity.
+      // Re-resolve the currently RLS-visible taxpayer immediately before the
+      // decision RPC rather than trusting the previously rendered invitation.
+      if (side === "taxpayer") {
+        const liveTaxpayerId = await sessionTaxpayerId();
+        if (epoch !== authEpoch.current) return;
+        if (!liveTaxpayerId ||
+            liveTaxpayerId !== taxpayerId ||
+            liveTaxpayerId !== liveInvite.taxpayer_id) {
+          setTaxpayerId(null);
+          setInvites([]);
+          setFirms([]);
+          setFirm("");
+          setError(fr ? "Invitation indisponible ou expirée." : "Invitation unavailable or expired.");
+          await load({ keepError: true });
+          if (epoch !== authEpoch.current) return;
+          return;
+        }
+      }
+
+      const { error: failure } = await db.rpc("decide_invitation", {
+        p_invitation_id: id, p_action: action,
+      });
+      if (epoch !== authEpoch.current) return;
+      await load();
+      if (epoch !== authEpoch.current) return;
+      if (failure) setError(fr ? "Action refusée ou invitation expirée." : "Action refused or invitation expired.");
+    } catch {
+      if (epoch === authEpoch.current) setError(fr ? "Impossible de vérifier les invitations. Actualisez la page." : "Unable to verify invitations. Refresh the page.");
+    } finally {
+      finishMutation(epoch);
+    }
   }
 
   async function requestFirm() {
