@@ -1431,3 +1431,44 @@ assert.deepEqual(JSON.parse(JSON.stringify(staleResubmissionReview)),
   { ok: false, reason: "not_permitted" });
 assert.equal(stored.status, "submitted");
 
+
+
+// Firm case tasks: button visibility is not authorization. A task update must
+// belong to the displayed case and compare the original task state atomically.
+// These synthetic PostgREST-boundary probes supplement authenticated staging.
+const toggleTaskBody = detail.src.split("async function toggleTask(task: CaseTask) {")[1]
+  ?.split("\n  /** A note's audience")[0] ?? "";
+assert.ok(toggleTaskBody.includes("task.case_id !== row.id"),
+  "task mutation must reject a task from another case");
+assert.ok(toggleTaskBody.includes('allowed("case.advance").ok') &&
+  toggleTaskBody.includes("engagement.id !== row.engagement_id") &&
+  toggleTaskBody.includes("engagement.taxpayer_id !== row.taxpayer_id") &&
+  toggleTaskBody.includes("engagement.revoked_at"),
+  "task mutation must independently enforce role and active engagement");
+assert.ok(toggleTaskBody.includes('!["open", "done"].includes(task.state)'),
+  "cancelled tasks must not be reopened by a stale control");
+assert.ok(toggleTaskBody.includes('updateById("case_tasks", task.id, {') &&
+  toggleTaskBody.includes("case_id: row.id") &&
+  toggleTaskBody.includes("state: task.state"),
+  "task mutation must use a case-scoped, original-state conditional PATCH");
+
+Object.assign(stored, {
+  id: "task-1", case_id: "case-A", state: "open", completed_at: null,
+});
+const taskOriginal = { case_id: "case-A", state: "open" };
+const wrongTaskCase = await writerModule.exports.updateById(
+  "case_tasks", "task-1", { state: "done", completed_at: "2026-11-03T00:00:00Z" },
+  { ...taskOriginal, case_id: "case-B" });
+assert.deepEqual(JSON.parse(JSON.stringify(wrongTaskCase)),
+  { ok: false, reason: "not_permitted" });
+assert.equal(stored.state, "open");
+const firstTaskUpdate = await writerModule.exports.updateById(
+  "case_tasks", "task-1", { state: "done", completed_at: "2026-11-03T00:00:00Z" },
+  taskOriginal);
+assert.deepEqual(JSON.parse(JSON.stringify(firstTaskUpdate)), { ok: true });
+const replayTaskUpdate = await writerModule.exports.updateById(
+  "case_tasks", "task-1", { state: "done", completed_at: "2026-11-03T00:01:00Z" },
+  taskOriginal);
+assert.deepEqual(JSON.parse(JSON.stringify(replayTaskUpdate)),
+  { ok: false, reason: "not_permitted" });
+assert.equal(stored.completed_at, "2026-11-03T00:00:00Z");
