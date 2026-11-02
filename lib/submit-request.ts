@@ -21,6 +21,13 @@ export async function submitRequestFile(input: {
   previousStatus: string;
 }): Promise<{ ok: true } | { ok: false; reason: "storage" | "document" | "status" | "error" }> {
   try {
+    // The helper is also callable outside this screen's UI preflight.
+    // A stale or forged original status must never move a reviewed request
+    // (or a submitted request awaiting firm review) back to "submitted".
+    // Refuse before touching storage or creating a document row.
+    if (!["requested", "in_progress", "in_client_review", "returned"].includes(input.previousStatus)) {
+      return { ok: false, reason: "status" };
+    }
     const db = supabase();
     const safe = input.file.name.replace(/[^\w.\-]/g, "_");
     const path = `${input.taxpayerId}/${input.requestId}/${Date.now()}-${safe}`;
