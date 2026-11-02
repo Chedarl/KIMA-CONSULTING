@@ -313,52 +313,56 @@ export function InvitationsPanel({ locale, side }: {
     const epoch = authEpoch.current;
     if (!beginMutation()) return;
     setError("");
-    const db = supabase();
-    const rejectStale = async () => {
-      // Hide a no-longer-authorized directory and its prior invitation rows.
-      setInvites([]);
-      setFirms([]);
-      setFirm("");
-      setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
-      await load({ keepError: true });
+    try {
+      const db = supabase();
+      const rejectStale = async () => {
+        // Hide a no-longer-authorized directory and its prior invitation rows.
+        setInvites([]);
+        setFirms([]);
+        setFirm("");
+        setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
+        await load({ keepError: true });
+      };
+
+      const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
+      if (epoch !== authEpoch.current) return;
+      if (liveAuthError || !liveAuth.user || liveAuth.user.id !== userId) {
+        await rejectStale();
+        return;
+      }
+
+      // sessionTaxpayerId verifies the selected taxpayer through current RLS,
+      // rather than trusting the value cached in browser session storage.
+      const liveTaxpayerId = await sessionTaxpayerId();
+      if (epoch !== authEpoch.current) return;
+      if (liveTaxpayerId !== requestedTaxpayer) {
+        await rejectStale();
+        return;
+      }
+
+      // A firm removed from the directory must not be requested using an
+      // obsolete dropdown option. The RPC still enforces transactional grants.
+      const { data: liveDirectory, error: liveDirectoryError } = await db.rpc("firm_directory");
+      if (epoch !== authEpoch.current) return;
+      if (liveDirectoryError || !Array.isArray(liveDirectory) ||
+          !liveDirectory.some((candidate) => candidate.id === requestedFirm)) {
+        await rejectStale();
+        return;
+      }
+
+      const { error: failure } = await db.rpc("create_invitation", {
+        p_direction: "taxpayer_to_firm", p_organization_id: requestedFirm,
+        p_taxpayer_id: requestedTaxpayer, p_contact_id: null,
+      });
+      if (epoch !== authEpoch.current) return;
+      await load();
+      if (epoch !== authEpoch.current) return;
+      if (failure) setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
+    } catch {
+      if (epoch === authEpoch.current) setError(fr ? "Impossible de vérifier la demande. Actualisez la page." : "Unable to verify the request. Refresh the page.");
+    } finally {
       finishMutation(epoch);
-    };
-
-    const { data: liveAuth, error: liveAuthError } = await db.auth.getUser();
-    if (epoch !== authEpoch.current) return;
-    if (liveAuthError || !liveAuth.user || liveAuth.user.id !== userId) {
-      await rejectStale();
-      return;
     }
-
-    // sessionTaxpayerId verifies the selected taxpayer through current RLS,
-    // rather than trusting the value cached in browser session storage.
-    const liveTaxpayerId = await sessionTaxpayerId();
-    if (epoch !== authEpoch.current) return;
-    if (liveTaxpayerId !== requestedTaxpayer) {
-      await rejectStale();
-      return;
-    }
-
-    // A firm removed from the directory must not be requested using an
-    // obsolete dropdown option. The RPC still enforces transactional grants.
-    const { data: liveDirectory, error: liveDirectoryError } = await db.rpc("firm_directory");
-    if (epoch !== authEpoch.current) return;
-    if (liveDirectoryError || !Array.isArray(liveDirectory) ||
-        !liveDirectory.some((candidate) => candidate.id === requestedFirm)) {
-      await rejectStale();
-      return;
-    }
-
-    const { error: failure } = await db.rpc("create_invitation", {
-      p_direction: "taxpayer_to_firm", p_organization_id: requestedFirm,
-      p_taxpayer_id: requestedTaxpayer, p_contact_id: null,
-    });
-    if (epoch !== authEpoch.current) return;
-    await load();
-    if (epoch !== authEpoch.current) return;
-    if (failure) setError(fr ? "Demande refusée. Vérifiez votre compte." : "Request refused. Check your account.");
-    finishMutation(epoch);
   }
 
   async function inviteContact() {
