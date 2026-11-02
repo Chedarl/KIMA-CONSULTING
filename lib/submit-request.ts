@@ -7,7 +7,6 @@
  * is not shown as a success.
  */
 
-import { updateById } from "./db-write";
 import { recordCaseEvent } from "./record-event";
 import { audit, supabase } from "./supabase";
 
@@ -44,11 +43,22 @@ export async function submitRequestFile(input: {
     });
     if (docErr) return { ok: false, reason: "document" };
 
-    const written = await updateById("document_requests", input.requestId, {
-      status: "submitted",
-      updated_at: new Date().toISOString(),
-    });
-    if (!written.ok) return { ok: false, reason: "status" };
+    // The file upload and document insert are asynchronous. The request may
+    // have been accepted, reassigned or revoked in the meantime. An ID-only
+    // update would silently move that later decision back to "submitted".
+    // Compare-and-swap on the exact tenant, request and original status.
+    const statusQuery = db.from("document_requests")
+      .update({ status: "submitted", updated_at: new Date().toISOString() })
+      .eq("id", input.requestId)
+      .eq("taxpayer_id", input.taxpayerId)
+      .eq("organization_id", input.organizationId)
+      .eq("status", input.previousStatus)
+      .eq("responsible", "taxpayer");
+    const { data: changed, error: statusError } = await (
+      input.caseId ? statusQuery.eq("case_id", input.caseId) : statusQuery.is("case_id", null)
+    ).select("id");
+    // PostgREST may return no error for a zero-row RLS/CAS refusal.
+    if (statusError || !changed?.length) return { ok: false, reason: "status" };
 
     await recordCaseEvent({
       taxpayerId: input.taxpayerId,
