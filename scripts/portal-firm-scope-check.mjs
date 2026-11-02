@@ -1049,7 +1049,7 @@ for (const guard of [
 }
 assert.ok(uploadStatusWrite.includes('status: "submitted"'),
   "a client upload must only submit, never accept, its request");
-assert.ok(uploadWriter.includes("if (!changed?.length)"),
-  "a zero-row conditional update must fail closed");
+assert.ok(uploadWriter.includes("if (statusError || !changed?.length)"),
+  "a failed or zero-row conditional update must fail closed");
 assert.ok(!uploadWriter.includes('updateById("document_requests"'),
   "upload must not use an ID-only update that can overwrite later review decisions");
