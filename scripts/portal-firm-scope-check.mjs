@@ -342,6 +342,35 @@ assert.match(service.src, /!clientApproved && !hasVerifiedEvidence/,
 assert.match(service.src, /!clientApproved && hasVerifiedEvidence && <div className="mt-3">/,
   "approval action must be hidden until verified evidence exists");
 
+// A case can be revoked, advanced or have its evidence replaced after render.
+// Re-read live RLS-scoped case and taxpayer immediately before writing consent.
+// This remains a UI contract; DB enforcement and authenticated staging tests are required.
+assert.ok(serviceApproval.includes("auth.user.id !== identityRef.current"),
+  "client consent must reject a switched authenticated identity");
+const approvalTaxpayerRead = serviceApproval.indexOf("await sessionTaxpayerId()");
+const approvalCaseRead = serviceApproval.indexOf('.from("compliance_cases")');
+const approvalInsert = serviceApproval.indexOf('.from("case_client_approvals").insert(');
+assert.ok(approvalTaxpayerRead >= 0 && approvalCaseRead > approvalTaxpayerRead &&
+  approvalInsert > approvalCaseRead, "client consent must revalidate taxpayer and case before insert");
+assert.ok(serviceApproval.includes("liveTaxpayerId !== ids.taxpayerId"),
+  "client consent must reject a switched taxpayer context");
+for (const guard of [
+  'liveCase.taxpayer_id !== ids.taxpayerId',
+  'liveCase.organization_id !== ids.organizationId',
+  'liveCase.engagement_id !== row.engagement_id',
+  'liveCase.stage !== "client_approval"',
+  'liveCase.approval_round !== row.approval_round',
+  'liveCase.filing_status !== "verified"',
+  'liveCase.filing_evidence_ref !== row.filing_evidence_ref',
+]) {
+  assert.ok(serviceApproval.includes(guard), "live consent case guard missing: " + guard);
+}
+assert.ok(serviceApproval.indexOf("if (liveCaseError || !liveCase") < approvalInsert,
+  "failed or absent live case must prevent client consent");
+assert.ok((serviceApproval.match(/if \(epoch !== authEpoch\.current \|\| actionCaseId !== activeCaseId\.current\) return;/g) ?? []).length >= 4,
+  "live taxpayer and case reads must preserve account/route race guards");
+
+
 
 // Token refresh must preserve current identity, pending work and visible data.
 assert.match(service.src, /event !== "SIGNED_OUT" && event !== "SIGNED_IN" && event !== "USER_UPDATED"/);
