@@ -1280,3 +1280,27 @@ assert.ok(decisionNetworkBody.slice(decisionFinally).includes("finishMutation(ep
   "invitation decision must release its single-flight lock in finally");
 assert.equal((decisionNetworkBody.match(/finishMutation\(epoch\);/g) ?? []).length, 1,
   "invitation decision must release its lock exactly once, in finally");
+
+
+// Phase 3 taxpayer-to-firm requests: rejected Auth, taxpayer RLS, directory,
+// invitation RPC or reload promises must not strand the shared mutation lock.
+// A single originating-epoch finally release and localized failure are required.
+// Source contract only; staging network-failure and replay acceptance remain open.
+const firmRequestNetworkBody = invitations.src.split("  async function requestFirm() {")[1]
+  ?.split("\n  async function inviteContact()")[0] ?? "";
+const firmRequestMutationStart = firmRequestNetworkBody.indexOf("if (!beginMutation()) return;");
+const firmRequestTry = firmRequestNetworkBody.indexOf("try {", firmRequestMutationStart);
+const firmRequestDb = firmRequestNetworkBody.indexOf("const db = supabase();", firmRequestMutationStart);
+const firmRequestCatch = firmRequestNetworkBody.lastIndexOf("} catch {");
+const firmRequestFinally = firmRequestNetworkBody.lastIndexOf("} finally {");
+assert.ok(firmRequestMutationStart >= 0 && firmRequestTry > firmRequestMutationStart &&
+  firmRequestDb > firmRequestTry && firmRequestCatch > firmRequestDb &&
+  firmRequestFinally > firmRequestCatch,
+  "firm request must protect Auth/taxpayer/directory/RPC awaits with try/catch/finally");
+assert.ok(firmRequestNetworkBody.slice(firmRequestCatch, firmRequestFinally).includes(
+  'if (epoch === authEpoch.current) setError(fr ? "Impossible de vérifier la demande. Actualisez la page." : "Unable to verify the request. Refresh the page.");'),
+  "rejected firm request must show FR/EN failure only for the originating account");
+assert.ok(firmRequestNetworkBody.slice(firmRequestFinally).includes("finishMutation(epoch);"),
+  "firm request must release its synchronous mutation lock in finally");
+assert.equal((firmRequestNetworkBody.match(/finishMutation\\(epoch\\);/g) ?? []).length, 1,
+  "firm request must release its lock exactly once in finally");
