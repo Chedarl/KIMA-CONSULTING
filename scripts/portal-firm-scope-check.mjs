@@ -340,6 +340,8 @@ const approvalAuthRead = serviceApproval.indexOf("await db.auth.getUser()");
 assert.ok(approvalLockGuard >= 0 && approvalLockAcquire > approvalLockGuard &&
   approvalAuthRead > approvalLockAcquire,
   "approval must synchronously acquire its lock before any asynchronous authorization read");
+assert.ok(serviceApproval.indexOf("try {") < serviceApproval.indexOf("const db = supabase();"),
+  "client approval must initialize Supabase inside try so a synchronous failure releases the lock");
 assert.ok(serviceApproval.includes("if (approvalInFlight.current === action) approvalInFlight.current = null;"),
   "only the originating approval attempt may release its lock");
 assert.match(service.src, /if \(caseStamp !== caseId\) \{[\s\S]*?approvalInFlight\.current = null;/,
