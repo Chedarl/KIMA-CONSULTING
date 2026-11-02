@@ -1176,3 +1176,83 @@ assert.ok(boardUnmount.includes("uploadInFlight.current = false;"),
   "RequestsBoard must release the lock on unmount");
 assert.ok(requestsBoardSingleFlight.includes("disabled={busy !== null}"),
   "disable every request upload button while any upload is in progress");
+
+
+// Phase 4: stale or cross-tenant document request must be refused before
+// uploading storage bytes or inserting a document. This executes the actual
+// helper against a synthetic, RLS-shaped PostgREST query boundary; it does
+// not substitute for two-taxpayer staging RLS/revocation acceptance.
+async function probeLiveDocumentRequest({ caseId = "case-1", liveRow = null, denied = false } = {}) {
+  const calls = [];
+  const requestQuery = {
+    select(columns) { calls.push(["select", columns]); return this; },
+    eq(column, value) { calls.push(["eq", column, value]); return this; },
+    is(column, value) { calls.push(["is", column, value]); return this; },
+    async maybeSingle() {
+      calls.push(["maybeSingle"]);
+      return { data: liveRow, error: denied ? { message: "RLS denied" } : null };
+    },
+  };
+  const db = {
+    from(table) {
+      calls.push(["from", table]);
+      if (table !== "document_requests") throw new Error("Unexpected table before storage: " + table);
+      return requestQuery;
+    },
+    storage: {
+      from(bucket) {
+        calls.push(["storage", bucket]);
+        throw new Error("Storage boundary reached");
+      },
+    },
+  };
+  const module = { exports: {} };
+  runInNewContext(uploadStatusGuardCjs, {
+    module,
+    exports: module.exports,
+    require: (id) => {
+      if (id === "./record-event") return { recordCaseEvent: async () => {} };
+      if (id === "./supabase") return { supabase: () => db, audit: async () => {} };
+      throw new Error("Unexpected dependency: " + id);
+    },
+  });
+  const result = await module.exports.submitRequestFile({
+    requestId: "request-1",
+    file: { name: "proof.pdf", size: 10, type: "application/pdf" },
+    taxpayerId: "taxpayer-1",
+    organizationId: "firm-1",
+    caseId,
+    label: "Proof",
+    actorLabel: "Client",
+    previousStatus: "requested",
+  });
+  return { result: JSON.parse(JSON.stringify(result)), calls };
+}
+for (const scenario of [
+  { caseId: "case-1", liveRow: null },
+  { caseId: null, liveRow: null },
+  { caseId: "case-1", liveRow: null, denied: true },
+]) {
+  const { result, calls } = await probeLiveDocumentRequest(scenario);
+  assert.deepEqual(result, { ok: false, reason: "status" },
+    "missing or RLS-denied request must fail before storage");
+  assert.ok(!calls.some(([op]) => op === "storage"),
+    "refused request must not upload an orphaned storage object");
+  for (const [column, value] of [
+    ["id", "request-1"], ["taxpayer_id", "taxpayer-1"],
+    ["organization_id", "firm-1"], ["status", "requested"],
+    ["responsible", "taxpayer"],
+  ]) {
+    assert.ok(calls.some(([op, col, val]) => op === "eq" && col === column && val === value),
+      "live request preflight must scope " + column);
+  }
+  assert.ok(calls.some(([op, col, val]) =>
+    op === (scenario.caseId === null ? "is" : "eq") &&
+    col === "case_id" && val === scenario.caseId),
+    "live request preflight must bind the exact case, including null");
+}
+const matchingRequest = await probeLiveDocumentRequest({ liveRow: { id: "request-1" } });
+assert.deepEqual(matchingRequest.result, { ok: false, reason: "error" },
+  "matching live request may reach the mocked storage boundary");
+assert.ok(matchingRequest.calls.some(([op]) => op === "storage"),
+  "matching live request must pass preflight before storage");
