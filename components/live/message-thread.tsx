@@ -176,6 +176,8 @@ export function MessageThread({
   const bottom = useRef<HTMLDivElement>(null);
   const currentTaxpayer = useRef(taxpayerId);
   currentTaxpayer.current = taxpayerId;
+  const currentOrg = useRef(orgId);
+  currentOrg.current = orgId;
   const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
@@ -347,6 +349,11 @@ export function MessageThread({
 
     // Stale or revoked grants must never be used even if the picker has not refreshed.
     const chosenOrg = orgId;
+    const sendGeneration = loadGeneration.current;
+    const isCurrentSend = () =>
+      sendGeneration === loadGeneration.current &&
+      taxpayerId === currentTaxpayer.current &&
+      chosenOrg === currentOrg.current;
     if (requestId && !requests.some((r) => r.id === requestId && r.organization_id === chosenOrg)) return;
     const id = crypto.randomUUID();
     const optimistic: Msg = {
@@ -361,9 +368,9 @@ export function MessageThread({
       read_at: null,
     };
 
+    // Keep the draft local until the write succeeds. Showing an optimistic
+    // message before Auth/grant validation can briefly expose stale content.
     setBusy(true);
-    setMsgs((prev) => [...(prev ?? []), optimistic]);
-    setDraft("");
 
     try {
       const db = supabase();
@@ -397,6 +404,9 @@ export function MessageThread({
       if (grantError || !current || !(current.authorized_at || current.accepted_at)) {
         throw new Error("Engagement is not authorized");
       }
+      // Authorization reads are asynchronous: a different account, firm, or
+      // grant refresh may have replaced this thread while they were in flight.
+      if (!isCurrentSend()) throw new Error("Message context changed");
       const { error: e } = await db.from("messages").insert(optimistic);
       if (e) throw e;
 
@@ -421,11 +431,13 @@ export function MessageThread({
         resourceId: id,
         after: { length: body.length, request_id: requestId || null },
       });
+      if (!isCurrentSend()) return;
+      setDraft((value) => value.trim() === body ? "" : value);
       toast(labels.sent);
+      // Only authenticated, live-grant reads may publish the sent message.
+      void load();
     } catch {
-      setMsgs((prev) => (prev ?? []).filter((m) => m.id !== id));
-      setDraft(body);
-      toast(labels.failed, "error");
+      if (isCurrentSend()) toast(labels.failed, "error");
     } finally {
       setBusy(false);
     }
