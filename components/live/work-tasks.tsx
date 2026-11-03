@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, whenSignedIn } from "@/lib/supabase";
 
 type Labels = {
   title: string; subtitle: string; empty: string; emptyHint: string;
@@ -34,6 +34,7 @@ export function WorkTasks({ t }: { t: Labels }) {
   useEffect(() => {
     let active = true;
     (async () => {
+      await whenSignedIn();
       try {
         const { data, error } = await supabase()
           .from("firm_task_board")
