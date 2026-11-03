@@ -56,3 +56,17 @@ gating items are, in order:
 5. `obligation_rules` with a verification audit, so the calendar can show a
    sourced date.
 6. DSF bridge and Clarity AI — no code at all.
+
+## 3 November audit — items closed since
+
+- Staging reconciled to 102/102 migrations. The 15 missing history rows were
+  recorded after verifying every object (9 tables, the board view, both RPCs,
+  five added columns, the storage policy) already exists on staging — they were
+  applied while building and only the history entries were missing. Byte-parity
+  with `supabase db diff` remains unverified (needs the database password).
+- P0 demo-link exposure: same-origin required, and the endpoint refuses when
+  the connected project is the production ref.
+- P0 DSF import authorization: requires a firm member via current_firm_member().
+- P0 upload consistency: object, row, status, event and audit are one
+  compensated contract.
+- Branding: the owner-provided lockup, monogram and favicon are installed.
