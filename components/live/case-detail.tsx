@@ -228,6 +228,9 @@ export function CaseDetail({
   const [missing, setMissing] = useState(false);
   const loadEpoch = useRef(0);
   const sessionMemberRef = useRef<string | null | undefined>(undefined);
+  // A document request is a non-idempotent insert; React busy state alone
+  // cannot serialize rapid submissions before the next render.
+  const requestInFlight = useRef(false);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -746,6 +749,7 @@ export function CaseDetail({
   }
 
   async function createRequest() {
+    if (requestInFlight.current) return;
     if (!row || !member) return;
     if (!askFr.trim() || !askEn.trim()) {
       setFailed("new-request");
@@ -758,6 +762,7 @@ export function CaseDetail({
       setRefusedBy(denialLabel(gate.reason, locale));
       return;
     }
+    requestInFlight.current = true;
     setBusy("new-request");
     setFailed(null);
     setRefusedBy(null);
@@ -852,6 +857,7 @@ export function CaseDetail({
     } catch {
       setFailed("new-request");
     } finally {
+      requestInFlight.current = false;
       setBusy(null);
     }
   }
