@@ -156,6 +156,7 @@ export function FirmDashboard({
   const [live, setLive] = useState(false);
   const toast = useToast();
   const [drawer, setDrawer] = useState<{ title: string; items: DrawerItem[] } | null>(null);
+  const [view, setView] = useState<"kanban" | "list">("kanban");
   const [money, setMoney] = useState<{ billed: number; collected: number; outstanding: number; awaiting: number; overdue: number } | null>(null);
   const [pendingDocs, setPendingDocs] = useState<{ id: string; file_name: string; taxpayer_id: string; created_at: string }[]>([]);
 
@@ -491,16 +492,18 @@ export function FirmDashboard({
         <CardHeader
           title={t.pipelineTitle}
           action={
-            <Link
-              href={queueHref}
-              className="inline-flex min-h-[44px] items-center text-xs font-semibold text-teal-text underline-offset-2 hover:underline"
-            >
-              {t.viewAll}
-            </Link>
+            <div className="flex items-center gap-3">
+              <div role="group" aria-label={t.pipelineTitle} className="flex rounded-lg border border-border p-0.5">
+                <button type="button" onClick={() => setView("kanban")} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (view === "kanban" ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{t.viewKanban}</button>
+                <button type="button" onClick={() => setView("list")} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (view === "list" ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{t.viewList}</button>
+              </div>
+              <Link href={queueHref} className="inline-flex min-h-[44px] items-center text-xs font-semibold text-teal-text underline-offset-2 hover:underline">{t.viewAll}</Link>
+            </div>
           }
         />
         <div className="p-4 sm:p-5">
           <p className="text-sm text-fg-muted">{t.pipelineHint}</p>
+          {view === "kanban" ? (
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
             {pipeline.map(({ stage, cases }) => (
               <section
@@ -551,6 +554,25 @@ export function FirmDashboard({
               </section>
             ))}
           </div>
+          ) : (
+          <ul className="mt-4 flex flex-col gap-1">
+            {queueOrder(rows ?? [], today).map((c) => {
+              const r = risk(c, today);
+              return (
+                <li key={c.id}>
+                  <Link
+                    href={`/${locale}/workspace/cases/${c.id}`}
+                    className="flex min-h-[48px] items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 text-sm hover:border-teal/40"
+                  >
+                    <span className="min-w-0 truncate font-medium text-fg">{nameOf(c)}</span>
+                    <span className="shrink-0 text-xs text-fg-muted">{stageLabel(c.stage, locale)} · {obligationLabel(c.obligation_code, locale)}</span>
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-fg-subtle"><span className={`h-1.5 w-1.5 rounded-full ${RISK_TONE[r]}`} aria-hidden /><span className="tnum font-mono">{c.due_on}</span></span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          )}
         </div>
       </Card>
 
