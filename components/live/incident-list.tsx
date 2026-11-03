@@ -13,6 +13,9 @@ type Labels = {
   maskedReference: string;
   newIncident: string; taxpayer: string; chooseTaxpayer: string; observedOn: string;
   amount: string; reportedError: string; createIncident: string; creatingIncident: string; createIncidentFailed: string;
+  evidence: string; addEvidence: string; evidenceKind: string; evidenceLabel: string;
+  adding: string; added: string; evidenceFailed: string;
+  kindDebitSms: string; kindWallet: string; kindBank: string; kindPortal: string; kindOfficial: string; kindResponse: string; kindOther: string;
 };
 
 type Row = {
@@ -22,20 +25,24 @@ type Row = {
 type Taxpayer = { id: string; legal_name: string };
 
 /**
- * The incident register, and the one write that opens it.
+ * The incident register, and the two writes that open it.
  *
  * Recording an incident names no reviewer and claims no verification: the row
- * lands as `open` with the payment dimension at `debit_observed`, and the
- * database refuses `verified` unless a named reviewer cites official evidence.
- * The trigger writes the first timeline entry, so the history exists from the
- * moment the incident does.
+ * lands `open` with the payment dimension at `debit_observed`, and the database
+ * refuses `verified` unless a named reviewer cites official evidence. Evidence
+ * is added as its own act, so the file can show a debit with no receipt — which
+ * is the whole point of the screen.
  */
 export function IncidentList({ t }: { t: Labels }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [taxpayers, setTaxpayers] = useState<Taxpayer[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [form, setForm] = useState({ taxpayerId: "", type: "debit_not_recognised", observedOn: "", amount: "", error: "" });
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [ev, setEv] = useState({ incidentId: "", kind: "official_receipt", label: "" });
+  const [evBusy, setEvBusy] = useState(false);
+  const [evNote, setEvNote] = useState<"added" | "failed" | null>(null);
 
   async function loadRows() {
     const { data } = await supabase()
@@ -43,7 +50,11 @@ export function IncidentList({ t }: { t: Labels }) {
       .select("id,type,status,payment_state,observed_at,amount_minor,reference_masked")
       .order("observed_at", { ascending: false })
       .limit(100);
-    setRows(((data ?? []) as Row[]).map((r) => r));
+    setRows((data ?? []) as Row[]);
+    const { data: evs } = await supabase().from("incident_evidence").select("incident_id").limit(1000);
+    const next: Record<string, number> = {};
+    for (const e of (evs ?? []) as { incident_id: string }[]) next[e.incident_id] = (next[e.incident_id] ?? 0) + 1;
+    setCounts(next);
   }
 
   useEffect(() => {
@@ -78,10 +89,43 @@ export function IncidentList({ t }: { t: Labels }) {
     await loadRows();
   }
 
+  async function addEvidence() {
+    if (!ev.incidentId || ev.label.trim().length < 2) return;
+    setEvBusy(true);
+    setEvNote(null);
+    const { error } = await supabase().from("incident_evidence").insert({
+      incident_id: ev.incidentId,
+      kind: ev.kind,
+      label: ev.label.trim(),
+      captured_at: new Date().toISOString(),
+      added_by: "reviewer",
+    });
+    setEvBusy(false);
+    if (error) { setEvNote("failed"); return; }
+    setEvNote("added");
+    setEv({ incidentId: "", kind: "official_receipt", label: "" });
+    await loadRows();
+  }
+
   const field = "mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg";
   const label = "text-xs font-semibold uppercase tracking-wide text-fg-muted";
 
-  const formBlock = (
+  const typeLabel: Record<string, string> = {
+    payment_step_error: t.typePaymentStepError,
+    debit_not_recognised: t.typeDebitNotRecognised,
+    certificate_blocked: t.typeCertificateBlocked,
+  };
+  const statusLabel: Record<string, string> = {
+    open: t.statusOpen, escalated: t.statusEscalated, awaiting_administration: t.statusAwaiting,
+    resolved: t.statusResolved, closed_unresolved: t.statusClosedUnresolved,
+  };
+  const paymentLabel: Record<string, string> = {
+    unknown: t.paymentUnknown, attempted: t.paymentAttempted, debit_observed: t.paymentDebitObserved,
+    reference_recorded: t.paymentReferenceRecorded, verified: t.paymentVerified,
+    disputed: t.paymentDisputed, not_applicable: t.paymentNotApplicable,
+  };
+
+  const createBlock = (
     <div className="rounded-card border border-border bg-surface px-5 py-4">
       <h3 className="text-sm font-semibold text-fg">{t.newIncident}</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -122,26 +166,52 @@ export function IncidentList({ t }: { t: Labels }) {
     </div>
   );
 
-  if (rows === null) return <div className="h-24" aria-hidden />;
+  const evidenceBlock = (
+    <div className="rounded-card border border-border bg-surface px-5 py-4">
+      <h3 className="text-sm font-semibold text-fg">{t.addEvidence}</h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <div>
+          <label className={label} htmlFor="ev-incident">{t.colType}</label>
+          <select id="ev-incident" className={field} value={ev.incidentId} onChange={(e) => setEv({ ...ev, incidentId: e.target.value })}>
+            <option value="">—</option>
+            {(rows ?? []).map((r) => (
+              <option key={r.id} value={r.id}>{typeLabel[r.type] ?? r.type} · {r.observed_at.slice(0, 10)}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={label} htmlFor="ev-kind">{t.evidenceKind}</label>
+          <select id="ev-kind" className={field} value={ev.kind} onChange={(e) => setEv({ ...ev, kind: e.target.value })}>
+            <option value="debit_sms">{t.kindDebitSms}</option>
+            <option value="wallet_screenshot">{t.kindWallet}</option>
+            <option value="bank_statement">{t.kindBank}</option>
+            <option value="portal_screenshot">{t.kindPortal}</option>
+            <option value="official_receipt">{t.kindOfficial}</option>
+            <option value="administration_response">{t.kindResponse}</option>
+            <option value="other">{t.kindOther}</option>
+          </select>
+        </div>
+        <div>
+          <label className={label} htmlFor="ev-label">{t.evidenceLabel}</label>
+          <input id="ev-label" className={field} value={ev.label} onChange={(e) => setEv({ ...ev, label: e.target.value })} />
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <button type="button" onClick={() => void addEvidence()} disabled={evBusy || !ev.incidentId || ev.label.trim().length < 2} className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface disabled:opacity-60">
+          {evBusy ? t.adding : t.addEvidence}
+        </button>
+        {evNote === "added" ? <span className="text-sm text-success-text">{t.added}</span> : null}
+        {evNote === "failed" ? <span className="text-sm text-danger">{t.evidenceFailed}</span> : null}
+      </div>
+    </div>
+  );
 
-  const typeLabel: Record<string, string> = {
-    payment_step_error: t.typePaymentStepError,
-    debit_not_recognised: t.typeDebitNotRecognised,
-    certificate_blocked: t.typeCertificateBlocked,
-  };
-  const statusLabel: Record<string, string> = {
-    open: t.statusOpen, escalated: t.statusEscalated, awaiting_administration: t.statusAwaiting,
-    resolved: t.statusResolved, closed_unresolved: t.statusClosedUnresolved,
-  };
-  const paymentLabel: Record<string, string> = {
-    unknown: t.paymentUnknown, attempted: t.paymentAttempted, debit_observed: t.paymentDebitObserved,
-    reference_recorded: t.paymentReferenceRecorded, verified: t.paymentVerified,
-    disputed: t.paymentDisputed, not_applicable: t.paymentNotApplicable,
-  };
+  if (rows === null) return <div className="h-24" aria-hidden />;
 
   return (
     <div className="flex flex-col gap-4">
-      {formBlock}
+      {createBlock}
+      {evidenceBlock}
       {rows.length === 0 ? (
         <div className="rounded-card border border-border bg-surface px-5 py-8 text-center">
           <p className="text-sm font-semibold text-fg">{t.empty}</p>
@@ -157,6 +227,7 @@ export function IncidentList({ t }: { t: Labels }) {
                 <th className="px-4 py-3">{t.colPayment}</th>
                 <th className="px-4 py-3">{t.colAmount}</th>
                 <th className="px-4 py-3">{t.colObserved}</th>
+                <th className="px-4 py-3">{t.evidence}</th>
               </tr>
             </thead>
             <tbody>
@@ -170,6 +241,7 @@ export function IncidentList({ t }: { t: Labels }) {
                   <td className="px-4 py-3">{paymentLabel[r.payment_state] ?? r.payment_state}</td>
                   <td className="px-4 py-3">{r.amount_minor === null ? "—" : `${r.amount_minor.toLocaleString("fr-FR")} XAF`}</td>
                   <td className="px-4 py-3 text-fg-muted">{r.observed_at.slice(0, 10)}</td>
+                  <td className="px-4 py-3">{counts[r.id] ?? 0}</td>
                 </tr>
               ))}
             </tbody>
