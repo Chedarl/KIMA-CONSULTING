@@ -234,6 +234,9 @@ export function CaseDetail({
   // A note is a non-idempotent case event; a rapid second click must not
   // insert another copy before React commits the busy state.
   const noteInFlight = useRef(false);
+  // A stage decision can write a transition and audit event. Serialize rapid
+  // competing stage clicks within this mounted case screen.
+  const stageInFlight = useRef(false);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -540,6 +543,7 @@ export function CaseDetail({
   );
 
   async function move(to: CaseStage) {
+    if (stageInFlight.current) return;
     if (!row || !member || !actor || !engagement ||
         engagement.id !== row.engagement_id ||
         engagement.taxpayer_id !== row.taxpayer_id) return;
@@ -556,6 +560,7 @@ export function CaseDetail({
       setRefusedBy(locale === "fr" ? result.reasonFr : result.reasonEn);
       return;
     }
+    stageInFlight.current = true;
     setBusy(to);
     setFailed(null);
     setRefusedBy(null);
@@ -629,6 +634,7 @@ export function CaseDetail({
     } catch {
       setFailed(to);
     } finally {
+      stageInFlight.current = false;
       setBusy(null);
     }
   }
