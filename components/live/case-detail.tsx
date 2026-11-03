@@ -663,22 +663,80 @@ export function CaseDetail({
 
   /** A note's audience is its content, which is why it is chosen and not derived. */
   async function saveNote() {
-    if (!row || !member || !note.trim()) return;
+    if (!note.trim()) return;
+    // A disabled visibility control is not authorization. Never create an
+    // internal or client-visible event from a cached, revoked or foreign case.
+    if (!row || !member || !engagement ||
+        engagement.id !== row.engagement_id ||
+        engagement.taxpayer_id !== row.taxpayer_id ||
+        engagement.revoked_at ||
+        !["authorized", "accepted"].includes(engagement.status) ||
+        !(engagement.authorized_at || engagement.accepted_at) ||
+        !allowed(noteClient ? "note.write_client" : "event.view_internal").ok) {
+      setFailed("note");
+      setRefusedBy(t.notPermitted);
+      return;
+    }
     setBusy("note");
     setFailed(null);
+    setRefusedBy(null);
     try {
+      const db = supabase();
+      // Revalidate the OTP member against the current Auth user, then the
+      // exact case and active engagement before exposing a note to the client.
+      // Database RLS remains authoritative at the insert boundary.
+      const { data: { user }, error: authError } = await db.auth.getUser();
+      if (authError || !user) throw new Error("Firm authentication unavailable");
+      const { data: liveMember, error: memberError } = await db
+        .from("firm_members")
+        .select("id, role, person_label, organization_id")
+        .eq("id", member.id)
+        .eq("auth_user_id", user.id)
+        .eq("organization_id", engagement.organization_id)
+        .eq("active", true)
+        .is("deactivated_at", null)
+        .maybeSingle();
+      if (memberError || !liveMember || liveMember.role !== member.role ||
+          liveMember.person_label !== member.person_label) {
+        throw new Error("Firm membership changed");
+      }
+      const { data: liveCase, error: caseError } = await db
+        .from("compliance_cases")
+        .select("id")
+        .eq("id", row.id)
+        .eq("taxpayer_id", row.taxpayer_id)
+        .eq("organization_id", engagement.organization_id)
+        .eq("engagement_id", engagement.id)
+        .maybeSingle();
+      if (caseError || !liveCase) throw new Error("Case authorization changed");
+      const { data: liveEngagement, error: engagementError } = await db
+        .from("engagements")
+        .select("id, assigned_to, authorized_at, accepted_at")
+        .eq("id", engagement.id)
+        .eq("taxpayer_id", row.taxpayer_id)
+        .eq("organization_id", engagement.organization_id)
+        .in("status", ["authorized", "accepted"])
+        .is("revoked_at", null)
+        .maybeSingle();
+      if (engagementError || !liveEngagement) throw new Error("Engagement unavailable");
+      if (!(liveEngagement.authorized_at || liveEngagement.accepted_at) ||
+          (member.role === "firm_staff" &&
+           liveEngagement.assigned_to !== member.person_label)) {
+        throw new Error("Engagement no longer authorizes this member");
+      }
       const event = noteEvent(
         row.id,
         { role: member.role, label: member.person_label },
         note,
         noteClient ? "client" : "internal",
       );
-      const { error } = await supabase().from("case_events").insert(event);
+      const { error } = await db.from("case_events").insert(event);
       if (error) throw error;
       setNote("");
       await load();
     } catch {
       setFailed("note");
+      setRefusedBy(t.notPermitted);
     } finally {
       setBusy(null);
     }
@@ -1172,12 +1230,12 @@ export function CaseDetail({
               <button
                 type="button"
                 onClick={() => void saveNote()}
-                disabled={!note.trim() || busy === "note"}
+                disabled={!note.trim() || busy === "note" || !allowed(noteClient ? "note.write_client" : "event.view_internal").ok}
                 className={btnPrimary}
               >
                 {busy === "note" ? t.moving : t.noteSend}
               </button>
-              {failed === "note" && <p className="text-xs text-danger-text">{t.noteEmpty}</p>}
+              {failed === "note" && <p className="text-xs text-danger-text">{refusedBy ?? t.moveFailed}</p>}
             </div>
           </Card>
 
