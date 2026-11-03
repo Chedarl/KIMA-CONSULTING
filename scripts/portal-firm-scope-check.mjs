@@ -49,6 +49,18 @@ assert.match(thread.src, /engagementQuery\.eq\("organization_id", firmOrgId\)/);
 // separately mounted thread or a stale member identity.
 const firmThreadLoad = thread.src.split("  const load = useCallback(async () => {")[1]?.split("\n  useEffect(() => {")[0] ?? "";
 const firmThreadSend = thread.src.split("  async function send(")[1]?.split("\n  if (!taxpayerId) return")[0] ?? "";
+// Realtime events must not keep a previous tenant/grant snapshot visible while
+// the authenticated thread loader rechecks membership and active engagements.
+// Keep the firm selection across a successful refresh; only hide message data.
+const hideMessages = firmThreadLoad.indexOf("setMsgs(null);");
+const hideRequests = firmThreadLoad.indexOf("setRequests([]);");
+const verifyAuth = firmThreadLoad.indexOf("const db = supabase();");
+const generationStart = firmThreadLoad.indexOf("const generation = ++loadGeneration.current;");
+assert.ok(generationStart >= 0 && generationStart < hideMessages &&
+  hideMessages < verifyAuth && hideRequests > generationStart && hideRequests < verifyAuth,
+  "thread reload must hide old messages and requests before rechecking Auth/grants");
+assert.ok(!firmThreadLoad.slice(generationStart, verifyAuth).includes("setOrgId(null)"),
+  "refresh must preserve the selected firm until the authorized grant response");
 for (const [operation, body] of [["read", firmThreadLoad], ["send", firmThreadSend]]) {
   assert.ok(body, "firm thread " + operation + " must exist");
   const auth = body.indexOf("await db.auth.getUser()");
@@ -524,3 +536,64 @@ assert.match(firmThreadLoad, /generation !== loadGeneration\.current/);
 assert.match(firmThreadLoad, /const allowedFirmIds = new Set\(liveIds\)/);
 assert.match(firmThreadLoad, /setMsgs\(\(\(m \?\? \[\]\) as Msg\[\]\)\.filter\(\(message\) => allowedFirmIds\.has\(message\.organization_id\)\)\)/);
 assert.match(firmThreadLoad, /setRequests\(\(\(r \?\? \[\]\) as RequestLite\[\]\)\.filter\(\(request\) => allowedFirmIds\.has\(request\.organization_id\)\)\)/);
+
+
+// A realtime INSERT payload is a notification, not proof that the currently
+// mounted taxpayer/member still has an active engagement. Re-read through the
+// authenticated tenant-scoped loader before publishing message content.
+// This source-contract check supplements real two-firm/two-taxpayer RLS tests.
+const realtimeThread = thread.src.split("  // A unique channel name per mount")[1]
+  ?.split("  useEffect(() => {\n    bottom.current?.scrollIntoView")[0] ?? "";
+assert.ok(realtimeThread, "realtime message subscription must exist");
+assert.match(realtimeThread, /if \(row\.organization_id !== orgId\) return;/,
+  "realtime notifications must be scoped to the selected firm");
+assert.match(realtimeThread, /void load\(\);/,
+  "realtime notification must recheck Auth and engagement grants before publishing");
+assert.ok(!realtimeThread.includes("setMsgs((prev) =>"),
+  "never append an unverified realtime payload directly to the thread");
+assert.match(realtimeThread, /\}, \[taxpayerId, side, orgId, load\]\);/,
+  "subscription must capture the current authorization loader");
+
+
+// A composer must not render its own message before Auth and engagement checks
+// complete. The send operation must also refuse a stale taxpayer/firm selection
+// after an asynchronous authorization read, before inserting anything.
+// This is a source-contract regression; authenticated race/RLS tests remain gates.
+const sendInsert = firmThreadSend.indexOf('.from("messages").insert(optimistic)');
+const sendGuard = firmThreadSend.indexOf('if (!isCurrentSend()) throw new Error("Message context changed");');
+assert.ok(sendInsert > 0 && sendGuard > 0 && sendGuard < sendInsert,
+  "send must reject changed taxpayer/firm/load generation before database insert");
+assert.match(thread.src, /const currentOrg = useRef\(orgId\)/);
+assert.match(thread.src, /currentOrg\.current = orgId/);
+assert.ok(firmThreadSend.includes("const sendGeneration = loadGeneration.current;") &&
+  firmThreadSend.includes("sendGeneration === loadGeneration.current") &&
+  firmThreadSend.includes("taxpayerId === currentTaxpayer.current") &&
+  firmThreadSend.includes("chosenOrg === currentOrg.current"),
+  "send must bind its async operation to the mounted taxpayer, firm and grant generation");
+assert.ok(!firmThreadSend.includes("setMsgs((prev) => [...(prev ?? []), optimistic])"),
+  "unverified optimistic content must not be rendered before the authorization check");
+assert.ok(firmThreadSend.indexOf('setDraft((value) => value.trim() === body ? "" : value);') > sendInsert &&
+  firmThreadSend.indexOf("void load();") > sendInsert,
+  "clear sent draft only after insert, then reload through authenticated tenant-scoped reads");
+assert.ok(firmThreadSend.includes('if (isCurrentSend()) toast(labels.failed, "error");'),
+  "a stale send failure must not report an error in the next tenant context");
+
+
+// Firm inbox realtime INSERTs are untrusted notifications, not proof that an
+// engagement is still active. Do not show payload.body using a cached tenant
+// grant set: hide the old inbox and rerun Auth/member/engagement-scoped reads.
+// These checks supplement (not replace) authenticated revocation/RLS tests.
+const firmInboxRealtime = workspace.src.split('channel = db\n          .channel(`firm-messages-')[1]
+  ?.split('          .subscribe();')[0] ?? "";
+assert.ok(firmInboxRealtime, "firm inbox realtime callback must exist");
+assert.ok(firmInboxRealtime.includes('row.organization_id !== firmOrgId') &&
+  firmInboxRealtime.includes('!allowedTaxpayers.has(row.taxpayer_id)'),
+  "firm inbox realtime events must retain organization and taxpayer guards");
+assert.ok(!firmInboxRealtime.includes('body: row.body') &&
+  !firmInboxRealtime.includes('setPreviews((prev) =>'),
+  "firm inbox must not publish an unverified realtime message body");
+for (const clear of ["setClients(null)", "setPreviews({})", "setActive(null)",
+  "setAssignments([])", "setRefreshEpoch((epoch) => epoch + 1)"]) {
+  assert.ok(firmInboxRealtime.includes(clear),
+    "realtime event must invalidate old firm inbox state before rechecking grants: " + clear);
+}
