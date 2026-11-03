@@ -11,6 +11,13 @@ services. Initial market Cameroon, expansion CEMAC. French and English, XAF.
 
 ---
 
+## Current state — 3 November 2026
+
+> **Release status: HOLD.** The workspace is operational for signed-in firm members; the public site remains demonstration content. Migration parity is restored (104/104), and the owner enabled firm signup and public contact intake on 3 November 2026. The dated, evidence-based snapshot — feature matrix, security boundaries, known defects, testing evidence, roadmap — lives in [docs/2026-11-03-product-state.md](docs/2026-11-03-product-state.md).
+
+---
+
+
 ## Why this exists
 
 Cameroon already has télédéclaration, so the fair question is what a
