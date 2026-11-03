@@ -7,6 +7,7 @@ import { FirmSearch } from "@/components/live/firm-search";
 import { FirmSessionBar } from "@/components/live/firm-session-bar";
 import { KimaAssistant } from "@/components/live/kima-assistant";
 import { CommandPalette } from "@/components/live/command-palette";
+import { ThemeRoot } from "@/components/theme-root";
 
 /**
  * Firm workspace chrome.
@@ -53,6 +54,7 @@ export default function FirmLayout({
   ];
 
   return (
+    <ThemeRoot>
     <Shell
       nav={nav}
       title={w.firm.title}
@@ -97,5 +99,6 @@ export default function FirmLayout({
       </div>
       {children}
     </Shell>
+    </ThemeRoot>
   );
 }
