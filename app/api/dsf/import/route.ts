@@ -23,6 +23,16 @@ export async function POST(request: Request) {
   if (!url || !anon) return NextResponse.json({ error: "not_configured" }, { status: 503 });
   const who = await fetch(url + "/auth/v1/user", { headers: { apikey: anon, Authorization: "Bearer " + token } });
   if (!who.ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  // An authenticated client is not enough for an accounting workflow: the
+  // caller must be a firm member. The RPC returns only the caller's own row.
+  const member = await fetch(url + "/rest/v1/rpc/current_firm_member", {
+    headers: { apikey: anon, Authorization: "Bearer " + token },
+  });
+  if (!member.ok) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  const memberRows = (await member.json()) as unknown[];
+  if (!Array.isArray(memberRows) || memberRows.length === 0) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   let body: { csv?: string; schedule?: Record<string, string> };
   try {

@@ -18,7 +18,11 @@ export const runtime = "nodejs";
  */
 export async function POST(request: Request) {
   const allowed = process.env.KIMA_DEMO_ENTRY === "1" && process.env.VERCEL_ENV !== "production";
-  if (!allowed) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  // A cross-site scripted POST has no Sec-Fetch-Site, which closes the
+  // simplest drive-by route; Vercel preview protection is the outer gate.
+  const sameOrigin = (request.headers.get("sec-fetch-site") ?? "") === "same-origin";
+  if (!allowed || !sameOrigin) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
   if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: "not_configured" }, { status: 503 });
 
   const email = process.env.KIMA_DEMO_EMAIL ?? "irina@demo.kima.cm";
