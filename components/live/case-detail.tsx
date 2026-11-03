@@ -569,6 +569,11 @@ export function CaseDetail({
       setRefusedBy(locale === "fr" ? result.reasonFr : result.reasonEn);
       return;
     }
+    const actionCaseId = row.id;
+    const actionMemberId = member.id;
+    const stageContextCurrent = () =>
+      activeCaseIdRef.current === actionCaseId &&
+      sessionMemberRef.current === actionMemberId;
     stageInFlight.current = true;
     setBusy(to);
     setFailed(null);
@@ -623,6 +628,7 @@ export function CaseDetail({
       // A stage decision was computed from this exact case snapshot. Refuse a
       // replay if its stage, approval round or tenant/engagement changed.
       // Database RLS and transition triggers remain the final authority.
+      if (!stageContextCurrent()) throw new Error("Case or firm session changed");
       const written = await updateById("compliance_cases", row.id, result.patch, {
         taxpayer_id: row.taxpayer_id,
         organization_id: engagement.organization_id,
@@ -631,20 +637,24 @@ export function CaseDetail({
         approval_round: row.approval_round,
       });
       if (!written.ok) {
-        setFailed(to);
-        setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        if (stageContextCurrent()) {
+          setFailed(to);
+          setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        }
         return;
       }
       if (result.events.length > 0) {
         const { error: logError } = await db.from("case_events").insert(result.events);
         if (logError) throw logError;
       }
-      await load();
+      // Always attempt the audit event above after a successful write, but
+      // never reload or publish feedback for a case no longer displayed.
+      if (stageContextCurrent()) await load();
     } catch {
-      setFailed(to);
+      if (stageContextCurrent()) setFailed(to);
     } finally {
       stageInFlight.current = false;
-      setBusy(null);
+      if (stageContextCurrent()) setBusy(null);
     }
   }
 
