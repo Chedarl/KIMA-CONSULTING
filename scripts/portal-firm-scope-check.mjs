@@ -1859,3 +1859,22 @@ assert.ok(requestLockCheck >= 0 && requestLockCheck < requestLockAcquire &&
   "request single-flight lock must be checked and acquired before the first async authorization step");
 assert.ok(requestReplayBody.includes("finally {\n      requestInFlight.current = false;"),
   "request single-flight lock must be released after success and all failures");
+
+
+// Phase 3/4: a client-visible or internal case note is a non-idempotent
+// event INSERT. React busy state cannot prevent two rapid submissions
+// before the next render; serialize within the mounted CaseDetail instance.
+// This does not replace server-side idempotency or authenticated replay tests.
+const noteReplayBody = detail.src.split("async function saveNote() {")[1]
+  ?.split("\n  if (!session) {")[0] ?? "";
+assert.ok(detail.src.includes("const noteInFlight = useRef(false);"),
+  "note creation requires a synchronous single-flight lock");
+const noteLockCheck = noteReplayBody.indexOf("if (noteInFlight.current) return;");
+const noteLockAcquire = noteReplayBody.indexOf("noteInFlight.current = true;");
+const noteAuthAwait = noteReplayBody.indexOf("await db.auth.getUser()");
+assert.ok(noteLockCheck >= 0 && noteLockCheck < noteLockAcquire &&
+  noteLockAcquire < noteAuthAwait &&
+  noteReplayBody.indexOf('!allowed(noteClient ? "note.write_client" : "event.view_internal").ok') < noteLockAcquire,
+  "note lock must be acquired only after capability checks and before async authorization");
+assert.ok(noteReplayBody.includes("finally {\n      noteInFlight.current = false;"),
+  "note lock must release after success and failure");
