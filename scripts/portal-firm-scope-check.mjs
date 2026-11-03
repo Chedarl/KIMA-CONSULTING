@@ -60,6 +60,24 @@ assert.match(portal.src, /engagement\.accepted_at \|\| engagement\.authorized_at
 const dashboard = inspect("components/live/client-dashboard.tsx");
 assert.match(dashboard.src, /\.eq\("organization_id", resolved\.organizationId\)/);
 const shell = inspect("components/client-portal/shell.tsx");
+// Account switches must clear all previously resolved taxpayer and firm UI
+// immediately, and invalidate in-flight shell directory/case lookups.
+assert.match(shell.src, /const authEpoch = useRef\(0\)/);
+assert.match(shell.src, /auth\.onAuthStateChange\(\(event, session\) =>/);
+const shellAuth = shell.src.split("auth.onAuthStateChange((event, session) => {")[1]?.split("\n    });")[0];
+assert.ok(shellAuth, "client shell must observe auth changes");
+assert.ok(shellAuth.includes("if (nextUserId === authIdentity.current) return;"),
+  "same-user token refresh must preserve the selected firm");
+for (const state of ["++authEpoch.current", "setBiz([])", "setActiveId(null)",
+  "setMultipleFirms(undefined)", "setFirmOptions([])", 'setSelectedFirmId("")',
+  "setUnread(0)", "catalogue.current = []", 'setQuery("")']) {
+  assert.ok(shellAuth.includes(state), "auth change must clear " + state);
+}
+assert.match(shell.src, /if \(cancelled \|\| epoch !== authEpoch\.current\) return;/);
+assert.ok((shell.src.match(/if \(cancelled \|\| epoch !== authEpoch\.current\) return;/g) ?? []).length >= 4,
+  "all asynchronous shell reads must reject prior-account completions");
+assert.match(shell.src, /subscription\.unsubscribe\(\)/);
+assert.match(shell.src, /copy\.nav\.requests, locale, identityVersion\]/);
 assert.match(shell.src, /multipleFirms && !path\.startsWith/);
 assert.match(shell.src, /savePortalFirmChoice\(activeId, id\)/);
 assert.match(shell.src, /firmOptions\.some\(\(firm\) => firm\.id === id\)/);
@@ -292,5 +310,23 @@ assert.ok(invitationDecision.includes("void load({ keepError: true });"),
 assert.ok(invitationDecision.indexOf("Invitation unavailable or expired.") <
   invitationDecision.indexOf('.rpc("decide_invitation"'),
   "stale-click feedback must precede the decision RPC");
+
+
+// A taxpayer may have multiple active accounting firms. The shell's search
+// catalogue and unread badge must use the selected, verified firm as well as
+// the taxpayer; otherwise one firm's cases/messages appear in another view.
+// These source assertions supplement authenticated two-firm staging tests.
+const shellContextReads = shell.src.split("const context = await resolvePortalContext();")[1]?.split("\n      } catch {")[0] ?? "";
+assert.ok(shellContextReads, "client shell context reads must exist");
+for (const table of ["compliance_cases", "document_requests"]) {
+  const read = shellContextReads.split('db.from("' + table + '")')[1]?.split("\n")[0] ?? "";
+  assert.ok(read.includes('.eq("taxpayer_id", ids.taxpayerId)') &&
+    read.includes('.eq("organization_id", ids.organizationId)'),
+    table + " must scope shell search to the selected firm and taxpayer");
+}
+const unreadRead = shellContextReads.split('.from("messages")')[1]?.split('.is("read_at", null)')[0] ?? "";
+assert.ok(unreadRead.includes('.eq("taxpayer_id", tid)') &&
+  unreadRead.includes('.eq("organization_id", ids.organizationId)'),
+  "unread badge must be scoped to the selected firm and taxpayer");
 
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
