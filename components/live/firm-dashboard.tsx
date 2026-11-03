@@ -18,6 +18,7 @@ import {
   type CaseRequest,
   type CaseTask,
   type ComplianceCase,
+  type CaseStage,
   type Risk,
 } from "@/lib/cases";
 import { describe, type CaseEvent } from "@/lib/events";
@@ -46,6 +47,17 @@ const RISK_TONE: Record<Risk, string> = {
   unknown: "border-border-strong bg-surface-sunken text-fg-muted",
   on_track: "border-success/40 bg-success-soft text-success-text",
 };
+
+const PIPELINE_STAGES: CaseStage[] = [
+  "documents",
+  "accounting",
+  "preparation",
+  "review",
+  "filing",
+  "evidence",
+  "client_approval",
+  "delivered",
+];
 
 function groupByCase<T extends { case_id: string | null }>(rows: T[]): Record<string, T[]> {
   const out: Record<string, T[]> = {};
@@ -208,6 +220,16 @@ export function FirmDashboard({
     [rows],
   );
 
+  // One column per stage: the whole firm's work, in the order work moves.
+  const pipeline = useMemo(
+    () =>
+      PIPELINE_STAGES.map((stage) => ({
+        stage,
+        cases: (rows ?? []).filter((c) => c.stage === stage),
+      })),
+    [rows],
+  );
+
   const greeting = useMemo(() => {
     const h = new Date().getHours();
     if (h < 12) return t.greetingMorning;
@@ -257,6 +279,74 @@ export function FirmDashboard({
           />
         </div>
       )}
+
+      {/* Pipeline: every open case, at the stage it is in. */}
+      <Card>
+        <CardHeader
+          title={t.pipelineTitle}
+          action={
+            <Link
+              href={queueHref}
+              className="inline-flex min-h-[44px] items-center text-xs font-semibold text-teal-text underline-offset-2 hover:underline"
+            >
+              {t.viewAll}
+            </Link>
+          }
+        />
+        <div className="p-4 sm:p-5">
+          <p className="text-sm text-fg-muted">{t.pipelineHint}</p>
+          <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+            {pipeline.map(({ stage, cases }) => (
+              <section
+                key={stage}
+                className="flex w-[15rem] shrink-0 flex-col gap-2 rounded-xl border border-border bg-surface-sunken/60 p-2.5"
+              >
+                <header className="flex items-center justify-between px-1">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                    {stageLabel(stage, locale)}
+                  </h3>
+                  <span className="tnum rounded-full bg-surface px-2 py-0.5 font-mono text-[11px] text-fg-muted">
+                    {cases.length}
+                  </span>
+                </header>
+                {cases.length === 0 ? (
+                  <p className="px-1 py-2 text-[11px] text-fg-subtle">{t.pipelineEmpty}</p>
+                ) : (
+                  cases.slice(0, 4).map((c) => {
+                    const r = risk(c, today);
+                    return (
+                      <Link
+                        key={c.id}
+                        href={`/${locale}/workspace/cases/${c.id}`}
+                        className="rounded-lg border border-border bg-surface px-2.5 py-2 transition hover:border-teal/40 hover:shadow-card"
+                      >
+                        <p className="truncate text-xs font-semibold text-fg">
+                          {c.taxpayer_name ?? names[c.taxpayer_id] ?? t.unnamedClient}
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px] text-fg-muted">
+                          {obligationLabel(c.obligation_code, locale)}
+                        </p>
+                        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-fg-subtle">
+                          <span className={`h-1.5 w-1.5 rounded-full ${RISK_TONE[r]}`} aria-hidden />
+                          <span className="tnum font-mono">{c.due_on}</span>
+                        </p>
+                      </Link>
+                    );
+                  })
+                )}
+                {cases.length > 4 && (
+                  <Link
+                    href={queueHref}
+                    className="px-1 text-[11px] font-semibold text-teal-text hover:underline"
+                  >
+                    +{cases.length - 4} {t.pipelineMore}
+                  </Link>
+                )}
+              </section>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
         <Card>
