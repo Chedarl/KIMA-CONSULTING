@@ -32,12 +32,15 @@ const LOCALE_NAMES: Record<Locale, string> = { fr: "Français", en: "English" };
 export function Chrome({
   locale,
   labels,
+  hideBrand = false,
   minimal = false,
 }: {
   locale: Locale;
   labels: ChromeLabels;
   /** Workspace keeps the brand, language and theme, not the marketing links. */
   minimal?: boolean;
+  /** The workspace sidebar already carries the brand. */
+  hideBrand?: boolean;
 }) {
   const pathname = usePathname() || `/${locale}`;
   const rest = pathname.split("/").slice(2).join("/");
@@ -77,19 +80,25 @@ export function Chrome({
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5">
-        <Link
-          href={`/${locale}`}
-          className="flex min-h-[44px] items-center gap-2.5"
-        >
-          {/* Colour mark on light chrome, white mark when the surface is dark. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/mark-color.svg" alt="" width={28} height={28} className="brand-mark-light h-7 w-7" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/mark-white.svg" alt="" width={28} height={28} className="brand-mark-dark h-7 w-7" />
-          <span className="text-sm font-bold tracking-tight text-fg">
-            KIMA<span className="font-normal text-fg-muted"> OS</span>
-          </span>
-        </Link>
+        {hideBrand ? (
+          <Link
+            href={`/${locale}/workspace`}
+            className="flex min-h-[44px] items-center text-sm font-semibold text-fg-muted hover:text-fg"
+          >
+            {labels.workspace}
+          </Link>
+        ) : (
+          <Link href={`/${locale}`} className="flex min-h-[44px] items-center gap-2.5">
+            {/* Colour mark on light chrome, white mark when the surface is dark. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/mark-color.svg" alt="" width={28} height={28} className="brand-mark-light h-7 w-7" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/mark-white.svg" alt="" width={28} height={28} className="brand-mark-dark h-7 w-7" />
+            <span className="text-sm font-bold tracking-tight text-fg">
+              KIMA<span className="font-normal text-fg-muted"> OS</span>
+            </span>
+          </Link>
+        )}
 
         <nav aria-label={labels.mainNav} className={`order-3 w-full sm:order-2 sm:w-auto${minimal ? " hidden" : ""}`}>
           <ul className="flex flex-wrap items-center gap-1">

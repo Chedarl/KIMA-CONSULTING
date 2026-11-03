@@ -86,17 +86,25 @@ export function FirmSessionBar({ locale, t }: { locale: "fr" | "en"; t: Labels }
           {t.signOut}
         </button>
       </div>
-      <p className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">{t.capabilities}</p>
-      <ul className="flex flex-wrap gap-1">
-        {caps.map((cap) => (
-          <li
-            key={cap}
-            className="rounded-full border border-border bg-surface-sunken px-2 py-0.5 font-mono text-[11px] text-fg-muted"
-          >
-            {cap}
-          </li>
-        ))}
-      </ul>
+      <details className="group">
+        <summary className="flex w-fit cursor-pointer list-none items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-fg-subtle hover:text-fg-muted">
+          {t.capabilities}
+          <span className="rounded-full bg-surface-sunken px-1.5 py-0.5 font-mono text-[10px] normal-case text-fg-muted">
+            {caps.length}
+          </span>
+          <span aria-hidden="true" className="text-[10px] transition group-open:rotate-180">▾</span>
+        </summary>
+        <ul className="mt-2 flex flex-wrap gap-1">
+          {caps.map((cap) => (
+            <li
+              key={cap}
+              className="rounded-full border border-border bg-surface-sunken px-2 py-0.5 font-mono text-[11px] text-fg-muted"
+            >
+              {cap}
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }
