@@ -5,6 +5,7 @@ import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import { Shell, type NavItem } from "@/components/shell";
 import { FirmSearch } from "@/components/live/firm-search";
 import { FirmSessionBar } from "@/components/live/firm-session-bar";
+import { KimaAssistant } from "@/components/live/kima-assistant";
 
 /**
  * Firm workspace chrome.
@@ -61,6 +62,7 @@ export default function FirmLayout({
     >
       <div className="mb-4 flex flex-col gap-3">
         <FirmSessionBar locale={locale} t={w.firmLogin} />
+        <KimaAssistant locale={locale} t={w.firm.kima} />
         <div className="flex flex-wrap items-center gap-3">
           <FirmSearch
             locale={locale}
