@@ -8,10 +8,9 @@ update when the facts change.
 
 **HOLD — not released for general customer use.**
 
-- Production migrations 104, staging 104 (parity restored 3 Nov).
+- Production migrations 106, staging 106 (parity re-confirmed 3 Nov).
 - `allow_firm_signup` and `allow_public_contact_inquiries` are **enabled** on
-  both environments, set by the owner on 3 November 2026 (recorded in the flag
-  notes). Firm account creation still waits on email delivery.
+  both environments, set by the owner on 3 November 2026 and re-confirmed keep-enabled in session the same day; the confirmation is recorded in the flag notes on both databases. Firm account creation still waits on email delivery.
 - No DGI/government integration exists or is claimed.
 - The public marketing site remains demonstration content; the workspace is
   operational for signed-in firm members.
@@ -73,6 +72,10 @@ correctness: a client or firm never sees another tenant's rows by policy.
   rotated and the description redacted.
 
 ## Known defects and open items
+
+- Client identity bridge: for a taxpayer engaged by several firms, the bridge
+  resolves the most recently authorized engagement; a client UI that lets the
+  user pick a firm would need the full list. Documented limitation.
 
 - Firm account creation cannot deliver one-time codes: no mail provider key is
   configured (Resend). Blocking item for self-signup.
