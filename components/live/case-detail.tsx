@@ -575,6 +575,49 @@ export function CaseDetail({
           !(engagement.authorized_at || engagement.accepted_at)) {
         throw new Error("No active engagement for this case");
       }
+      // The OTP session and cached case can outlive the member's actual
+      // grant. Rebind the member to current Auth, then verify this exact case
+      // and its active firm engagement before inserting a new request.
+      // RLS is still authoritative at the insert boundary.
+      const { data: { user }, error: authError } = await db.auth.getUser();
+      if (authError || !user) throw new Error("Firm authentication unavailable");
+      const { data: liveMember, error: memberError } = await db
+        .from("firm_members")
+        .select("id, role, person_label")
+        .eq("id", member.id)
+        .eq("auth_user_id", user.id)
+        .eq("organization_id", orgId)
+        .eq("active", true)
+        .is("deactivated_at", null)
+        .maybeSingle();
+      if (memberError || !liveMember || liveMember.role !== member.role ||
+          liveMember.person_label !== member.person_label) {
+        throw new Error("Firm membership changed");
+      }
+      const { data: liveCase, error: caseError } = await db
+        .from("compliance_cases")
+        .select("id")
+        .eq("id", row.id)
+        .eq("taxpayer_id", row.taxpayer_id)
+        .eq("organization_id", orgId)
+        .eq("engagement_id", engagement.id)
+        .maybeSingle();
+      if (caseError || !liveCase) throw new Error("Case authorization changed");
+      const { data: liveEngagement, error: engagementError } = await db
+        .from("engagements")
+        .select("id, assigned_to, authorized_at, accepted_at")
+        .eq("id", engagement.id)
+        .eq("taxpayer_id", row.taxpayer_id)
+        .eq("organization_id", orgId)
+        .in("status", ["authorized", "accepted"])
+        .is("revoked_at", null)
+        .maybeSingle();
+      if (engagementError || !liveEngagement) throw new Error("Engagement unavailable");
+      if (!(liveEngagement.authorized_at || liveEngagement.accepted_at) ||
+          (member.role === "firm_staff" &&
+           liveEngagement.assigned_to !== member.person_label)) {
+        throw new Error("Engagement no longer authorizes this member");
+      }
       const due =
         askDue ||
         (() => {
