@@ -42,7 +42,7 @@ select is(
   (select count(*)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
-      and p.proname in ('can_see_taxpayer', 'client_taxpayer_ids', 'member_has',
+      and p.proname in ('can_see_taxpayer', 'member_has',
                         'member_has_in_org', 'firm_member_has', 'current_firm_role',
                         'current_member_label', 'demo_taxpayer_id', 'flag_enabled',
                         'auth_identity_is_single', 'portal_request_code')),
@@ -106,8 +106,8 @@ select is(
       and p.prosecdef
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
-  'admin_review_firm, can_write_client_note, current_firm_member, firm_directory, list_unassigned_registrations, '
-  'manage_firm_staff, route_unassigned_registration, sign_up_firm',
+  'admin_review_firm, can_write_client_note, client_taxpayer_ids, current_firm_member, firm_directory, '
+  'list_unassigned_registrations, manage_firm_staff, route_unassigned_registration, sign_up_firm',
   'T-53 only the definer functions named here stay callable in public'
 );
 
