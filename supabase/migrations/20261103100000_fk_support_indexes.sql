@@ -1,0 +1,35 @@
+-- Foreign-key support indexes (Supabase performance advisories).
+-- One index per unindexed foreign key, in the FK's own column order.
+create index if not exists idx_account_tags_tag_id on public.account_tags (tag_id);
+create index if not exists idx_accounting_periods_taxpayer_id on public.accounting_periods (taxpayer_id);
+create index if not exists idx_audit_events_actor_member_id on public.audit_events (actor_member_id);
+create index if not exists idx_case_client_approvals_approved_by on public.case_client_approvals (approved_by);
+create index if not exists idx_case_client_approvals_case_id_taxpayer_id on public.case_client_approvals (case_id, taxpayer_id);
+create index if not exists idx_case_events_taxpayer_id on public.case_events (taxpayer_id);
+create index if not exists idx_compliance_cases_organization_id on public.compliance_cases (organization_id);
+create index if not exists idx_contacts_organization_id on public.contacts (organization_id);
+create index if not exists idx_declarations_organization_id on public.declarations (organization_id);
+create index if not exists idx_document_access_log_version_id on public.document_access_log (version_id);
+create index if not exists idx_document_requests_case_id_taxpayer_id on public.document_requests (case_id, taxpayer_id);
+create index if not exists idx_document_requests_organization_id on public.document_requests (organization_id);
+create index if not exists idx_documents_request_id on public.documents (request_id);
+create index if not exists idx_engagement_invitations_decided_by on public.engagement_invitations (decided_by);
+create index if not exists idx_engagement_invitations_engagement_id on public.engagement_invitations (engagement_id);
+create index if not exists idx_engagement_invitations_initiated_by on public.engagement_invitations (initiated_by);
+create index if not exists idx_engagement_invitations_recipient_user_id on public.engagement_invitations (recipient_user_id);
+create index if not exists idx_engagement_invitations_taxpayer_id on public.engagement_invitations (taxpayer_id);
+create index if not exists idx_engagements_taxpayer_id on public.engagements (taxpayer_id);
+create index if not exists idx_incident_contacts_incident_id on public.incident_contacts (incident_id);
+create index if not exists idx_message_threads_organization_id on public.message_threads (organization_id);
+create index if not exists idx_messages_attachment_id on public.messages (attachment_id);
+create index if not exists idx_messages_organization_id on public.messages (organization_id);
+create index if not exists idx_messages_request_id on public.messages (request_id);
+create index if not exists idx_notification_outbox_taxpayer_id on public.notification_outbox (taxpayer_id);
+create index if not exists idx_portal_accounts_contact_id on public.portal_accounts (contact_id);
+create index if not exists idx_registrations_organization_id on public.registrations (organization_id);
+create index if not exists idx_registrations_taxpayer_id on public.registrations (taxpayer_id);
+create index if not exists idx_service_payments_organization_id on public.service_payments (organization_id);
+create index if not exists idx_tax_attestations_document_id on public.tax_attestations (document_id);
+create index if not exists idx_tax_attestations_recorded_by on public.tax_attestations (recorded_by);
+create index if not exists idx_time_entries_case_id on public.time_entries (case_id);
+create index if not exists idx_validation_findings_taxpayer_id on public.validation_findings (taxpayer_id);
