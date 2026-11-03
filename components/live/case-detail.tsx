@@ -227,6 +227,9 @@ export function CaseDetail({
   const [offline, setOffline] = useState(false);
   const [missing, setMissing] = useState(false);
   const loadEpoch = useRef(0);
+  // Render-time identity, so an old async task cannot act after route changes.
+  const activeCaseIdRef = useRef(caseId);
+  activeCaseIdRef.current = caseId;
   const sessionMemberRef = useRef<string | null | undefined>(undefined);
   // A document request is a non-idempotent insert; React busy state alone
   // cannot serialize rapid submissions before the next render.
@@ -897,6 +900,11 @@ export function CaseDetail({
       setRefusedBy(t.notPermitted);
       return;
     }
+    const actionCaseId = row.id;
+    const actionMemberId = member.id;
+    const taskContextCurrent = () =>
+      activeCaseIdRef.current === actionCaseId &&
+      sessionMemberRef.current === actionMemberId;
     taskInFlight.current = true;
     setBusy(task.id);
     setFailed(null);
@@ -953,6 +961,9 @@ export function CaseDetail({
         .eq("state", task.state)
         .maybeSingle();
       if (taskError || !liveTask) throw new Error("Task state or case changed");
+      // Async Auth/tenant preflight may have crossed a route or member switch.
+      // Do not submit a former case action from the newly displayed context.
+      if (!taskContextCurrent()) throw new Error("Case or firm session changed");
       const done = task.state === "done";
       const written = await updateById("case_tasks", task.id, {
         state: done ? "open" : "done",
@@ -965,16 +976,19 @@ export function CaseDetail({
         state: task.state,
       });
       if (!written.ok) {
-        setFailed(task.id);
-        setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        if (taskContextCurrent()) {
+          setFailed(task.id);
+          setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        }
         return;
       }
-      await load();
+      // A late completion must not reload or clear feedback for another case.
+      if (taskContextCurrent()) await load();
     } catch {
-      setFailed(task.id);
+      if (taskContextCurrent()) setFailed(task.id);
     } finally {
       taskInFlight.current = false;
-      setBusy(null);
+      if (taskContextCurrent()) setBusy(null);
     }
   }
 
