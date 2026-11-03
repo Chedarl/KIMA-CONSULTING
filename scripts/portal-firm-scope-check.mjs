@@ -888,3 +888,25 @@ const invitationAuthReset = invitations.src.split("auth.onAuthStateChange(")[1]
   ?.split("subscription.unsubscribe();")[0] ?? "";
 assert.ok(invitationAuthReset.includes("mutationInFlight.current = false;"),
   "Auth identity changes must release the prior user's mutation lock");
+
+
+// A firm operator may belong to multiple organizations. An engagement moved
+// between firms after the invitation form loaded must not silently redirect a
+// contact invitation to another firm the operator also belongs to.
+// Source-contract only; authenticated cross-firm tests remain required.
+assert.ok(invitations.src.includes("type DraftEngagement = { id: string; taxpayer_id: string; organization_id: string }"),
+  "draft selection must retain its original organization ID");
+assert.ok(firmInvitationLoad.includes('.select("id,taxpayer_id,organization_id").in("organization_id", memberOrgIds)'),
+  "firm draft loader must retain the selected organization's ID");
+const contactInvitationBody = invitations.src.split("  async function inviteContact()")[1]
+  ?.split("\n  return (")[0] ?? "";
+const contactLiveDraft = contactInvitationBody.indexOf('.from("engagements")');
+const contactRpc = contactInvitationBody.indexOf('db.rpc("create_invitation_for_contact"');
+assert.ok(contactLiveDraft > 0 && contactRpc > contactLiveDraft,
+  "contact invitation must fetch live engagement before RPC");
+assert.ok(contactInvitationBody.includes("liveDraft.organization_id !== selectedDraft.organization_id") &&
+  contactInvitationBody.indexOf("liveDraft.organization_id !== selectedDraft.organization_id") < contactRpc,
+  "contact invitation must reject an engagement reassigned to another firm");
+assert.ok(contactInvitationBody.includes("await rejectStale();") &&
+  contactInvitationBody.includes('.eq("organization_id", liveDraft.organization_id)'),
+  "changed firm must fail closed while preserving live membership verification");

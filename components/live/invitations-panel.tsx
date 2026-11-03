@@ -11,7 +11,7 @@ type Invitation = {
   expires_at: string;
 };
 type Firm = { id: string; name: string };
-type DraftEngagement = { id: string; taxpayer_id: string };
+type DraftEngagement = { id: string; taxpayer_id: string; organization_id: string };
 
 export function InvitationsPanel({ locale, side }: {
   locale: "fr" | "en"; side: "taxpayer" | "firm";
@@ -104,7 +104,7 @@ export function InvitationsPanel({ locale, side }: {
       scopedInvitationQuery.order("created_at", { ascending: false }).limit(100),
       side === "taxpayer" ? db.rpc("firm_directory") : Promise.resolve({ data: [] }),
       side === "firm" ? db.from("engagements")
-        .select("id,taxpayer_id").in("organization_id", memberOrgIds)
+        .select("id,taxpayer_id,organization_id").in("organization_id", memberOrgIds)
         .in("status", ["draft", "invited"])
         .is("revoked_at", null) : Promise.resolve({ data: [] }),
     ]);
@@ -399,6 +399,9 @@ export function InvitationsPanel({ locale, side }: {
     if (epoch !== authEpoch.current) return;
     if (liveDraftError || !liveDraft ||
         liveDraft.taxpayer_id !== selectedDraft.taxpayer_id ||
+        // A multi-firm operator must not silently invite through a different
+        // firm if this engagement was reassigned after the form loaded.
+        liveDraft.organization_id !== selectedDraft.organization_id ||
         liveDraft.revoked_at ||
         (liveDraft.status !== "draft" && liveDraft.status !== "invited")) {
       await rejectStale();
