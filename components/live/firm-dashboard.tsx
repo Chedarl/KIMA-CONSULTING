@@ -1,4 +1,6 @@
 "use client";
+import { ledgerBalance } from "@/lib/billing";
+import { formatXaf } from "@/lib/i18n";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -80,6 +82,13 @@ const daysAgoISO = (n: number) => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 };
 
+/** Whole days since an ISO timestamp, floored at 0 — the age a reviewer cares about. */
+function daysWaiting(iso: string): number {
+  const start = Date.parse(iso);
+  if (Number.isNaN(start)) return 0;
+  return Math.max(0, Math.floor((Date.now() - start) / 86_400_000));
+}
+
 function Tile({
   label,
   value,
@@ -130,11 +139,13 @@ export function FirmDashboard({
   const [events, setEvents] = useState<CaseEvent[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
   const [offline, setOffline] = useState(false);
+  const [money, setMoney] = useState<{ billed: number; collected: number; outstanding: number; awaiting: number; overdue: number } | null>(null);
+  const [pendingDocs, setPendingDocs] = useState<{ id: string; file_name: string; taxpayer_id: string; created_at: string }[]>([]);
 
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      const [cases, reqs, tsk, evs, tps] = await Promise.all([
+      const [cases, reqs, tsk, evs, tps, inv, pay, docs] = await Promise.all([
         db
           .from("compliance_cases")
           .select(
@@ -161,6 +172,9 @@ export function FirmDashboard({
           .order("occurred_at", { ascending: false })
           .limit(8),
         db.from("taxpayers").select("id, legal_name"),
+        db.from("invoices").select("id, total_minor, status, due_on"),
+        db.from("service_payments").select("id, invoice_id, amount_minor, status"),
+        db.from("documents").select("id, file_name, taxpayer_id, created_at").eq("review_status", "pending").order("created_at", { ascending: true }).limit(50),
       ]);
 
       if (cases.error) throw cases.error;
@@ -176,6 +190,29 @@ export function FirmDashboard({
           ]),
         ),
       );
+      {
+        const invRows = (inv.data ?? []) as { id: string; total_minor: number; status: string; due_on: string | null }[];
+        const payRows = (pay.data ?? []) as { id: string; invoice_id: string; amount_minor: number; status: string }[];
+        let billed = 0;
+        let collected = 0;
+        let outstanding = 0;
+        let overdue = 0;
+        const todayIso = todayISO();
+        for (const row of invRows) {
+          if (row.status === "void" || row.status === "draft") continue;
+          const bal = ledgerBalance(payRows as never, row.id);
+          billed += row.total_minor;
+          collected += bal.confirmed;
+          const left = row.total_minor - bal.confirmed;
+          if (left > 0) {
+            outstanding += left;
+            if (row.due_on && row.due_on < todayIso) overdue += left;
+          }
+        }
+        const awaiting = payRows.filter((x) => x.status === "pending_confirmation").reduce((s, x) => s + x.amount_minor, 0);
+        setMoney({ billed, collected, outstanding, awaiting, overdue });
+        setPendingDocs((docs.data ?? []) as { id: string; file_name: string; taxpayer_id: string; created_at: string }[]);
+      }
     } catch {
       // Nothing rather than stale numbers: a dashboard that keeps showing the
       // last good figure during an outage is how a deadline gets missed.
@@ -279,6 +316,80 @@ export function FirmDashboard({
           />
         </div>
       )}
+
+      {/* F2 + F3: the money, and what is ageing in review. */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <CardHeader
+            title={t.moneyTitle}
+            action={
+              <Link
+                href={`/${locale}/workspace/billing`}
+                className="inline-flex min-h-[44px] items-center text-xs font-semibold text-teal-text underline-offset-2 hover:underline"
+              >
+                {t.viewAll}
+              </Link>
+            }
+          />
+          <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4 sm:p-5">
+            {[
+              { label: t.moneyBilled, value: money?.billed ?? 0 },
+              { label: t.moneyCollected, value: money?.collected ?? 0 },
+              { label: t.moneyOutstanding, value: money?.outstanding ?? 0 },
+              { label: t.moneyAwaiting, value: money?.awaiting ?? 0 },
+            ].map((s) => (
+              <div key={s.label}>
+                <p className="text-[11px] uppercase tracking-wide text-fg-subtle">{s.label}</p>
+                <p className="tnum mt-1 font-mono text-sm font-semibold text-fg">
+                  {formatXaf(s.value, locale)} XAF
+                </p>
+              </div>
+            ))}
+            {money && money.overdue > 0 && (
+              <p className="col-span-2 text-[11px] text-danger-text sm:col-span-4">
+                {t.moneyOverdue} : {formatXaf(money.overdue, locale)} XAF
+              </p>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title={t.reviewTitle}
+            action={
+              <Link
+                href={`/${locale}/workspace/inbox`}
+                className="inline-flex min-h-[44px] items-center text-xs font-semibold text-teal-text underline-offset-2 hover:underline"
+              >
+                {t.viewAll}
+              </Link>
+            }
+          />
+          <div className="p-4 sm:p-5">
+            {pendingDocs.length === 0 ? (
+              <p className="text-sm text-fg-muted">{t.reviewEmpty}</p>
+            ) : (
+              <>
+                <p className="text-sm text-fg-muted">
+                  {t.reviewOldest} {daysWaiting(pendingDocs[0].created_at)} {t.reviewDays}
+                </p>
+                <ul className="mt-3 flex flex-col gap-1.5">
+                  {pendingDocs.slice(0, 3).map((d) => (
+                    <li key={d.id} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="min-w-0 truncate text-fg">
+                        {names[d.taxpayer_id] ?? t.unnamedClient} — {d.file_name}
+                      </span>
+                      <span className="tnum shrink-0 font-mono text-xs text-fg-subtle">
+                        {daysWaiting(d.created_at)} {t.reviewDays}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        </Card>
+      </div>
 
       {/* Pipeline: every open case, at the stage it is in. */}
       <Card>
