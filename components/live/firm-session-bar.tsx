@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   clearFirmSession,
+  hydrateFirmSession,
   memberFromSession,
   subscribeFirmSession,
   type FirmSession,
@@ -27,7 +28,20 @@ type Labels = {
 export function FirmSessionBar({ locale, t }: { locale: "fr" | "en"; t: Labels }) {
   const [session, setSession] = useState<FirmSession | null | undefined>(undefined);
 
-  useEffect(() => subscribeFirmSession(setSession), []);
+  useEffect(() => {
+    let alive = true;
+    const unsubscribe = subscribeFirmSession((next: FirmSession | null) => {
+      if (alive) setSession(next);
+    });
+    // A Supabase session with no firm record is still a signed-in partner.
+    void hydrateFirmSession().then((next) => {
+      if (alive && next) setSession(next);
+    });
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
 
   const caps = useMemo(() => {
     if (!session) return [];

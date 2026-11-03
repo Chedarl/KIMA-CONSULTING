@@ -176,3 +176,46 @@ export async function clearFirmSession(): Promise<void> {
     // Auth may be unconfigured.
   }
 }
+
+/**
+ * Adopt an existing Supabase session as a firm session.
+ *
+ * The OTP flow normally writes the firm session itself, but a magic link, a
+ * refreshed tab or a second device produces a valid Supabase session with no
+ * record in sessionStorage — and the bar would then tell a signed-in partner
+ * they were not connected while their own dashboard rendered their clients.
+ * This resolves the member from `firm_members.auth_user_id`, which is the same
+ * binding every RLS policy reads, and remembers it under the existing key.
+ *
+ * `firm_members.email` is deliberately not selected: the column grants withhold
+ * it from authenticated callers, so the address comes from the auth user.
+ */
+export async function hydrateFirmSession(): Promise<FirmSession | null> {
+  const existing = readFirmSession();
+  if (existing) return existing;
+
+  try {
+    const client = supabase();
+    const { data: auth } = await client.auth.getUser();
+    const user = auth?.user;
+    if (!user) return null;
+
+    // The table cannot answer this: auth_user_id is withheld from authenticated
+    // callers and Postgres requires the privilege for a column in a WHERE.
+    const { data: rows } = await client.rpc("current_firm_member");
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) return null;
+
+    const session: FirmSession = {
+      memberId: row.id,
+      personLabel: row.person_label,
+      email: user.email ?? "",
+      role: row.role as FirmRole,
+      signedInAt: new Date().toISOString(),
+    };
+    rememberFirmSession(session);
+    return session;
+  } catch {
+    return null;
+  }
+}
