@@ -67,6 +67,21 @@ assert.ok(firmThreadLoad.indexOf('.eq("auth_user_id", user.id)') <
 assert.ok(firmThreadSend.indexOf('.eq("auth_user_id", user.id)') <
   firmThreadSend.indexOf('.from("messages").insert(optimistic)'),
   "member identity must be verified before sending a message");
+// The taxpayer thread must independently revalidate its mounted taxpayer
+// against the current authenticated portal session before reading or sending.
+// The parent wrapper alone cannot protect a stale async operation or a direct
+// MessageThread mount. Database RLS remains the final authorization boundary.
+for (const [operation, body, protectedRead] of [
+  ["read", firmThreadLoad, 'const messageQuery = db.from("messages")'],
+  ["send", firmThreadSend, '.from("messages").insert(optimistic)'],
+]) {
+  const guard = body.indexOf('side === "taxpayer" && (await sessionTaxpayerId()) !== taxpayerId');
+  const query = body.indexOf(protectedRead);
+  assert.ok(guard >= 0 && query > guard,
+    "taxpayer thread " + operation + " must revalidate its Auth-bound taxpayer before message access");
+  assert.ok(body.includes('throw new Error("Taxpayer session unavailable")'),
+    "taxpayer thread " + operation + " must fail closed for a stale taxpayer session");
+}
 const workspace = inspect("components/live/messages-workspace.tsx");
 assert.match(workspace.src, /memberId: session\.memberId/);
 // Firm inbox must resolve its OTP member against the authenticated user and
@@ -457,3 +472,29 @@ assert.ok(firmMessagesView.includes('db.from("taxpayers")') &&
   "all firm message data reads must live inside the session-keyed child");
 assert.ok(!firmMessagesView.includes("subscribeFirmSession("),
   "data-bearing child must not own an independent stale session subscription");
+
+
+// A mounted firm inbox must revalidate membership and engagement grants after
+// returning to the tab and on a bounded interval. A one-time authorized-set
+// snapshot must not remain visible indefinitely after access is revoked.
+// These source-contract checks do not replace authenticated revocation tests.
+const firmRefresh = workspace.src.split("function FirmMessagesView(")[1]?.split("  const sorted = useMemo(")[0] ?? "";
+assert.ok(firmRefresh, "firm inbox view must exist");
+assert.match(firmRefresh, /const \[refreshEpoch, setRefreshEpoch\] = useState\(0\)/);
+assert.match(firmRefresh, /window\.setInterval\(refreshAccess, 60_000\)/,
+  "mounted inbox must revalidate access periodically");
+assert.match(firmRefresh, /window\.addEventListener\("focus", refreshAccess\)/,
+  "returning to the browser must revalidate firm access");
+assert.match(firmRefresh, /document\.addEventListener\("visibilitychange", onVisibilityChange\)/,
+  "returning to a background tab must revalidate firm access");
+assert.match(firmRefresh, /document\.visibilityState === "visible"/);
+const refreshBody = firmRefresh.split("const refreshAccess = () => {")[1]?.split("\n    };")[0] ?? "";
+for (const clear of ["setClients(null)", "setPreviews({})", "setActive(null)",
+  "setAssignments([])", "setRefreshEpoch((epoch) => epoch + 1)"]) {
+  assert.ok(refreshBody.includes(clear), "access refresh must invalidate " + clear);
+}
+assert.match(firmRefresh, /}, \[session\.memberId, refreshEpoch\]\);/,
+  "every access refresh must re-run Auth, member, and engagement checks");
+assert.match(firmRefresh, /window\.clearInterval\(timer\)/);
+assert.match(firmRefresh, /window\.removeEventListener\("focus", refreshAccess\)/);
+assert.match(firmRefresh, /document\.removeEventListener\("visibilitychange", onVisibilityChange\)/);
