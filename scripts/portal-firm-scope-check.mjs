@@ -1839,3 +1839,23 @@ for (const guard of [
   "state: task.state,",
 ]) assert.ok(taskLivePreflight.includes(guard),
   "task live authorization or stale-state guard missing: " + guard);
+
+
+// Phase 3/4: creating a document request is a non-idempotent INSERT followed
+// by an event INSERT. React's busy state is asynchronous; rapid clicks must
+// not send two identical requests before the disabled button renders.
+// This is a source-contract regression; DB-level idempotency and authenticated
+// staging replay remain independent release gates.
+const requestReplayBody = detail.src.split("async function createRequest() {")[1]
+  ?.split("\n  async function toggleTask(")[0] ?? "";
+assert.ok(detail.src.includes("const requestInFlight = useRef(false);"),
+  "document-request creation needs a synchronous single-flight lock");
+const requestLockCheck = requestReplayBody.indexOf("if (requestInFlight.current) return;");
+const requestLockAcquire = requestReplayBody.indexOf("requestInFlight.current = true;");
+const requestAuthAwait = requestReplayBody.indexOf("await db.auth.getUser()");
+assert.ok(requestLockCheck >= 0 && requestLockCheck < requestLockAcquire &&
+  requestLockAcquire < requestAuthAwait &&
+  requestReplayBody.indexOf('const gate = allowed("request.create");') < requestLockAcquire,
+  "request single-flight lock must be checked and acquired before the first async authorization step");
+assert.ok(requestReplayBody.includes("finally {\n      requestInFlight.current = false;"),
+  "request single-flight lock must be released after success and all failures");
