@@ -69,6 +69,8 @@ export function ClientService({
   const pending = useRef<string | null>(null);
   const loadEpoch = useRef(0);
   const authEpoch = useRef(0);
+  // Synchronous guard: React may not disable the button before a second tap.
+  const approvalInFlight = useRef<string | null>(null);
   const identityRef = useRef<string | null | undefined>(undefined);
   // Updated during render: route changes invalidate prior-case mutation completions
   // even before effect cleanup runs.
@@ -76,6 +78,7 @@ export function ClientService({
   activeCaseId.current = caseId;
   if (caseStamp !== caseId) {
     setCaseStamp(caseId);
+    approvalInFlight.current = null;
     setBusy(null);
     setFailed(null);
     pending.current = null;
@@ -180,6 +183,7 @@ export function ClientService({
       identityRef.current = nextUserId;
       ++authEpoch.current;
       ++loadEpoch.current;
+      approvalInFlight.current = null;
       // Clear the previous identity's approval and case before reloading.
       setLoadedCaseId(null);
       setRow(undefined);
@@ -200,6 +204,7 @@ export function ClientService({
     return () => {
       ++authEpoch.current;
       ++loadEpoch.current;
+      approvalInFlight.current = null;
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
     };
@@ -261,12 +266,15 @@ export function ClientService({
     if (row.filing_status !== "verified" || !row.filing_evidence_ref?.trim()) return;
     // Do not initiate consent from a stale case while the route is changing.
     if (loadedCaseId !== caseId || row.id !== caseId) return;
+    if (approvalInFlight.current !== null) return;
     const epoch = authEpoch.current;
     const actionCaseId = caseId;
+    const approvalToken = `${epoch}:${caseId}:${row.approval_round}`;
+    approvalInFlight.current = approvalToken;
     setBusy("client-approval");
     setFailed(null);
-    const db = supabase();
     try {
+      const db = supabase();
       const { data: auth, error: authError } = await db.auth.getUser();
       if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
       if (authError || !auth.user) throw new Error("Sign-in required");
@@ -282,6 +290,8 @@ export function ClientService({
     } catch {
       if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");
     } finally {
+      // Do not unlock an approval belonging to a newer account or case.
+      if (approvalInFlight.current === approvalToken) approvalInFlight.current = null;
       if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
     }
   }

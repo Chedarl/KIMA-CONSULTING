@@ -234,8 +234,20 @@ assert.match(serviceApproval ?? "",
   /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setFailed/);
 assert.match(serviceApproval ?? "",
   /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setBusy/);
-assert.match(service.src, /if \(caseStamp !== caseId\) \{\n    setCaseStamp\(caseId\);\n    setBusy\(null\);\n    setFailed\(null\);\n    pending\.current = null;\n  \}/,
+assert.match(service.src, /if \(caseStamp !== caseId\) \{\n    setCaseStamp\(caseId\);\n    approvalInFlight\.current = null;\n    setBusy\(null\);\n    setFailed\(null\);\n    pending\.current = null;\n  \}/,
   "switching cases must clear approval busy, failure, and pending state before paint");
+
+// Rapid double-tap approval is guarded synchronously, before React renders.
+// Source contracts only; authenticated mobile race testing remains outstanding.
+assert.ok(service.src.includes("const approvalInFlight = useRef<string | null>(null)"));
+assert.ok((serviceApproval ?? "").includes("if (approvalInFlight.current !== null) return;"));
+assert.ok((serviceApproval ?? "").includes("approvalInFlight.current = approvalToken;"));
+assert.ok((serviceApproval ?? "").includes("const approvalToken = `${epoch}:${caseId}:${row.approval_round}`;"));
+assert.ok((serviceApproval ?? "").includes("try {\n      const db = supabase();"));
+assert.ok((serviceApproval ?? "").includes("if (approvalInFlight.current === approvalToken) approvalInFlight.current = null;"));
+assert.ok(service.src.includes("setCaseStamp(caseId);\n    approvalInFlight.current = null;"));
+assert.ok(service.src.includes("++authEpoch.current;\n      ++loadEpoch.current;\n      approvalInFlight.current = null;"));
+assert.ok(service.src.includes("return () => {\n      ++authEpoch.current;\n      ++loadEpoch.current;\n      approvalInFlight.current = null;"));
 
 // A route switch can happen while the previous case's file picker remains open.
 // Reject old-case uploads and approvals at initiation, not only after an await.
