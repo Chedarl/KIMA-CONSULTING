@@ -199,6 +199,11 @@ const fr = {
     welcome: "Bonjour ! Le guide suit la page où vous êtes. L'onglet Premiers pas trace vos débuts, et Rechercher répond depuis les guides vérifiés.",
     done: "fait",
   },
+    cmdPlaceholder: "Aller à… ou chercher un dossier",
+    cmdGroupNavigate: "Naviguer",
+    cmdGroupCases: "Dossiers et clients",
+    cmdNoResults: "Aucun résultat.",
+    cmdHint: "↑ ↓ pour naviguer · Entrée pour ouvrir · Échap pour fermer",
   dsf: {
     title: "Passerelle DSF",
     subtitle: "Déposez un journal (CSV). Rien n'est écrit : le contrôle est une simulation.",
@@ -1384,6 +1389,11 @@ const en: WorkspaceDictionary = {
     welcome: "Hello! The guide follows the page you are on. Getting started tracks your first steps, and Search answers from the verified guides.",
     done: "done",
   },
+    cmdPlaceholder: "Go to… or search a case",
+    cmdGroupNavigate: "Navigate",
+    cmdGroupCases: "Cases and clients",
+    cmdNoResults: "No results.",
+    cmdHint: "↑ ↓ to move · Enter to open · Esc to close",
   dsf: {
     title: "DSF bridge",
     subtitle: "Drop a ledger (CSV). Nothing is written: the check is a dry run.",

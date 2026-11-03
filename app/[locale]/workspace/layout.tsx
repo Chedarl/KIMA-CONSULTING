@@ -6,6 +6,7 @@ import { Shell, type NavItem } from "@/components/shell";
 import { FirmSearch } from "@/components/live/firm-search";
 import { FirmSessionBar } from "@/components/live/firm-session-bar";
 import { KimaAssistant } from "@/components/live/kima-assistant";
+import { CommandPalette } from "@/components/live/command-palette";
 
 /**
  * Firm workspace chrome.
@@ -63,6 +64,17 @@ export default function FirmLayout({
       <div className="mb-4 flex flex-col gap-3">
         <FirmSessionBar locale={locale} t={w.firmLogin} />
         <KimaAssistant locale={locale} t={w.firm.kima} />
+        <CommandPalette
+          locale={locale}
+          nav={nav.filter((n) => n.ready !== false).map((n) => ({ href: n.href, label: n.label }))}
+          labels={{
+            placeholder: w.firm.cmdPlaceholder,
+            groupNavigate: w.firm.cmdGroupNavigate,
+            groupCases: w.firm.cmdGroupCases,
+            noResults: w.firm.cmdNoResults,
+            hint: w.firm.cmdHint,
+          }}
+        />
         <div className="flex flex-wrap items-center gap-3">
           <FirmSearch
             locale={locale}
