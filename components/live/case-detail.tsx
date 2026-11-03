@@ -237,6 +237,9 @@ export function CaseDetail({
   // A stage decision can write a transition and audit event. Serialize rapid
   // competing stage clicks within this mounted case screen.
   const stageInFlight = useRef(false);
+  // Accept and return compete for one submitted document. Block a second
+  // review decision synchronously, before React commits busy state.
+  const reviewInFlight = useRef(false);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -648,6 +651,7 @@ export function CaseDetail({
    * becomes a guessing game.
    */
   async function settleRequest(r: CaseRequest, to: "accepted" | "returned") {
+    if (reviewInFlight.current) return;
     if (!row || !member) return;
     // The button's visibility is not authorization. Bind the review to the
     // exact submitted request, live case tenant, and active firm engagement.
@@ -669,6 +673,7 @@ export function CaseDetail({
       setFailed(r.id);
       return;
     }
+    reviewInFlight.current = true;
     setBusy(r.id);
     setFailed(null);
     setRefusedBy(null);
@@ -753,6 +758,7 @@ export function CaseDetail({
     } catch {
       setFailed(r.id);
     } finally {
+      reviewInFlight.current = false;
       setBusy(null);
     }
   }
