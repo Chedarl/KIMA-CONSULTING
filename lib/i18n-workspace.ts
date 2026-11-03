@@ -1064,6 +1064,14 @@ const fr = {
     blocking: "Bloquante",
     stateOpen: "Ouverte",
     stateDone: "Faite",
+    newTask: "Nouvelle tâche",
+    taskTitle: "Intitulé",
+    caseLabel: "Dossier",
+    dueDate: "Échéance",
+    create: "Créer la tâche",
+    creating: "Création…",
+    createFailed: "La tâche n'a pas été créée.",
+    chooseCase: "Choisir un dossier",
   },
 };
 
@@ -2101,6 +2109,14 @@ const en: WorkspaceDictionary = {
     blocking: "Blocking",
     stateOpen: "Open",
     stateDone: "Done",
+    newTask: "New task",
+    taskTitle: "Title",
+    caseLabel: "Case",
+    dueDate: "Due date",
+    create: "Create task",
+    creating: "Creating…",
+    createFailed: "The task was not created.",
+    chooseCase: "Choose a case",
   },
 };
 
