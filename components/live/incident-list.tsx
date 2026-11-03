@@ -16,6 +16,10 @@ type Labels = {
   evidence: string; addEvidence: string; evidenceKind: string; evidenceLabel: string;
   adding: string; added: string; evidenceFailed: string;
   kindDebitSms: string; kindWallet: string; kindBank: string; kindPortal: string; kindOfficial: string; kindResponse: string; kindOther: string;
+  escalationTitle: string; channel: string; counterparty: string; response: string; unresolved: string;
+  logContact: string; logging: string; logged: string; contactFailed: string;
+  channelPhone: string; channelInPerson: string; channelEmail: string; channelForm: string; channelOther: string;
+  verify: string; verifying: string; verifyFailed: string; verifiedOk: string;
 };
 
 type Row = {
@@ -43,6 +47,10 @@ export function IncidentList({ t }: { t: Labels }) {
   const [ev, setEv] = useState({ incidentId: "", kind: "official_receipt", label: "" });
   const [evBusy, setEvBusy] = useState(false);
   const [evNote, setEvNote] = useState<"added" | "failed" | null>(null);
+  const [ct, setCt] = useState({ incidentId: "", channel: "phone", counterparty: "", response: "", unresolved: "" });
+  const [ctBusy, setCtBusy] = useState(false);
+  const [ctNote, setCtNote] = useState<"logged" | "failed" | null>(null);
+  const [vNote, setVNote] = useState<Record<string, "ok" | "refused">>({});
 
   async function loadRows() {
     const { data } = await supabase()
@@ -105,6 +113,36 @@ export function IncidentList({ t }: { t: Labels }) {
     setEvNote("added");
     setEv({ incidentId: "", kind: "official_receipt", label: "" });
     await loadRows();
+  }
+
+  async function logContact() {
+    if (!ct.incidentId || ct.counterparty.trim().length < 2) return;
+    setCtBusy(true);
+    setCtNote(null);
+    const { error } = await supabase().from("incident_contacts").insert({
+      incident_id: ct.incidentId,
+      channel: ct.channel,
+      counterparty: ct.counterparty.trim(),
+      response: ct.response.trim() || null,
+      unresolved: ct.unresolved.trim() || null,
+      recorded_by: "reviewer",
+    });
+    setCtBusy(false);
+    if (error) { setCtNote("failed"); return; }
+    setCtNote("logged");
+    setCt({ incidentId: "", channel: "phone", counterparty: "", response: "", unresolved: "" });
+    await loadRows();
+  }
+
+  async function verifyPayment(id: string) {
+    const { data: member } = await supabase().rpc("current_firm_member");
+    const label = Array.isArray(member) ? member[0]?.person_label : member?.person_label;
+    const { error } = await supabase()
+      .from("payment_incidents")
+      .update({ payment_state: "verified", verified_by: label ?? "reviewer", verified_at: new Date().toISOString() })
+      .eq("id", id);
+    setVNote((v) => ({ ...v, [id]: error ? "refused" : "ok" }));
+    if (!error) await loadRows();
   }
 
   const field = "mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg";
@@ -206,12 +244,59 @@ export function IncidentList({ t }: { t: Labels }) {
     </div>
   );
 
+  const contactBlock = (
+    <div className="rounded-card border border-border bg-surface px-5 py-4">
+      <h3 className="text-sm font-semibold text-fg">{t.escalationTitle}</h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div>
+          <label className={label} htmlFor="ct-incident">{t.colType}</label>
+          <select id="ct-incident" className={field} value={ct.incidentId} onChange={(e) => setCt({ ...ct, incidentId: e.target.value })}>
+            <option value="">—</option>
+            {(rows ?? []).map((r) => (
+              <option key={r.id} value={r.id}>{typeLabel[r.type] ?? r.type} · {r.observed_at.slice(0, 10)}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={label} htmlFor="ct-channel">{t.channel}</label>
+          <select id="ct-channel" className={field} value={ct.channel} onChange={(e) => setCt({ ...ct, channel: e.target.value })}>
+            <option value="phone">{t.channelPhone}</option>
+            <option value="in_person">{t.channelInPerson}</option>
+            <option value="email">{t.channelEmail}</option>
+            <option value="online_form">{t.channelForm}</option>
+            <option value="other">{t.channelOther}</option>
+          </select>
+        </div>
+        <div>
+          <label className={label} htmlFor="ct-party">{t.counterparty}</label>
+          <input id="ct-party" className={field} value={ct.counterparty} onChange={(e) => setCt({ ...ct, counterparty: e.target.value })} />
+        </div>
+        <div>
+          <label className={label} htmlFor="ct-response">{t.response}</label>
+          <input id="ct-response" className={field} value={ct.response} onChange={(e) => setCt({ ...ct, response: e.target.value })} />
+        </div>
+        <div>
+          <label className={label} htmlFor="ct-unresolved">{t.unresolved}</label>
+          <input id="ct-unresolved" className={field} value={ct.unresolved} onChange={(e) => setCt({ ...ct, unresolved: e.target.value })} />
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <button type="button" onClick={() => void logContact()} disabled={ctBusy || !ct.incidentId || ct.counterparty.trim().length < 2} className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface disabled:opacity-60">
+          {ctBusy ? t.logging : t.logContact}
+        </button>
+        {ctNote === "logged" ? <span className="text-sm text-success-text">{t.logged}</span> : null}
+        {ctNote === "failed" ? <span className="text-sm text-danger">{t.contactFailed}</span> : null}
+      </div>
+    </div>
+  );
+
   if (rows === null) return <div className="h-24" aria-hidden />;
 
   return (
     <div className="flex flex-col gap-4">
       {createBlock}
       {evidenceBlock}
+      {contactBlock}
       {rows.length === 0 ? (
         <div className="rounded-card border border-border bg-surface px-5 py-8 text-center">
           <p className="text-sm font-semibold text-fg">{t.empty}</p>
@@ -228,6 +313,7 @@ export function IncidentList({ t }: { t: Labels }) {
                 <th className="px-4 py-3">{t.colAmount}</th>
                 <th className="px-4 py-3">{t.colObserved}</th>
                 <th className="px-4 py-3">{t.evidence}</th>
+                  <th className="px-4 py-3">{t.verify}</th>
               </tr>
             </thead>
             <tbody>
@@ -242,6 +328,17 @@ export function IncidentList({ t }: { t: Labels }) {
                   <td className="px-4 py-3">{r.amount_minor === null ? "—" : `${r.amount_minor.toLocaleString("fr-FR")} XAF`}</td>
                   <td className="px-4 py-3 text-fg-muted">{r.observed_at.slice(0, 10)}</td>
                   <td className="px-4 py-3">{counts[r.id] ?? 0}</td>
+                  <td className="px-4 py-3">
+                    {r.payment_state === "verified" ? (
+                      <span className="text-success-text">{t.paymentVerified}</span>
+                    ) : (
+                      <button type="button" onClick={() => void verifyPayment(r.id)} className="inline-flex min-h-[36px] items-center rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg hover:bg-surface-sunken">
+                        {t.verify}
+                      </button>
+                    )}
+                    {vNote[r.id] === "refused" ? <p className="mt-1 text-xs text-danger">{t.verifyFailed}</p> : null}
+                    {vNote[r.id] === "ok" ? <p className="mt-1 text-xs text-success-text">{t.verifiedOk}</p> : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
