@@ -38,6 +38,7 @@ import { commandAdvanceCase } from "@/lib/commands";
 import { updateById } from "@/lib/db-write";
 import {
   memberFromSession,
+  readFirmSession,
   subscribeFirmSession,
   type FirmSession,
 } from "@/lib/firm-auth";
@@ -226,11 +227,16 @@ export function CaseDetail({
   const [offline, setOffline] = useState(false);
   const [missing, setMissing] = useState(false);
   const loadEpoch = useRef(0);
+  const sessionMemberRef = useRef<string | null | undefined>(undefined);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
     try {
       const db = supabase();
+      const firmSession = readFirmSession();
+      if (!firmSession) throw new Error("Firm session unavailable");
+      const { data: { user }, error: authError } = await db.auth.getUser();
+      if (authError || !user) throw new Error("Firm authentication unavailable");
       const { data: c, error } = await db
         .from("compliance_cases")
         .select(CASE_COLUMNS)
@@ -255,7 +261,7 @@ export function CaseDetail({
       }
       const kase = c as unknown as ComplianceCase & { organization_id: string };
 
-      const [tp, eng, assigned, reqs, tsk, evs, mem, consent] = await Promise.all([
+      const [tp, eng, assigned, reqs, tsk, evs, mem, consent, firmMember] = await Promise.all([
         db
           .from("taxpayers")
           .select("id, legal_name, profile_verified, tax_centre, accounting_framework, tax_regime")
@@ -303,6 +309,13 @@ export function CaseDetail({
         db.from("case_client_approvals").select("case_id")
           .eq("case_id", caseId).eq("approval_round", kase.approval_round)
           .maybeSingle(),
+        db.from("firm_members").select("id")
+          .eq("id", firmSession.memberId)
+          .eq("auth_user_id", user.id)
+          .eq("organization_id", kase.organization_id)
+          .eq("active", true)
+          .is("deactivated_at", null)
+          .maybeSingle(),
       ]);
       if (epoch !== loadEpoch.current) return;
 
@@ -310,7 +323,8 @@ export function CaseDetail({
       // dependent read. In particular, a foreign engagement or roster cannot
       // supply the authority shown by this case screen.
       if (tp.error || ("error" in eng && eng.error) || assigned.error ||
-          reqs.error || tsk.error || evs.error || mem.error || consent.error) {
+          reqs.error || tsk.error || evs.error || mem.error || consent.error ||
+          firmMember.error || !firmMember.data) {
         throw new Error("Case dependent read unavailable");
       }
       if (!tp.data || (kase.engagement_id &&
@@ -361,8 +375,43 @@ export function CaseDetail({
     };
   }, [load]);
 
-  // The signed-in member is who you are. There is no stand-in selector.
-  useEffect(() => subscribeFirmSession(setSession), []);
+  // The signed-in member is who you are. Switching members or signing out
+  // must invalidate in-flight reads and remove the previous firm\u0027s snapshot.
+  // Repeated notifications for the same member must not reset their work.
+  useEffect(() => subscribeFirmSession((nextSession) => {
+    const nextMemberId = nextSession?.memberId ?? null;
+    const previousMemberId = sessionMemberRef.current;
+    sessionMemberRef.current = nextMemberId;
+    if (previousMemberId !== undefined && previousMemberId !== nextMemberId) {
+      ++loadEpoch.current;
+      setRow(null);
+      setTaxpayer(null);
+      setEngagement(null);
+      setAssignments([]);
+      setRequests([]);
+      setTasks([]);
+      setEvents([]);
+      setMembers([]);
+      setClientApproved(false);
+      setMissing(false);
+      setOffline(false);
+      setLive(false);
+      setBusy(null);
+      setFailed(null);
+      setRefusedBy(null);
+      setNote("");
+      setNoteClient(false);
+      setReasons({});
+      setAskFr("");
+      setAskEn("");
+      setAskWho("taxpayer");
+      setAskDue("");
+      setDisclose(false);
+      setTab("firm");
+      if (nextMemberId) void load();
+    }
+    setSession(nextSession);
+  }), [load]);
 
   // The client acts on these same rows. A document arriving while an accountant
   // has the case open should appear without a refresh.
@@ -887,6 +936,17 @@ export function CaseDetail({
     } finally {
       setBusy(null);
     }
+  }
+
+  if (!session) {
+    return (
+      <Card className="p-6">
+        <p className="text-sm text-fg-muted">{t.actingAsHint}</p>
+        <Link href={signInHref} className="mt-3 inline-block text-sm font-semibold text-teal-text">
+          {t.signIn}
+        </Link>
+      </Card>
+    );
   }
 
   if (missing) {
