@@ -472,3 +472,29 @@ assert.ok(firmMessagesView.includes('db.from("taxpayers")') &&
   "all firm message data reads must live inside the session-keyed child");
 assert.ok(!firmMessagesView.includes("subscribeFirmSession("),
   "data-bearing child must not own an independent stale session subscription");
+
+
+// A mounted firm inbox must revalidate membership and engagement grants after
+// returning to the tab and on a bounded interval. A one-time authorized-set
+// snapshot must not remain visible indefinitely after access is revoked.
+// These source-contract checks do not replace authenticated revocation tests.
+const firmRefresh = workspace.src.split("function FirmMessagesView(")[1]?.split("  const sorted = useMemo(")[0] ?? "";
+assert.ok(firmRefresh, "firm inbox view must exist");
+assert.match(firmRefresh, /const \[refreshEpoch, setRefreshEpoch\] = useState\(0\)/);
+assert.match(firmRefresh, /window\.setInterval\(refreshAccess, 60_000\)/,
+  "mounted inbox must revalidate access periodically");
+assert.match(firmRefresh, /window\.addEventListener\("focus", refreshAccess\)/,
+  "returning to the browser must revalidate firm access");
+assert.match(firmRefresh, /document\.addEventListener\("visibilitychange", onVisibilityChange\)/,
+  "returning to a background tab must revalidate firm access");
+assert.match(firmRefresh, /document\.visibilityState === "visible"/);
+const refreshBody = firmRefresh.split("const refreshAccess = () => {")[1]?.split("\n    };")[0] ?? "";
+for (const clear of ["setClients(null)", "setPreviews({})", "setActive(null)",
+  "setAssignments([])", "setRefreshEpoch((epoch) => epoch + 1)"]) {
+  assert.ok(refreshBody.includes(clear), "access refresh must invalidate " + clear);
+}
+assert.match(firmRefresh, /}, \[session\.memberId, refreshEpoch\]\);/,
+  "every access refresh must re-run Auth, member, and engagement checks");
+assert.match(firmRefresh, /window\.clearInterval\(timer\)/);
+assert.match(firmRefresh, /window\.removeEventListener\("focus", refreshAccess\)/);
+assert.match(firmRefresh, /document\.removeEventListener\("visibilitychange", onVisibilityChange\)/);
