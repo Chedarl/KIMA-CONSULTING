@@ -89,6 +89,7 @@ export default function LocaleLayout({
               overview: t.nav.overview,
               taxpayer: t.nav.taxpayer,
               workspace: t.nav.workspace,
+              login: t.nav.login,
               design: t.nav.design,
               language: t.nav.language,
               mainNav: t.nav.mainNav,

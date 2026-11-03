@@ -20,6 +20,7 @@ export type ChromeLabels = {
   overview: string;
   taxpayer: string;
   workspace: string;
+  login: string;
   design: string;
   language: string;
   mainNav: string;
@@ -60,6 +61,7 @@ export function Chrome({ locale, labels }: { locale: Locale; labels: ChromeLabel
     { href: `/${locale}`, label: labels.overview },
     { href: `/${locale}/app`, label: labels.taxpayer },
     { href: `/${locale}/workspace`, label: labels.workspace },
+    { href: `/${locale}/firm-login`, label: labels.login },
     { href: `/${locale}/design`, label: labels.design },
   ];
 
