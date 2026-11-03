@@ -230,7 +230,7 @@ for (const [name, body, required] of [
   ["requestFirm", requestFirmAction, ['side !== "taxpayer"', "!userId", "firms.some((candidate) => candidate.id === firm)"]],
   ["inviteContact", inviteContactAction, ['side !== "firm"', "!userId", "drafts.some((candidate) => candidate.id === engagement)"]],
 ]) {
-  const rpc = body.indexOf("await supabase().rpc(");
+  const rpc = Math.max(body.indexOf("await supabase().rpc("), body.indexOf("await db.rpc("));
   assert.ok(rpc > 0, name + ": invitation RPC must exist");
   for (const guard of required) {
     assert.ok(body.indexOf(guard) >= 0 && body.indexOf(guard) < rpc,
@@ -405,6 +405,38 @@ for (const check of [
 }
 assert.ok(liveDecision.includes("await load({ keepError: true })"),
   "stale or unauthorized invitation must refresh without issuing a decision");
+
+// A firm-side invitation must revalidate the current Auth identity, selected
+// draft engagement and active firm membership before sending a recipient email.
+// A stale cached draft from another account or revoked firm must not trigger RPC.
+// Source-contract regression; authenticated RLS/negative staging tests still owed.
+const liveContact = inviteContactAction.split("const db = supabase();")[1]?.split(
+  '.rpc("create_invitation_for_contact"'
+)[0] ?? "";
+assert.ok(liveContact.includes("await db.auth.getUser()"),
+  "firm invitation must refresh authenticated identity before RPC");
+assert.ok(liveContact.includes('.from("engagements")') &&
+  liveContact.includes('.eq("id", engagement).maybeSingle()'),
+  "firm invitation must fetch selected live engagement before RPC");
+assert.ok(liveContact.includes('.from("firm_members")'),
+  "firm invitation must verify active firm membership before RPC");
+for (const check of [
+  "liveAuth.user.id !== userId",
+  "liveDraft.taxpayer_id !== selectedDraft.taxpayer_id",
+  "liveDraft.revoked_at",
+  'liveDraft.status !== "draft" && liveDraft.status !== "invited"',
+  '.eq("organization_id", liveDraft.organization_id)',
+  '.eq("auth_user_id", userId)',
+  '.eq("active", true)',
+  '.is("deactivated_at", null)',
+  "epoch !== authEpoch.current",
+  "await load({ keepError: true })",
+]) {
+  assert.ok(liveContact.includes(check), "firm invitation live guard missing: " + check);
+}
+assert.ok(inviteContactAction.indexOf("await db.auth.getUser()") <
+  inviteContactAction.indexOf('.rpc("create_invitation_for_contact"'),
+  "live auth and engagement checks must precede invitation creation");
 
 // A failed invitation, firm-directory or draft-engagement read must never
 // retain the previous authorized snapshot or pretend no pending drafts exist.
