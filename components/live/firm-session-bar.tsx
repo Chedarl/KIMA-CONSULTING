@@ -27,7 +27,11 @@ type Labels = {
  */
 export function FirmSessionBar({ locale, t }: { locale: "fr" | "en"; t: Labels }) {
   const [session, setSession] = useState<FirmSession | null | undefined>(undefined);
+  // The session lives in localStorage, which the server cannot see: render
+  // nothing until the client mounts, so hydration can never disagree.
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    setMounted(true);
     let alive = true;
     const unsubscribe = subscribeFirmSession((next: FirmSession | null) => {
       if (alive) setSession(next);
@@ -47,7 +51,7 @@ export function FirmSessionBar({ locale, t }: { locale: "fr" | "en"; t: Labels }
     return capabilitiesOf({ kind: "firm", member: memberFromSession(session) });
   }, [session]);
 
-  if (session === undefined) {
+  if (!mounted || session === undefined) {
     return <div className="h-11" aria-hidden />;
   }
 
