@@ -311,4 +311,22 @@ assert.ok(invitationDecision.indexOf("Invitation unavailable or expired.") <
   invitationDecision.indexOf('.rpc("decide_invitation"'),
   "stale-click feedback must precede the decision RPC");
 
+
+// A taxpayer may have multiple active accounting firms. The shell's search
+// catalogue and unread badge must use the selected, verified firm as well as
+// the taxpayer; otherwise one firm's cases/messages appear in another view.
+// These source assertions supplement authenticated two-firm staging tests.
+const shellContextReads = shell.src.split("const context = await resolvePortalContext();")[1]?.split("\n      } catch {")[0] ?? "";
+assert.ok(shellContextReads, "client shell context reads must exist");
+for (const table of ["compliance_cases", "document_requests"]) {
+  const read = shellContextReads.split('db.from("' + table + '")')[1]?.split("\n")[0] ?? "";
+  assert.ok(read.includes('.eq("taxpayer_id", ids.taxpayerId)') &&
+    read.includes('.eq("organization_id", ids.organizationId)'),
+    table + " must scope shell search to the selected firm and taxpayer");
+}
+const unreadRead = shellContextReads.split('.from("messages")')[1]?.split('.is("read_at", null)')[0] ?? "";
+assert.ok(unreadRead.includes('.eq("taxpayer_id", tid)') &&
+  unreadRead.includes('.eq("organization_id", ids.organizationId)'),
+  "unread badge must be scoped to the selected firm and taxpayer");
+
 console.log("ok: live engagement recipient selector and case-scoped tenant routing");
