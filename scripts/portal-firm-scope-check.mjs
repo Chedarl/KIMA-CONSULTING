@@ -234,8 +234,8 @@ assert.match(serviceApproval ?? "",
   /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setFailed/);
 assert.match(serviceApproval ?? "",
   /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setBusy/);
-assert.match(service.src, /if \(caseStamp !== caseId\) \{\n    setCaseStamp\(caseId\);\n    setBusy\(null\);\n    setFailed\(null\);\n    pending\.current = null;\n  \}/,
-  "switching cases must clear approval busy, failure, and pending state before paint");
+assert.match(service.src, /useLayoutEffect\(\(\) => \{\n    setBusy\(null\);\n    setFailed\(null\);\n    pending\.current = null;\n    if \(fileRef\.current\) fileRef\.current\.value = "";\n  \}, \[caseId\]\);/,
+  "switching cases clears approval state before paint");
 
 // A route switch can happen while the previous case's file picker remains open.
 // Reject old-case uploads and approvals at initiation, not only after an await.
