@@ -780,3 +780,21 @@ assert.ok(firmInvitationLoad.includes('.in("organization_id", memberOrgIds)'),
   "firm invitation queries must filter organization IDs to live memberships");
 assert.ok((firmInvitationLoad.match(/\.in\("organization_id", memberOrgIds\)/g) ?? []).length >= 2,
   "both invitations and draft engagements must be scoped to live firm memberships");
+
+
+// Taxpayer invitation reads must be scoped at the database query boundary to
+// the currently RLS-resolved taxpayer, not only filtered while rendering.
+// A signed-in operator with more than one visible taxpayer must not load
+// another taxpayer's invitations into this component's state.
+const taxpayerInvitationQuery = firmInvitationLoad.split("const scopedInvitationQuery =")[1]
+  ?.split("const [rows, directory, engagements]")[0] ?? "";
+assert.ok(taxpayerInvitationQuery.includes('side === "firm"') &&
+  taxpayerInvitationQuery.includes('.in("organization_id", memberOrgIds)'),
+  "preserve live firm membership filtering for firm-side invitations");
+assert.ok(taxpayerInvitationQuery.includes('.eq("taxpayer_id", tp ?? "")'),
+  "taxpayer invitation query must filter by the RLS-resolved taxpayer ID");
+assert.ok(firmInvitationLoad.indexOf('if (side === "taxpayer" && !tp) {') <
+  firmInvitationLoad.indexOf("const scopedInvitationQuery ="),
+  "reject missing taxpayer before issuing a scoped invitation query");
+assert.ok(firmInvitationLoad.includes('scopedInvitationQuery.order("created_at"'),
+  "rendered invitation rows must come from the tenant-scoped query");

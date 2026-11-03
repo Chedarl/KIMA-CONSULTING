@@ -95,7 +95,8 @@ export function InvitationsPanel({ locale, side }: {
     const invitationQuery = db.from("engagement_invitations")
       .select("id,organization_id,taxpayer_id,direction,initiated_by,recipient_user_id,status,expires_at");
     const scopedInvitationQuery = side === "firm"
-      ? invitationQuery.in("organization_id", memberOrgIds) : invitationQuery;
+      ? invitationQuery.in("organization_id", memberOrgIds)
+      : invitationQuery.eq("taxpayer_id", tp ?? "");
     const [rows, directory, engagements] = await Promise.all([
       scopedInvitationQuery.order("created_at", { ascending: false }).limit(100),
       side === "taxpayer" ? db.rpc("firm_directory") : Promise.resolve({ data: [] }),
