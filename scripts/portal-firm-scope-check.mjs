@@ -1979,3 +1979,26 @@ assert.ok(stageSingleFlightBody.includes("if (stageContextCurrent()) setFailed(t
   stageSingleFlightBody.includes("if (stageContextCurrent()) setBusy(null);") &&
   stageSingleFlightBody.includes("if (stageContextCurrent()) {\n          setFailed(to);"),
   "late stage outcomes must not overwrite the new case's failure or busy state");
+
+// Phase 3/4: accepting or returning a document must not submit a former
+// case's decision after asynchronous preflight crosses a route/member switch.
+// A successful conditional write must still attempt its audit event, while
+// late feedback, form clearing and reload are confined to the active case.
+// This is a source-contract check, not an authenticated cross-tenant replay.
+assert.ok(reviewSingleFlightBody.includes("const reviewContextCurrent = () =>") &&
+  reviewSingleFlightBody.includes("activeCaseIdRef.current === actionCaseId") &&
+  reviewSingleFlightBody.includes("sessionMemberRef.current === actionMemberId"),
+  "document review must bind its original case and firm member");
+const reviewContextGuard = reviewSingleFlightBody.indexOf('if (!reviewContextCurrent()) throw new Error("Case or firm session changed");');
+const reviewConditionalWrite = reviewSingleFlightBody.indexOf('const written = await updateById("document_requests"');
+assert.ok(reviewContextGuard >= 0 && reviewContextGuard < reviewConditionalWrite,
+  "stale document decisions must be rejected before the conditional PATCH");
+const reviewAuditInsert = reviewSingleFlightBody.indexOf('db.from("case_events").insert(event)');
+const reviewContextReload = reviewSingleFlightBody.indexOf("if (reviewContextCurrent()) {\n        setReasons(");
+assert.ok(reviewAuditInsert > reviewConditionalWrite && reviewContextReload > reviewAuditInsert &&
+  reviewSingleFlightBody.includes("        await load();"),
+  "a successful review must attempt audit insertion before any context-guarded UI reload");
+assert.ok(reviewSingleFlightBody.includes("if (reviewContextCurrent()) {\n          setFailed(r.id);") &&
+  reviewSingleFlightBody.includes("if (reviewContextCurrent()) setFailed(r.id);") &&
+  reviewSingleFlightBody.includes("if (reviewContextCurrent()) setBusy(null);"),
+  "late document review outcomes must not alter a new case's feedback");
