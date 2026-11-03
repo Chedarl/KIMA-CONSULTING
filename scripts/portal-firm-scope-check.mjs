@@ -1958,3 +1958,24 @@ assert.ok(taskSingleFlightBody.includes("if (taskContextCurrent()) await load();
 assert.ok(taskSingleFlightBody.includes("if (taskContextCurrent()) setFailed(task.id);") &&
   taskSingleFlightBody.includes("if (taskContextCurrent()) setBusy(null);"),
   "stale task completions must not overwrite the new case's feedback");
+
+
+// Phase 3/4: a stage decision computed on an earlier case/member must not
+// mutate that case after route navigation or a firm-session switch. The audit
+// event for a successful write must still be attempted before skipping UI load.
+assert.ok(stageSingleFlightBody.includes("const stageContextCurrent = () =>") &&
+  stageSingleFlightBody.includes("activeCaseIdRef.current === actionCaseId") &&
+  stageSingleFlightBody.includes("sessionMemberRef.current === actionMemberId"),
+  "stage action must bind the rendered case and acting firm member");
+const stageContextGuard = stageSingleFlightBody.indexOf('if (!stageContextCurrent()) throw new Error("Case or firm session changed");');
+const stageConditionalWrite = stageSingleFlightBody.indexOf('const written = await updateById("compliance_cases"');
+assert.ok(stageContextGuard >= 0 && stageContextGuard < stageConditionalWrite,
+  "reject a stale stage action after async preflight and before the conditional write");
+const stageAuditInsert = stageSingleFlightBody.indexOf('db.from("case_events").insert(result.events)');
+const stageReload = stageSingleFlightBody.indexOf("if (stageContextCurrent()) await load();");
+assert.ok(stageAuditInsert > stageConditionalWrite && stageReload > stageAuditInsert,
+  "preserve stage audit insertion after successful writes even if navigation happened");
+assert.ok(stageSingleFlightBody.includes("if (stageContextCurrent()) setFailed(to);") &&
+  stageSingleFlightBody.includes("if (stageContextCurrent()) setBusy(null);") &&
+  stageSingleFlightBody.includes("if (stageContextCurrent()) {\n          setFailed(to);"),
+  "late stage outcomes must not overwrite the new case's failure or busy state");
