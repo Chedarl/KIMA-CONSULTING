@@ -1755,3 +1755,44 @@ const noFirmSessionGuard = detail.src.indexOf("if (!session) {");
 const caseMissingGuard = detail.src.indexOf("if (missing) {");
 assert.ok(noFirmSessionGuard > 0 && noFirmSessionGuard < caseMissingGuard,
   "no firm session must render a sign-in gate before any case content");
+
+
+// Phase 3/4: reviewing a submitted document is a firm-authorized decision.
+// The cached OTP member and engagement must not authorize a review after
+// Auth account change, member deactivation, reassignment or revocation.
+// Source-contract checks complement (but do not replace) authenticated staging
+// isolation tests and the existing executable conditional-PATCH replay tests.
+const liveReview = detail.src.split('async function settleRequest(r: CaseRequest, to: "accepted" | "returned") {')[1]
+  ?.split("\n  async function createRequest()")[0] ?? "";
+const reviewAuth = liveReview.indexOf("await db.auth.getUser()");
+const reviewMember = liveReview.indexOf('.from("firm_members")');
+const reviewCase = liveReview.indexOf('.from("compliance_cases")');
+const reviewGrant = liveReview.indexOf('.from("engagements")');
+const reviewWrite = liveReview.indexOf('updateById("document_requests", r.id, patch, {');
+assert.ok(reviewAuth >= 0 && reviewAuth < reviewMember &&
+  reviewMember < reviewCase && reviewCase < reviewGrant &&
+  reviewGrant < reviewWrite,
+  "document review must revalidate live Auth, firm member, case and engagement before PATCH");
+for (const guard of [
+  "if (authError || !user) throw",
+  '.eq("id", member.id)',
+  '.eq("auth_user_id", user.id)',
+  '.eq("organization_id", engagement.organization_id)',
+  '.eq("active", true)',
+  '.is("deactivated_at", null)',
+  "liveMember.role !== member.role",
+  "liveMember.person_label !== member.person_label",
+  '.eq("id", row.id)',
+  '.eq("taxpayer_id", row.taxpayer_id)',
+  '.eq("engagement_id", engagement.id)',
+  "if (caseError || !liveCase) throw",
+  '.eq("id", engagement.id)',
+  '.in("status", ["authorized", "accepted"])',
+  '.is("revoked_at", null)',
+  "if (engagementError || !liveEngagement) throw",
+  "liveEngagement.assigned_to !== member.person_label",
+  "if (!(liveEngagement.authorized_at || liveEngagement.accepted_at)",
+]) assert.ok(liveReview.includes(guard),
+  "document review live tenant guard missing: " + guard);
+assert.ok(liveReview.includes("setRefusedBy(t.notPermitted);"),
+  "document review must report permission denial without claiming success");
