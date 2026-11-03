@@ -118,3 +118,32 @@ test("service request revalidates account and selected firm before insert", () =
   assert.match(board, /identityRef\.current = nextUserId;[\s\S]*?sendInFlight\.current = null;/);
   assert.match(board, /active = false;[\s\S]*?sendInFlight\.current = null;[\s\S]*?subscription\.unsubscribe\(\)/);
 });
+
+
+// If any tenant-scoped source fails, the board must not silently render
+// incomplete case actions or hide a draft engagement requiring acceptance.
+// This is a source-level regression; staging fault injection is still required.
+test("services board fails closed when any of its parallel reads fails", () => {
+  const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
+  const start = board.indexOf("const [cs, rq, eng] = await Promise.all([");
+  const end = board.indexOf("setOffline(false);", start);
+  assert.ok(start !== -1 && end > start, "parallel case, request and engagement reads must exist");
+  const loadResult = board.slice(start, end);
+  const guard = loadResult.indexOf("if (cs.error || rq.error || eng.error) throw");
+  const publish = loadResult.indexOf("setCases((cs.data ?? [])");
+  assert.ok(guard >= 0, "any failed tenant read must trigger the offline path");
+  assert.ok(publish > guard, "all three read errors must be checked before publishing case data");
+  assert.ok(!loadResult.includes("eng.error ? []"),
+    "engagement read errors must not be silently replaced with an empty list");
+});
+
+
+// An offline/unauthorized board must not tell a taxpayer that no services
+// exist, or open a request form without a current taxpayer/firm context.
+// Authenticated FR/EN staging validation is still required.
+test("offline or unresolved board never renders a false empty state or enables new requests", () => {
+  const board = readFileSync("components/client-portal/services-board.tsx", "utf8");
+  assert.match(board, /<PrimaryButton disabled=\{!ids \|\| offline \|\| cases === null\} onClick=\{\(\) => setAskOpen\(true\)\}>/);
+  assert.match(board, /\) : offline \|\| !ids \? null : visible\.length === 0 \? \(/);
+  assert.match(board, /\{offline && <OfflineNote>\{copy\.offline\}<\/OfflineNote>\}/);
+});
