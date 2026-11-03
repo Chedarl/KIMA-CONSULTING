@@ -1580,3 +1580,50 @@ assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-B"]),
 assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-A"]),
   "request.create", "taxpayer-A").ok, true,
   "assigned firm staff retain the request-creation capability");
+
+
+// A case-stage decision is professional judgement, not an ID-only update.
+// Before the stage CAS, rebind the OTP member to live Auth and the current
+// case/engagement; reject account switch, deactivation, revocation and staff
+// reassignment. These source contracts supplement the synthetic CAS probe
+// above; authenticated two-firm/two-taxpayer staging is still required.
+const liveStageMove = detail.src.split("async function move(to: CaseStage) {")[1]
+  ?.split("\n  /**")[0] ?? "";
+const liveStageAuth = liveStageMove.indexOf("await db.auth.getUser()");
+const liveStageMember = liveStageMove.indexOf('.from("firm_members")');
+const liveStageCase = liveStageMove.indexOf('.from("compliance_cases")');
+const liveStageEngagement = liveStageMove.indexOf('.from("engagements")');
+const liveStageWrite = liveStageMove.indexOf('updateById("compliance_cases", row.id, result.patch, {');
+assert.ok(liveStageAuth >= 0 && liveStageAuth < liveStageMember &&
+  liveStageMember < liveStageCase && liveStageCase < liveStageEngagement &&
+  liveStageEngagement < liveStageWrite,
+  "stage mutation must verify live Auth, member, exact case and engagement before CAS");
+for (const guard of [
+  'if (authError || !user) throw',
+  '.eq("id", member.id)',
+  '.eq("auth_user_id", user.id)',
+  '.eq("organization_id", engagement.organization_id)',
+  '.eq("active", true)',
+  '.is("deactivated_at", null)',
+  'liveMember.role !== member.role',
+  'liveMember.person_label !== member.person_label',
+  '.eq("id", row.id)',
+  '.eq("taxpayer_id", row.taxpayer_id)',
+  '.eq("engagement_id", engagement.id)',
+  '.eq("stage", row.stage)',
+  '.eq("approval_round", row.approval_round)',
+  '.in("status", ["authorized", "accepted"])',
+  '.is("revoked_at", null)',
+  'if (caseError || !liveCase) throw',
+  'if (engagementError || !liveEngagement) throw',
+  'liveEngagement.assigned_to !== member.person_label',
+]) assert.ok(liveStageMove.includes(guard),
+  "stage mutation missing live tenant or replay guard: " + guard);
+assert.equal(noteCan(noteActor("kima_admin"), "case.advance", "taxpayer-A").ok, false,
+  "platform admin cannot advance a firm's case");
+assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-B"]),
+  "case.advance", "taxpayer-A").ok, false,
+  "staff cannot advance a different taxpayer's case");
+assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-A"]),
+  "case.advance", "taxpayer-A").ok, true,
+  "active assigned staff retain their case-advance capability");
