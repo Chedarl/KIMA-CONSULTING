@@ -7,14 +7,14 @@ type Labels = {
   title: string; subtitle: string; chooseFile: string; run: string; running: string;
   totals: string; debit: string; credit: string; unmapped: string; invalid: string;
   colLine: string; colAccount: string; colLabel: string; colDebit: string; colCredit: string; colStatus: string;
-  mapped: string; unmappedRow: string; noChart: string; failed: string; empty: string;
+  mapped: string; unmappedRow: string; noChart: string; failed: string; empty: string; download: string;
 };
 
 type Row = {
   line: number; account: string; label: string; debitXaf: number; creditXaf: number;
   mapping: { status: string };
 };
-type Result = { rows: Row[]; totalDebitXaf: number; totalCreditXaf: number; unmappedCount: number; invalidCount: number };
+type Result = { rows: Row[]; totalDebitXaf: number; totalCreditXaf: number; unmappedCount: number; invalidCount: number; export?: string };
 
 /**
  * DSF dry run. The file never leaves the browser until the user asks for the
@@ -93,6 +93,26 @@ export function DsfImport({ t }: { t: Labels }) {
               <p className="mt-1 text-lg font-semibold text-danger">{result.invalidCount}</p>
             </div>
           </div>
+
+          {result.export ? (
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  const blob = new Blob([result.export ?? ""], { type: "text/csv;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "kima-working-pack.csv";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="inline-flex min-h-[44px] items-center rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken"
+              >
+                {t.download}
+              </button>
+            </div>
+          ) : null}
 
           {result.unmappedCount > 0 ? (
             <p className="rounded-card border border-amber/50 bg-amber-soft px-4 py-3 text-sm text-amber-text">{t.noChart}</p>
