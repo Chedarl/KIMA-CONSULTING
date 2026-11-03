@@ -97,12 +97,14 @@ function Tile({
   hint,
   trend,
   tone,
+  href,
 }: {
   label: string;
   value: number;
   hint?: string;
   trend?: string;
   tone: "neutral" | "amber" | "danger" | "success";
+  href?: string;
 }) {
   const accent =
     tone === "danger"
@@ -112,8 +114,8 @@ function Tile({
         : tone === "success"
           ? "text-success-text"
           : "text-fg";
-  return (
-    <div className="rounded-card border border-border bg-surface p-4">
+  const inner = (
+    <>
       <p className="flex items-baseline gap-2">
         <span className={`tnum font-display text-3xl font-semibold leading-none ${accent}`}>
           {value}
@@ -122,8 +124,17 @@ function Tile({
       </p>
       <p className="mt-2 text-sm font-medium text-fg-muted">{label}</p>
       {hint && <p className="mt-0.5 text-xs leading-tight text-fg-subtle">{hint}</p>}
-    </div>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="rounded-card border border-border bg-surface p-4 transition hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-raised">
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="rounded-card border border-border bg-surface p-4">{inner}</div>;
 }
 
 export function FirmDashboard({
@@ -318,21 +329,30 @@ export function FirmDashboard({
           ))}
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Tile
             label={t.activeCases}
             value={metrics.active}
             tone="neutral"
             trend={metrics.openedThisWeek > 0 ? `+${metrics.openedThisWeek}` : undefined}
+            href={`/${locale}/workspace/cases`}
           />
-          <Tile label={t.waitingOnClients} value={metrics.waiting} tone="amber" />
-          <Tile label={t.pendingReview} value={metrics.review} tone="neutral" />
+          <Tile label={t.waitingOnClients} value={metrics.waiting} tone="amber" href={`/${locale}/workspace/queue`} />
+          <Tile label={t.pendingReview} value={metrics.review} tone="neutral" href={`/${locale}/workspace/reviews`} />
           <Tile
             label={t.blocked}
             value={metrics.blocked}
             hint={t.blockedHint}
             tone={metrics.blocked > 0 ? "danger" : "success"}
+            href={`/${locale}/workspace/queue`}
           />
+          <Tile
+            label={t.moneyAwaiting}
+            value={money?.awaiting ?? 0}
+            tone={money && money.awaiting > 0 ? "amber" : "neutral"}
+            href={`/${locale}/workspace/billing`}
+          />
+          <Tile label={t.docsReceived} value={pendingDocs.length} tone="neutral" href={`/${locale}/workspace/inbox`} />
         </div>
       )}
 
