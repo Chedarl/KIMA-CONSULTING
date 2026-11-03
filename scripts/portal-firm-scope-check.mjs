@@ -1938,3 +1938,23 @@ assert.ok(taskLockCheck >= 0 && taskLockCheck < taskLockAcquire &&
   "task lock must reject overlapping actions and acquire after permission validation but before async Auth");
 assert.ok(taskSingleFlightBody.includes("finally {\n      taskInFlight.current = false;"),
   "task lock must release on success, denied conditional update and failure");
+
+
+// Phase 3/4: an in-flight task action must not write a previous case after
+// navigation or an OTP member switch, or publish stale feedback/reload.
+// Realtime refreshes within the same case must not invalidate the action.
+assert.ok(detail.src.includes("const activeCaseIdRef = useRef(caseId);") &&
+  detail.src.includes("activeCaseIdRef.current = caseId;"),
+  "task actions need the currently rendered case identity");
+assert.ok(taskSingleFlightBody.includes("activeCaseIdRef.current === actionCaseId") &&
+  taskSingleFlightBody.includes("sessionMemberRef.current === actionMemberId"),
+  "task action context must bind both case and firm member");
+const taskContextGuard = taskSingleFlightBody.indexOf('if (!taskContextCurrent()) throw new Error("Case or firm session changed");');
+const taskWrite = taskSingleFlightBody.indexOf('const written = await updateById("case_tasks"');
+assert.ok(taskContextGuard >= 0 && taskContextGuard < taskWrite,
+  "reject stale task actions before the conditional database write");
+assert.ok(taskSingleFlightBody.includes("if (taskContextCurrent()) await load();"),
+  "a previous case action must not trigger a late reload of its former case");
+assert.ok(taskSingleFlightBody.includes("if (taskContextCurrent()) setFailed(task.id);") &&
+  taskSingleFlightBody.includes("if (taskContextCurrent()) setBusy(null);"),
+  "stale task completions must not overwrite the new case's feedback");
