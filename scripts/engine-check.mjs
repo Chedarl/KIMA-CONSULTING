@@ -638,16 +638,23 @@ try {
       name: "Amina Ngo",
       email: "amina@example.com",
       legalName: "Mbango Trading SARL",
-      niu: "rc/yaoundé/b/1234",
+      niu: "M1234567890123",
       services: ["tax", "dsf"],
       language: "en",
     };
     assert.deepEqual(onboarding.issuesFor("verify", draft), []);
+    // The NIU shape the DGI issues: 14 characters, M for a company, P for a person.
+    assert.deepEqual(onboarding.issuesFor("verify", { ...draft, niu: "M123" }), ["niu"]);
+    assert.deepEqual(onboarding.issuesFor("verify", { ...draft, niu: "P1234567890123" }), ["niu"]);
+    assert.deepEqual(onboarding.issuesFor("verify", { ...draft, niu: "M1234567890123" }), []);
+    assert.equal(onboarding.niuProblem("M123", "business"), "length");
+    assert.equal(onboarding.niuProblem("M1234567890123", "business"), null);
+    assert.equal(onboarding.niuProblem("M1234567890123", "individual"), "prefix");
     assert.equal(onboarding.taxpayerTypeFor("accounting_firm"), "business_moral");
     assert.equal(onboarding.taxpayerTypeFor("individual"), "individual_pit");
     const row = onboarding.registrationInsert(draft, "11111111-1111-1111-1111-111111111111");
     assert.equal(row.base.taxpayer_type, "business_moral");
-    assert.equal(row.base.declared_niu, "RCYAOUNDB1234");
+    assert.equal(row.base.declared_niu, "M1234567890123");
     assert.equal(row.full.workspace_kind, "business");
     assert.equal(row.full.onboarding.isolation, "private_application");
     assert.equal(row.base.declared_regime, undefined);

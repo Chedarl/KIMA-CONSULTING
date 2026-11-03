@@ -98,6 +98,27 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const normaliseNiu = (raw: string): string =>
   raw.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
+/**
+ * The NIU as the DGI issues it: 14 characters, one letter of prefix plus
+ * thirteen, and the prefix says what the taxpayer is — M for a legal person,
+ * P for a natural person. Sources: the DGI's immatriculation factsheet and the
+ * public tax-ID guides that reproduce it. Length and prefix are checked; the
+ * tail is not, because the public sources disagree on whether it ends with a
+ * digit or a control letter, and a rule we cannot source must not be invented.
+ */
+export const NIU_LENGTH = 14;
+
+export type NiuProblem = "length" | "prefix";
+
+export function niuProblem(raw: string, kind: WorkspaceKind | ""): NiuProblem | null {
+  const value = normaliseNiu(raw);
+  if (!value) return null; // optional on this form; emptiness is not an error
+  if (value.length !== NIU_LENGTH) return "length";
+  const prefix = kind === "individual" ? "P" : kind === "business" || kind === "accounting_firm" ? "M" : "";
+  if (prefix && value[0] !== prefix) return "prefix";
+  return null;
+}
+
 export const emailLooksValid = (raw: string): boolean => EMAIL.test(raw.trim());
 
 export const phoneLooksValid = (raw: string): boolean => {
@@ -171,7 +192,7 @@ function companyIssues(draft: OnboardingDraft): OnboardingIssue[] {
   const issues: OnboardingIssue[] = [];
   if (needsLegalName(draft.kind) && draft.legalName.trim().length < 2) issues.push("legalName");
   const niu = normaliseNiu(draft.niu);
-  if (draft.niu.trim() && niu.length < 5) issues.push("niu");
+  if (niuProblem(draft.niu, draft.kind)) issues.push("niu");
   return issues;
 }
 

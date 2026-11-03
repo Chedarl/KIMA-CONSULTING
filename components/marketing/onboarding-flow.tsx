@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { niuProblem } from "@/lib/public-onboarding";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { ServiceIcon, type ServiceIconName } from "@/components/marketing/icons";
 import { KimaWordmark } from "@/components/marketing/wordmark";
@@ -512,6 +513,15 @@ function CompanyStep({
           value={draft.niu}
           onChange={(e) => patch({ niu: e.target.value })}
         />
+        {issues.includes("niu") && (
+          <p id="niu-problem" role="alert" className="mt-1 text-xs font-medium text-danger-text">
+            {niuProblem(draft.niu, draft.kind) === "prefix"
+              ? draft.kind === "individual"
+                ? t.niuPrefixIndividual
+                : t.niuPrefixBusiness
+              : t.niuLength}
+          </p>
+        )}
       </Field>
       {draft.kind !== "individual" && (
         <Field label={t.fields.sector}>
