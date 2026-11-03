@@ -35,6 +35,7 @@ export default function FirmLayout({
     { href: `${base}/queue`, label: w.firm.nav.queue, icon: "queue", ready: true },
     { href: `${base}/tasks`, label: w.firm.nav.tasks, icon: "check", ready: true },
     { href: `${base}/incidents`, label: w.firm.nav.incidents, icon: "shield", ready: true },
+    { href: `${base}/dsf`, label: w.firm.nav.dsf, icon: "file", ready: true },
     { href: `${base}/inbox`, label: w.firm.nav.inbox, icon: "inbox", ready: true },
     { href: `${base}/cases`, label: w.firm.nav.cases, icon: "file", ready: true },
     { href: `${base}/reviews`, label: w.firm.nav.reviews, icon: "check", ready: true },
