@@ -20,6 +20,7 @@ import {
   stageLabel,
   queueOrder,
   risk,
+  canAdvance,
   type CaseRequest,
   type CaseTask,
   type ComplianceCase,
@@ -157,6 +158,7 @@ export function FirmDashboard({
   const toast = useToast();
   const [drawer, setDrawer] = useState<{ title: string; items: DrawerItem[] } | null>(null);
   const [view, setView] = useState<"kanban" | "list">("kanban");
+  const [dragId, setDragId] = useState<string | null>(null);
   const [clientQ, setClientQ] = useState("");
   const [stageFilter, setStageFilter] = useState<CaseStage | "">("");
   const [riskFilter, setRiskFilter] = useState<Risk | "">("");
@@ -550,6 +552,18 @@ export function FirmDashboard({
             {pipeline.map(({ stage, cases }) => (
               <section
                 key={stage}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const card = (rows ?? []).find((r) => r.id === dragId);
+                  if (!card || card.stage === stage) { setDragId(null); return; }
+                  if (canAdvance(card.stage, stage)) {
+                    toast(`${t.moveReady} ${stageLabel(stage, locale)}`);
+                  } else {
+                    toast(t.moveRefused);
+                  }
+                  setDragId(null);
+                }}
                 className="flex w-[15rem] shrink-0 flex-col gap-2 rounded-xl border border-border bg-surface-sunken/60 p-2.5"
               >
                 <header className="flex items-center justify-between px-1">
@@ -568,6 +582,8 @@ export function FirmDashboard({
                     return (
                       <Link
                         key={c.id}
+                        draggable
+                        onDragStart={(e) => { setDragId(c.id); e.dataTransfer.effectAllowed = "move"; }}
                         href={`/${locale}/workspace/cases/${c.id}`}
                         className="rounded-lg border border-border bg-surface px-2.5 py-2 transition hover:border-teal/40 hover:shadow-card"
                       >
