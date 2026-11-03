@@ -28,6 +28,9 @@ export function SiteFrame({
   const portal = path === `/${locale}/app` || path.startsWith(`/${locale}/app/`);
   if (portal) return <>{children}</>;
 
+  const inWorkspace =
+    path === `/${locale}/workspace` || path.startsWith(`/${locale}/workspace/`);
+
   const firmChrome =
     path === `/${locale}/workspace` ||
     path.startsWith(`/${locale}/workspace/`) ||
@@ -42,7 +45,7 @@ export function SiteFrame({
 
   return (
     <>
-      <Chrome locale={locale} labels={labels} />
+      <Chrome locale={locale} labels={labels} minimal={inWorkspace} />
       <main id="main" className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
         {children}
       </main>

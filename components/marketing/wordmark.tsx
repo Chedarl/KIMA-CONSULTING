@@ -16,7 +16,7 @@ export function KimaWordmark({
 }) {
   const src = tone === "light" ? "/brand/logo-white.svg" : "/brand/logo-color.svg";
   const sizeClass =
-    size === "lg" ? "mx-auto h-auto w-[min(100%,22rem)]" : "h-auto max-h-12 w-auto";
+    size === "lg" ? "mx-auto h-auto w-[min(100%,22rem)]" : "h-9 w-auto shrink-0";
 
   return (
     // eslint-disable-next-line @next/next/no-img-element

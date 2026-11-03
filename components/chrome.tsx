@@ -29,7 +29,16 @@ export type ChromeLabels = {
 
 const LOCALE_NAMES: Record<Locale, string> = { fr: "Français", en: "English" };
 
-export function Chrome({ locale, labels }: { locale: Locale; labels: ChromeLabels }) {
+export function Chrome({
+  locale,
+  labels,
+  minimal = false,
+}: {
+  locale: Locale;
+  labels: ChromeLabels;
+  /** Workspace keeps the brand, language and theme, not the marketing links. */
+  minimal?: boolean;
+}) {
   const pathname = usePathname() || `/${locale}`;
   const rest = pathname.split("/").slice(2).join("/");
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
@@ -82,7 +91,7 @@ export function Chrome({ locale, labels }: { locale: Locale; labels: ChromeLabel
           </span>
         </Link>
 
-        <nav aria-label={labels.mainNav} className="order-3 w-full sm:order-2 sm:w-auto">
+        <nav aria-label={labels.mainNav} className={`order-3 w-full sm:order-2 sm:w-auto${minimal ? " hidden" : ""}`}>
           <ul className="flex flex-wrap items-center gap-1">
             {links.map((l) => {
               const active = pathname === l.href;
