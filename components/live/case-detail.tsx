@@ -661,6 +661,50 @@ export function CaseDetail({
     setFailed(null);
     setRefusedBy(null);
     try {
+      const db = supabase();
+      // A document review is a professional decision, not an action authorized
+      // by a cached OTP member or an earlier engagement snapshot. Recheck the
+      // current Auth user, active firm member, exact case and live engagement
+      // before the existing conditional PATCH. Database RLS remains final.
+      const { data: { user }, error: authError } = await db.auth.getUser();
+      if (authError || !user) throw new Error("Firm authentication unavailable");
+      const { data: liveMember, error: memberError } = await db
+        .from("firm_members")
+        .select("id, role, person_label")
+        .eq("id", member.id)
+        .eq("auth_user_id", user.id)
+        .eq("organization_id", engagement.organization_id)
+        .eq("active", true)
+        .is("deactivated_at", null)
+        .maybeSingle();
+      if (memberError || !liveMember || liveMember.role !== member.role ||
+          liveMember.person_label !== member.person_label) {
+        throw new Error("Firm membership changed");
+      }
+      const { data: liveCase, error: caseError } = await db
+        .from("compliance_cases")
+        .select("id")
+        .eq("id", row.id)
+        .eq("taxpayer_id", row.taxpayer_id)
+        .eq("organization_id", engagement.organization_id)
+        .eq("engagement_id", engagement.id)
+        .maybeSingle();
+      if (caseError || !liveCase) throw new Error("Case authorization changed");
+      const { data: liveEngagement, error: engagementError } = await db
+        .from("engagements")
+        .select("id, assigned_to, authorized_at, accepted_at")
+        .eq("id", engagement.id)
+        .eq("taxpayer_id", row.taxpayer_id)
+        .eq("organization_id", engagement.organization_id)
+        .in("status", ["authorized", "accepted"])
+        .is("revoked_at", null)
+        .maybeSingle();
+      if (engagementError || !liveEngagement) throw new Error("Engagement unavailable");
+      if (!(liveEngagement.authorized_at || liveEngagement.accepted_at) ||
+          (member.role === "firm_staff" &&
+           liveEngagement.assigned_to !== member.person_label)) {
+        throw new Error("Engagement no longer authorizes this member");
+      }
       const patch =
         to === "returned" ? { status: to, returned_count: r.returned_count + 1 } : { status: to };
       // Status and return count form a submission-version check. A stale
@@ -678,7 +722,6 @@ export function CaseDetail({
         setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
         return;
       }
-      const db = supabase();
       const event = eventFromRequest(
         row.id,
         {
