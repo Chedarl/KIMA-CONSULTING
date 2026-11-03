@@ -1919,3 +1919,22 @@ assert.ok(reviewLockCheck >= 0 && reviewLockCheck < reviewLockAcquire &&
   "review lock must reject competing decisions and acquire only after capability and reason checks, before async Auth");
 assert.ok(reviewSingleFlightBody.includes("finally {\n      reviewInFlight.current = false;"),
   "review lock must release after success, denied conditional updates and failures");
+
+
+// Phase 3/4: task completion/reopening must not enter concurrent Auth checks
+// from rapid clicks in one mounted CaseDetail screen. The conditional task
+// PATCH remains the stale-state authority; this is only UI single-flight.
+const taskSingleFlightBody = detail.src.split("async function toggleTask(task: CaseTask) {")[1]
+  ?.split("\n  /** A note's audience")[0] ?? "";
+assert.ok(detail.src.includes("const taskInFlight = useRef(false);"),
+  "case task decisions require a synchronous single-flight guard");
+const taskLockCheck = taskSingleFlightBody.indexOf("if (taskInFlight.current) return;");
+const taskLockAcquire = taskSingleFlightBody.indexOf("taskInFlight.current = true;");
+const taskAuthAwait = taskSingleFlightBody.indexOf("await db.auth.getUser()");
+const taskCapabilityCheck = taskSingleFlightBody.indexOf('!allowed("case.advance").ok');
+assert.ok(taskLockCheck >= 0 && taskLockCheck < taskLockAcquire &&
+  taskCapabilityCheck >= 0 && taskCapabilityCheck < taskLockAcquire &&
+  taskLockAcquire < taskAuthAwait,
+  "task lock must reject overlapping actions and acquire after permission validation but before async Auth");
+assert.ok(taskSingleFlightBody.includes("finally {\n      taskInFlight.current = false;"),
+  "task lock must release on success, denied conditional update and failure");
