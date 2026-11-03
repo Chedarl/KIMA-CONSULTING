@@ -8,6 +8,7 @@ import { AuthBootstrap } from "@/components/auth-bootstrap";
 import { ToastProvider } from "@/components/toast";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { getPublicCopy } from "@/lib/i18n-public";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 /**
  * This is the root layout. Every route lives under the [locale] segment so that
@@ -100,6 +101,7 @@ export default function LocaleLayout({
             {children}
           </SiteFrame>
         </ToastProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
