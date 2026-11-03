@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import {
+  hydrateFirmSession,
   clearFirmSession,
   readFirmSession,
   requestFirmCode,
   verifyFirmCode,
   type FirmSession,
 } from "@/lib/firm-auth";
+import { supabase } from "@/lib/supabase";
 
 type Labels = {
   title: string;
@@ -32,6 +34,10 @@ type Labels = {
   signOut: string;
   continueToWorkspace: string;
   role: string;
+  passwordIntro: string;
+  passwordLabel: string;
+  passwordSignIn: string;
+  wrongCredentials: string;
 };
 
 export function FirmLogin({
@@ -51,6 +57,29 @@ export function FirmLogin({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<FirmSession | null>(null);
+  const [password, setPassword] = useState("");
+
+  async function passwordSignIn() {
+    setBusy(true);
+    setError(null);
+    const { error: authError } = await supabase().auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (authError) {
+      setBusy(false);
+      setError(t.wrongCredentials);
+      return;
+    }
+    const hydrated = await hydrateFirmSession();
+    setBusy(false);
+    if (hydrated) {
+      setSession(hydrated);
+      setPassword("");
+    } else {
+      setError(t.wrongCredentials);
+    }
+  }
 
   useEffect(() => {
     const existing = readFirmSession();
@@ -134,6 +163,56 @@ export function FirmLogin({
         >
           {t.continueToWorkspace}
         </a>
+      </div>
+    );
+  }
+
+  if (!session && !reference) {
+    return (
+      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-raised sm:p-6">
+        <div>
+          <h2 className="font-display text-xl font-semibold text-fg">{t.title}</h2>
+          <p className="mt-1 text-sm text-fg-muted">{t.passwordIntro}</p>
+        </div>
+        <label className="text-xs font-semibold uppercase tracking-wide text-fg-muted" htmlFor="firm-email">
+          {t.email}
+        </label>
+        <input
+          id="firm-email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-fg"
+        />
+        <label className="text-xs font-semibold uppercase tracking-wide text-fg-muted" htmlFor="firm-password">
+          {t.passwordLabel}
+        </label>
+        <input
+          id="firm-password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !busy) void passwordSignIn(); }}
+          className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-fg"
+        />
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
+        <button
+          type="button"
+          disabled={busy || !email || !password}
+          onClick={() => void passwordSignIn()}
+          className="min-h-[44px] rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface disabled:opacity-60"
+        >
+          {busy ? t.submitting : t.passwordSignIn}
+        </button>
+        <button
+          type="button"
+          onClick={() => void requestCode()}
+          className="text-left text-sm font-semibold text-teal-text hover:underline"
+        >
+          {t.requestCode}
+        </button>
       </div>
     );
   }

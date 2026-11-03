@@ -677,6 +677,10 @@ const fr = {
     signedOut: "Aucune session cabinet. Les actions restent refusées tant que vous n'êtes pas connecté.",
     demoEnter: "Entrer en démo (aperçu)",
     capabilities: "Capacités de ce rôle",
+    passwordIntro: "Connectez-vous avec votre courriel et votre mot de passe.",
+    passwordLabel: "Mot de passe",
+    passwordSignIn: "Se connecter",
+    wrongCredentials: "Courriel ou mot de passe incorrect, ou compte sans accès cabinet.",
   },
 
   /**
@@ -1815,6 +1819,10 @@ const en: WorkspaceDictionary = {
     welcome: "Welcome",
     signOut: "Sign out",
     continueToWorkspace: "Continue to the firm workspace",
+    passwordIntro: "Sign in with your email and password.",
+    passwordLabel: "Password",
+    passwordSignIn: "Sign in",
+    wrongCredentials: "Wrong email or password, or an account without firm access.",
     role: "Role",
     signedOut: "No firm session. Actions stay refused until you sign in.",
     demoEnter: "Enter demo (preview)",
