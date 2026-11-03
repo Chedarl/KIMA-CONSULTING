@@ -1878,3 +1878,23 @@ assert.ok(noteLockCheck >= 0 && noteLockCheck < noteLockAcquire &&
   "note lock must be acquired only after capability checks and before async authorization");
 assert.ok(noteReplayBody.includes("finally {\n      noteInFlight.current = false;"),
   "note lock must release after success and failure");
+
+
+// Phase 3/4: case-stage decisions must not overlap in one mounted screen.
+// Concurrent clicks can race preflight and create confusing success/failure
+// outcomes even when the conditional database stage PATCH rejects a replay.
+// This is a source-contract regression, not a substitute for DB transitions.
+const stageSingleFlightBody = detail.src.split("async function move(to: CaseStage) {")[1]
+  ?.split("\n  /**\n   * Accept or return one document.")[0] ?? "";
+assert.ok(detail.src.includes("const stageInFlight = useRef(false);"),
+  "case-stage transitions require a synchronous single-flight guard");
+const stageLockCheck = stageSingleFlightBody.indexOf("if (stageInFlight.current) return;");
+const stageLockAcquire = stageSingleFlightBody.indexOf("stageInFlight.current = true;");
+const stageAuthAwait = stageSingleFlightBody.indexOf("await db.auth.getUser()");
+assert.ok(stageLockCheck >= 0 &&
+  stageLockCheck < stageLockAcquire &&
+  stageLockAcquire < stageAuthAwait &&
+  stageSingleFlightBody.indexOf("if (!result.ok)") < stageLockAcquire,
+  "stage lock must reject overlapping actions, acquire after validation and before auth awaits");
+assert.ok(stageSingleFlightBody.includes("finally {\n      stageInFlight.current = false;"),
+  "stage lock must release after success, denied updates and failures");
