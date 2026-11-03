@@ -89,7 +89,7 @@ type Dict = ReturnType<typeof getWorkspaceDictionary>;
 type Taxpayer = CaseTaxpayer & { id: string; legal_name: string };
 
 const CASE_COLUMNS =
-  "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, approval_round, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved";
+  "id, taxpayer_id, engagement_id, obligation_code, period_token, due_on, due_needs_confirmation, due_basis, stage, approval_round, owner, blocker, opened_at, closed_at, filing_status, filing_reference, filing_evidence_ref, filing_attempted_at, filing_verified_at, payment_evidence_status, billing_status, prepared_by, prepared_at, approved_by, approved_at, self_approved, organization_id";
 
 const EVENT_COLUMNS =
   "id, case_id, occurred_at, dimension, kind, actor_role, actor_label, from_value, to_value, subject_ref, reason, visibility";
@@ -236,11 +236,21 @@ export function CaseDetail({
         .maybeSingle();
       if (error) throw error;
       if (!c) {
+        // A missing or RLS-denied case must not leave the previous case visible.
+        setRow(null);
+        setTaxpayer(null);
+        setEngagement(null);
+        setAssignments([]);
+        setRequests([]);
+        setTasks([]);
+        setEvents([]);
+        setMembers([]);
+        setClientApproved(false);
         setMissing(true);
+        setOffline(false);
         return;
       }
-      const kase = c as unknown as ComplianceCase;
-      setRow(kase);
+      const kase = c as unknown as ComplianceCase & { organization_id: string };
 
       const [tp, eng, assigned, reqs, tsk, evs, mem, consent] = await Promise.all([
         db
@@ -249,15 +259,24 @@ export function CaseDetail({
           .eq("id", kase.taxpayer_id)
           .maybeSingle(),
         kase.engagement_id
-          ? db.from("engagements").select("*").eq("id", kase.engagement_id).maybeSingle()
+          ? db.from("engagements").select("*")
+              .eq("id", kase.engagement_id)
+              .eq("taxpayer_id", kase.taxpayer_id)
+              .eq("organization_id", kase.organization_id)
+              .maybeSingle()
           : Promise.resolve({ data: null }),
-        db.from("engagements").select("taxpayer_id, assigned_to"),
+        db.from("engagements").select("taxpayer_id, assigned_to")
+          .eq("organization_id", kase.organization_id)
+          .in("status", ["authorized", "accepted"])
+          .is("revoked_at", null),
         db
           .from("document_requests")
           .select(
             "id, case_id, taxpayer_id, label_fr, label_en, status, responsible, due_on, returned_count",
           )
           .eq("case_id", caseId)
+          .eq("taxpayer_id", kase.taxpayer_id)
+          .eq("organization_id", kase.organization_id)
           .order("due_on", { ascending: true }),
         db
           .from("case_tasks")
@@ -274,13 +293,30 @@ export function CaseDetail({
           // be trusted: `occurred_at` alone is not a total order.
           .order("occurred_at", { ascending: true })
           .order("created_at", { ascending: true }),
-        db.from("firm_members").select("id, person_label, role, active, deactivated_at"),
+        db.from("firm_members").select("id, person_label, role, active, deactivated_at")
+          .eq("organization_id", kase.organization_id)
+          .eq("active", true)
+          .is("deactivated_at", null),
         db.from("case_client_approvals").select("case_id")
           .eq("case_id", caseId).eq("approval_round", kase.approval_round)
           .maybeSingle(),
       ]);
 
-      if (consent.error) throw consent.error;
+      // Never publish a partial tenant snapshot when RLS denies any
+      // dependent read. In particular, a foreign engagement or roster cannot
+      // supply the authority shown by this case screen.
+      if (tp.error || ("error" in eng && eng.error) || assigned.error ||
+          reqs.error || tsk.error || evs.error || mem.error || consent.error) {
+        throw new Error("Case dependent read unavailable");
+      }
+      if (!tp.data || (kase.engagement_id &&
+          (!eng.data || eng.data.organization_id !== kase.organization_id ||
+           eng.data.taxpayer_id !== kase.taxpayer_id))) {
+        throw new Error("Case taxpayer or engagement tenant mismatch");
+      }
+      setRow(kase);
+      setMissing(false);
+      setOffline(false);
       setClientApproved(Boolean(consent.data));
       setTaxpayer((tp.data ?? null) as Taxpayer | null);
       setEngagement((eng.data ?? null) as (Engagement & { organization_id: string }) | null);
@@ -296,8 +332,18 @@ export function CaseDetail({
       }));
       setMembers(roster);
     } catch {
-      // Nothing rather than something stale: this is the screen where somebody
-      // decides whether work leaves the building.
+      // Denied or failed related reads cannot preserve a previous case's
+      // taxpayer, document, event or staff data on this professional screen.
+      setRow(null);
+      setTaxpayer(null);
+      setEngagement(null);
+      setAssignments([]);
+      setRequests([]);
+      setTasks([]);
+      setEvents([]);
+      setMembers([]);
+      setClientApproved(false);
+      setMissing(false);
       setOffline(true);
     }
   }, [caseId]);
