@@ -157,6 +157,16 @@ export function FirmDashboard({
   const toast = useToast();
   const [drawer, setDrawer] = useState<{ title: string; items: DrawerItem[] } | null>(null);
   const [view, setView] = useState<"kanban" | "list">("kanban");
+  const [clientQ, setClientQ] = useState("");
+  const [stageFilter, setStageFilter] = useState<CaseStage | "">("");
+  const [riskFilter, setRiskFilter] = useState<Risk | "">("");
+  const [viewName, setViewName] = useState("");
+  const [savedViews, setSavedViews] = useState<Record<string, { clientQ: string; stage: CaseStage | ""; risk: Risk | "" }>>({});
+
+  useEffect(() => {
+    const raw = localStorage.getItem("kima.pipeline.views");
+    if (raw) { try { setSavedViews(JSON.parse(raw)); } catch { /* ignore a corrupt view */ } }
+  }, []);
   const [money, setMoney] = useState<{ billed: number; collected: number; outstanding: number; awaiting: number; overdue: number } | null>(null);
   const [pendingDocs, setPendingDocs] = useState<{ id: string; file_name: string; taxpayer_id: string; created_at: string }[]>([]);
 
@@ -297,11 +307,21 @@ export function FirmDashboard({
   );
 
   // One column per stage: the whole firm's work, in the order work moves.
+  // A saved view is a set of filters over the same rows, per browser.
+  const filteredRows = useMemo(() => {
+    let r = rows ?? [];
+    const q = clientQ.trim().toLowerCase();
+    if (q) r = r.filter((c) => (c.taxpayer_name ?? names[c.taxpayer_id] ?? "").toLowerCase().includes(q));
+    if (stageFilter) r = r.filter((c) => c.stage === stageFilter);
+    if (riskFilter) r = r.filter((c) => risk(c, today) === riskFilter);
+    return r;
+  }, [rows, clientQ, stageFilter, riskFilter, names, today]);
+
   const pipeline = useMemo(
     () =>
       PIPELINE_STAGES.map((stage) => ({
         stage,
-        cases: (rows ?? []).filter((c) => c.stage === stage),
+        cases: filteredRows.filter((c) => c.stage === stage),
       })),
     [rows],
   );
@@ -503,6 +523,28 @@ export function FirmDashboard({
         />
         <div className="p-4 sm:p-5">
           <p className="text-sm text-fg-muted">{t.pipelineHint}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input value={clientQ} onChange={(e) => setClientQ(e.target.value)} placeholder={t.filterPlaceholder} className="min-h-[36px] rounded-lg border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-teal/40" />
+            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as CaseStage | "")} className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+              <option value="">{t.stageAll}</option>
+              {PIPELINE_STAGES.map((s) => (<option key={s} value={s}>{stageLabel(s, locale)}</option>))}
+            </select>
+            <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value as Risk | "")} className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+              <option value="">{t.riskAll}</option>
+              <option value="overdue">{t.overdue}</option>
+              <option value="due_soon">{t.dueSoon}</option>
+              <option value="on_track">{t.riskOnTrack}</option>
+              <option value="unknown">{t.riskUnknown}</option>
+            </select>
+            <span className="text-fg-subtle" aria-hidden>|</span>
+            <input value={viewName} onChange={(e) => setViewName(e.target.value)} placeholder={t.viewName} className="min-h-[36px] w-36 rounded-lg border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-teal/40" />
+            <button type="button" onClick={() => { const next = { ...savedViews, [viewName]: { clientQ, stage: stageFilter, risk: riskFilter } }; setSavedViews(next); localStorage.setItem("kima.pipeline.views", JSON.stringify(next)); setViewName(""); }} className="min-h-[36px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d]">{t.saveView}</button>
+            <select value="" onChange={(e) => { const v = savedViews[e.target.value]; if (v) { setClientQ(v.clientQ); setStageFilter(v.stage); setRiskFilter(v.risk); } }} className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+              <option value="">{t.savedViews}</option>
+              {Object.keys(savedViews).map((k) => (<option key={k} value={k}>{k}</option>))}
+            </select>
+          </div>
+
           {view === "kanban" ? (
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
             {pipeline.map(({ stage, cases }) => (
@@ -556,7 +598,7 @@ export function FirmDashboard({
           </div>
           ) : (
           <ul className="mt-4 flex flex-col gap-1">
-            {queueOrder(rows ?? [], today).map((c) => {
+            {queueOrder(filteredRows, today).map((c) => {
               const r = risk(c, today);
               return (
                 <li key={c.id}>
