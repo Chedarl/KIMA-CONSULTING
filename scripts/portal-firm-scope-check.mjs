@@ -1535,3 +1535,48 @@ assert.equal(noteCan({ kind: "firm", member: { ...noteMemberBase,
 assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-A"]),
   "note.write_client", "taxpayer-A").ok, true,
   "assigned active staff retain their existing note capability");
+
+// Firm-created document requests must not trust a cached OTP member or case
+// after sign-out, staff deactivation, taxpayer reassignment, or revocation.
+// This checks the live Auth/tenant preflight ordering; authenticated staging
+// and database RLS tests are still required for release.
+const createRequestBody = detail.src.split("async function createRequest() {")[1]
+  ?.split("\n  async function toggleTask(")[0] ?? "";
+const requestAuth = createRequestBody.indexOf("await db.auth.getUser()");
+const requestMember = createRequestBody.indexOf('.from("firm_members")');
+const requestMemberBinding = createRequestBody.indexOf('.eq("auth_user_id", user.id)');
+const requestCase = createRequestBody.indexOf('.from("compliance_cases")');
+const requestEngagement = createRequestBody.indexOf('.from("engagements")');
+const requestInsert = createRequestBody.indexOf('.from("document_requests").insert({');
+assert.ok(requestAuth >= 0 && requestAuth < requestMember &&
+  requestMember < requestMemberBinding && requestMemberBinding < requestCase &&
+  requestCase < requestEngagement && requestEngagement < requestInsert,
+  "request creation must revalidate live Auth, member, case, engagement before insert");
+for (const guard of [
+  'allowed("request.create")',
+  'if (authError || !user) throw',
+  '.eq("id", member.id)',
+  '.eq("auth_user_id", user.id)',
+  '.eq("active", true)',
+  '.is("deactivated_at", null)',
+  'liveMember.role !== member.role',
+  '.eq("id", row.id)',
+  '.eq("taxpayer_id", row.taxpayer_id)',
+  '.eq("organization_id", orgId)',
+  '.eq("engagement_id", engagement.id)',
+  '.in("status", ["authorized", "accepted"])',
+  '.is("revoked_at", null)',
+  'if (caseError || !liveCase) throw',
+  'if (engagementError || !liveEngagement) throw',
+  'liveEngagement.assigned_to !== member.person_label',
+]) assert.ok(createRequestBody.includes(guard),
+  "request creation live tenant guard missing: " + guard);
+assert.ok(createRequestBody.includes('if (memberError || !liveMember') &&
+  createRequestBody.includes('if (!(liveEngagement.authorized_at || liveEngagement.accepted_at)'),
+  "request creation must fail closed on revoked, inactive or unauthorised grants");
+assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-B"]),
+  "request.create", "taxpayer-A").ok, false,
+  "firm staff must not request documents for an unassigned taxpayer");
+assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-A"]),
+  "request.create", "taxpayer-A").ok, true,
+  "assigned firm staff retain the request-creation capability");
