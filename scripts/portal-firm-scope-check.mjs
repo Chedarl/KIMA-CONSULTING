@@ -1304,3 +1304,26 @@ assert.ok(firmRequestNetworkBody.slice(firmRequestFinally).includes("finishMutat
   "firm request must release its synchronous mutation lock in finally");
 assert.equal((firmRequestNetworkBody.match(/finishMutation\(epoch\);/g) ?? []).length, 1,
   "firm request must release its lock exactly once in finally");
+
+
+// Phase 3 firm-to-client contact invitations: an Auth/RLS/membership/RPC
+// rejection must never strand the shared invitation mutation lock.
+// Source-contract regression; authenticated rejection and replay tests still
+// require staging and an independent security review.
+const contactInviteNetworkBody = invitations.src.split("  async function inviteContact() {")[1]
+  ?.split("\n  return (")[0] ?? "";
+const contactMutationStart = contactInviteNetworkBody.indexOf("if (!beginMutation()) return;");
+const contactTry = contactInviteNetworkBody.indexOf("try {", contactMutationStart);
+const contactDb = contactInviteNetworkBody.indexOf("const db = supabase();", contactMutationStart);
+const contactCatch = contactInviteNetworkBody.lastIndexOf("} catch {");
+const contactFinally = contactInviteNetworkBody.lastIndexOf("} finally {");
+assert.ok(contactMutationStart >= 0 && contactTry > contactMutationStart &&
+  contactDb > contactTry && contactCatch > contactDb && contactFinally > contactCatch,
+  "contact invitation must protect Auth/engagement/membership/RPC awaits with try/catch/finally");
+assert.ok(contactInviteNetworkBody.slice(contactCatch, contactFinally).includes(
+  'if (epoch === authEpoch.current) setError(fr ? "Impossible de vérifier le destinataire. Actualisez la page." : "Unable to verify the recipient. Refresh the page.");'),
+  "rejected contact invitation must show localized failure only to its originating identity");
+assert.ok(contactInviteNetworkBody.slice(contactFinally).includes("finishMutation(epoch);"),
+  "contact invitation must release its single-flight lock in finally");
+assert.equal((contactInviteNetworkBody.match(/finishMutation\(epoch\);/g) ?? []).length, 1,
+  "contact invitation must release its lock exactly once, in finally");
