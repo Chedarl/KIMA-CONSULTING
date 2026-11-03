@@ -61,6 +61,7 @@ export function ClientDashboard({
   const [clientName, setClientName] = useState(fallbackName);
   const [cases, setCases] = useState<ComplianceCase[] | null>(null);
   const [requests, setRequests] = useState<CaseRequest[]>([]);
+  const [noClient, setNoClient] = useState(false);
   const [offline, setOffline] = useState(false);
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -82,6 +83,7 @@ export function ClientDashboard({
       if (epoch !== loadEpoch.current) return;
       setIds(resolved);
       if (!resolved) {
+        setNoClient(true);
         setClientName(fallbackName);
         setCases([]);
         setRequests([]);
@@ -113,6 +115,7 @@ export function ClientDashboard({
       setCases((cs.data ?? []) as ComplianceCase[]);
       setRequests((rq.data ?? []) as CaseRequest[]);
       setOffline(false);
+      setNoClient(false);
     } catch {
       if (epoch !== loadEpoch.current) return;
       setIds(null);
@@ -300,6 +303,27 @@ export function ClientDashboard({
     },
   ];
 
+  if (noClient) {
+    return (
+      <section className="max-w-2xl rounded-card border border-border bg-white p-6 shadow-card">
+        <h1 className="font-display text-xl font-semibold text-fg">
+          {locale === "fr" ? "Espace client" : "Client portal"}
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-fg-muted">
+          {locale === "fr"
+            ? "Aucun accès client n'est rattaché à ce compte. Un cabinet invite le contribuable avant que ses dossiers apparaissent ici."
+            : "No client access is linked to this account. A firm invites the taxpayer before their cases appear here."}
+        </p>
+        <a
+          href={locale === "fr" ? "/fr/workspace" : "/en/workspace"}
+          className="mt-5 inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90"
+        >
+          {locale === "fr" ? "Ouvrir l'espace cabinet" : "Open the firm workspace"}
+        </a>
+      </section>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -356,35 +380,44 @@ export function ClientDashboard({
             primary ? "border-amber/40 bg-[#FFF8EC]" : "border-border bg-white"
           }`}
         >
-          {primary ? (
+          {owed.length > 0 ? (
             <>
               <p className="flex items-center gap-2 text-sm font-semibold text-amber-text">
                 <WarningIcon />
-                {copy.actionNeeded}
+                {copy.actionsTitle} · {owed.length}
               </p>
-              <h2 className="mt-2 font-display text-lg font-semibold text-fg">{label(primary)}</h2>
-              <p className="mt-1 text-sm text-fg-muted">
-                {t.dueOn} {primary.due_on}
-                {primary.status === "returned" ? ` — ${t.againHint}` : ""}
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <PrimaryButton
-                  disabled={busy === primary.id}
-                  onClick={() => {
-                    pending.current = primary.id;
-                    fileRef.current?.click();
-                  }}
-                >
-                  {busy === primary.id ? copy.uploading : copy.upload}
-                </PrimaryButton>
-                {owed.length > 1 && (
-                  <Link href={`/${locale}/app/requests`} className="text-sm font-semibold text-navy hover:underline">
-                    {owed.length - 1} {copy.moreActions}
-                  </Link>
-                )}
-              </div>
-              {failed === primary.id && <p className="mt-2 text-xs font-medium text-danger-text">{t.sendFailed}</p>}
-              <p className="mt-4 text-xs text-fg-subtle">{t.receivedNotAccepted}</p>
+              <ul className="mt-3 divide-y divide-border">
+                {owed.slice(0, 5).map((r) => {
+                  const late = r.due_on && r.due_on < today;
+                  return (
+                    <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-fg">{label(r)}</span>
+                        <span className={`tnum font-mono text-[11px] ${late ? "text-danger-text" : "text-fg-subtle"}`}>
+                          {copy.actionDue} {r.due_on}
+                          {r.status === "returned" ? ` — ${t.againHint}` : ""}
+                        </span>
+                      </span>
+                      <PrimaryButton
+                        disabled={busy === r.id}
+                        onClick={() => {
+                          pending.current = r.id;
+                          fileRef.current?.click();
+                        }}
+                      >
+                        {busy === r.id ? copy.uploading : copy.upload}
+                      </PrimaryButton>
+                    </li>
+                  );
+                })}
+              </ul>
+              {owed.length > 5 && (
+                <Link href={`/${locale}/app/requests`} className="mt-2 inline-flex min-h-[44px] items-center text-sm font-semibold text-navy hover:underline">
+                  {owed.length - 5} {copy.moreActions}
+                </Link>
+              )}
+              {failed && <p className="mt-2 text-xs font-medium text-danger-text">{t.sendFailed}</p>}
+              <p className="mt-3 text-xs text-fg-subtle">{t.receivedNotAccepted}</p>
             </>
           ) : (
             <>
@@ -410,6 +443,12 @@ export function ClientDashboard({
             <ul className="mt-3 divide-y divide-border">
               {(cases ?? []).slice(0, 4).map((c) => {
                 const state = clientStatus(c, awaitingClient(byCase[c.id] ?? []));
+                const stepIndex =
+                  c.stage === "documents" ? 0
+                    : c.stage === "accounting" || c.stage === "preparation" ? 1
+                    : c.stage === "review" ? 2
+                    : c.stage === "filing" || c.stage === "evidence" ? 3
+                    : 4;
                 return (
                   <li key={c.id}>
                     <Link
@@ -419,6 +458,15 @@ export function ClientDashboard({
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium text-fg">{obligationLabel(c.obligation_code, locale)}</span>
                         <span className="tnum block font-mono text-xs text-fg-subtle">{c.period_token}</span>
+                        <span className="mt-1 flex items-center gap-1" aria-label={copy.progressLabel}>
+                          {stepLabels.map((s, k) => (
+                            <span
+                              key={s}
+                              className={`h-1.5 w-4 rounded-full ${k <= stepIndex ? "bg-teal-text" : "bg-border"}`}
+                              aria-hidden
+                            />
+                          ))}
+                        </span>
                       </span>
                       <Pill tone={state === "waiting_on_you" ? "amber" : state === "complete" ? "green" : "muted"}>
                         {state === "waiting_on_you" ? copy.badgeAction : state === "complete" ? copy.badgeDone : copy.badgeActive}
@@ -431,6 +479,22 @@ export function ClientDashboard({
           )}
         </section>
       </div>
+
+      {/* C5: the four axes decide the obligations. Ask once, plainly. */}
+      <section className="rounded-card border border-border bg-white p-5 shadow-card">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-base font-semibold text-fg">{copy.detailsTitle}</h2>
+            <p className="mt-1 max-w-2xl text-sm text-fg-muted">{copy.detailsBody}</p>
+          </div>
+          <Link
+            href={`/${locale}/app/profile`}
+            className="inline-flex min-h-[44px] items-center rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken"
+          >
+            {copy.detailsCta}
+          </Link>
+        </div>
+      </section>
 
       {featured && featuredStatus ? (
         <div>
@@ -472,3 +536,4 @@ function WarningIcon() {
     </svg>
   );
 }
+
