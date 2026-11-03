@@ -2014,13 +2014,13 @@ assert.ok(requestReplayBody.includes("const requestContextCurrent = () =>") &&
   requestReplayBody.includes("sessionMemberRef.current === actionMemberId"),
   "request creation must bind its original case and acting firm member");
 const requestContextGuard = requestReplayBody.indexOf('if (!requestContextCurrent()) throw new Error("Case or firm session changed");');
-const requestInsert = requestReplayBody.indexOf('db.from("document_requests").insert({');
-assert.ok(requestContextGuard >= 0 && requestContextGuard < requestInsert &&
+const requestContextInsert = requestReplayBody.indexOf('db.from("document_requests").insert({');
+assert.ok(requestContextGuard >= 0 && requestContextGuard < requestContextInsert &&
   requestContextGuard > requestReplayBody.indexOf("if (engagementError || !liveEngagement)"),
   "stale request creation must be rejected after live preflight but before INSERT");
 const requestAuditInsert = requestReplayBody.indexOf('db.from("case_events").insert(event)');
 const requestContextReload = requestReplayBody.indexOf('if (requestContextCurrent()) {\n        setAskFr("");');
-assert.ok(requestAuditInsert > requestInsert && requestContextReload > requestAuditInsert &&
+assert.ok(requestAuditInsert > requestContextInsert && requestContextReload > requestAuditInsert &&
   requestReplayBody.includes("        await load();"),
   "successful request insert must attempt audit logging before guarded UI reset/reload");
 assert.ok(requestReplayBody.includes('if (requestContextCurrent()) setFailed("new-request");') &&
