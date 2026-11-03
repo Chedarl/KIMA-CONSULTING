@@ -13,13 +13,14 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const out = mkdtempSync(join(tmpdir(), "kima-dsf-"));
 const tsc = join(root, "node_modules", "typescript", "bin", "tsc");
-const args = [join(root, "lib", "dsf-mapping.ts"), "--outDir", out, "--module", "commonjs", "--target", "es2020", "--skipLibCheck", "--strict", "--moduleResolution", "node"];
+const args = [join(root, "lib", "dsf-mapping.ts"), join(root, "lib", "dsf-import.ts"), "--outDir", out, "--module", "commonjs", "--target", "es2020", "--skipLibCheck", "--strict", "--moduleResolution", "node"];
 const r = spawnSync(process.execPath, [tsc, ...args], { encoding: "utf8" });
 if (r.status !== 0) {
   console.error(r.stdout || r.stderr || r.error);
   throw new Error("tsc failed");
 }
 const { mapAccount, normaliseAccount, mapAccounts } = createRequire(import.meta.url)(join(out, "dsf-mapping.js"));
+const { importLedger, detectColumns, parseXaf } = createRequire(import.meta.url)(join(out, "dsf-import.js"));
 
 const table = { "70": "Ventes", "701": "Ventes de marchandises", "7011": "Ventes au comptant" };
 let count = 0;
@@ -49,6 +50,38 @@ check("nonsense is unmapped rather than guessed", () => {
 });
 check("order is preserved across an import", () => {
   assert.deepEqual(mapAccounts(["7011", "4011", "70"], table).map((m) => m.status), ["mapped", "unmapped", "mapped"]);
+});
+
+check("a French header is understood", () => {
+  const cols = detectColumns(["Compte", "Libellé", "Débit", "Crédit"]);
+  assert.ok(cols);
+  assert.equal(cols.account, 0);
+  assert.equal(cols.debit, 2);
+});
+check("a header without an amount column is refused, not guessed", () => {
+  assert.equal(detectColumns(["Compte", "Libellé"]), null);
+});
+check("amounts must be whole XAF", () => {
+  assert.equal(parseXaf("1 250 000"), 1250000);
+  assert.equal(parseXaf("1250000"), 1250000);
+  assert.equal(parseXaf("12,50"), 1250);
+  assert.equal(parseXaf("abc"), null);
+  assert.equal(parseXaf(""), 0);
+});
+check("an import totals what it read and flags what it could not", () => {
+  const csv = ["Compte;Libellé;Débit;Crédit", "7011000;Ventes;0;2500000", "4011000;Achats;1200000;0", "9999;Inconnu;abc;0"].join("\n");
+  const res = importLedger(csv, table);
+  assert.equal(res.rows.length, 3);
+  assert.equal(res.totalDebitXaf, 1200000);
+  assert.equal(res.totalCreditXaf, 2500000);
+  assert.equal(res.unmappedCount, 2);
+  assert.equal(res.invalidCount, 1);
+  assert.equal(res.rows[2].issues[0], "amount_not_integer");
+});
+check("a quoted label keeps its separator", () => {
+  const csv = ['Compte,Libellé,Débit,Crédit', '7011,"Ventes, comptant",0,100'].join("\n");
+  const res = importLedger(csv, table);
+  assert.equal(res.rows[0].label, "Ventes, comptant");
 });
 
 console.log("\n" + count + " assertions passed");
