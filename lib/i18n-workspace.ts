@@ -659,6 +659,7 @@ const fr = {
     continueToWorkspace: "Continuer vers l'espace cabinet",
     role: "Rôle",
     signedOut: "Aucune session cabinet. Les actions restent refusées tant que vous n'êtes pas connecté.",
+    demoEnter: "Entrer en démo (aperçu)",
     capabilities: "Capacités de ce rôle",
   },
 
@@ -1784,6 +1785,7 @@ const en: WorkspaceDictionary = {
     continueToWorkspace: "Continue to the firm workspace",
     role: "Role",
     signedOut: "No firm session. Actions stay refused until you sign in.",
+    demoEnter: "Enter demo (preview)",
     capabilities: "What this role can do",
   },
 
