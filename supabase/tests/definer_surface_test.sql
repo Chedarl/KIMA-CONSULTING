@@ -72,7 +72,7 @@ select is(
   'create_invitation_for_contact_internal, create_invitation_internal, current_firm_role, '
   'current_member_id, current_member_label, current_member_org, '
   'decide_invitation_internal, delivered_evidence_lock, demo_taxpayer_id, '
-  'document_version_number, document_version_path_guard, '
+  'document_version_number, document_version_path_guard, domain_event_capture, '
   'engagement_authorized_at_is_permanent, engagements_grant_guard, enqueue_due_reminders, '
   'firm_member_has, firm_name_key, firm_previously_granted, flag_enabled, '
   'guard_client_invite_authorization, incident_timeline_guard, incident_verify_guard, is_kima_admin, '
