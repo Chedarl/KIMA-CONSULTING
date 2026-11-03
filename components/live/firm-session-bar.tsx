@@ -17,7 +17,6 @@ type Labels = {
   signOut: string;
   signedOut: string;
   capabilities: string;
-  demoEnter: string;
 };
 
 /**
@@ -28,22 +27,6 @@ type Labels = {
  */
 export function FirmSessionBar({ locale, t }: { locale: "fr" | "en"; t: Labels }) {
   const [session, setSession] = useState<FirmSession | null | undefined>(undefined);
-  const [demoBusy, setDemoBusy] = useState(false);
-  // Preview-only entry. The API refuses in production whatever the flag says.
-  const demoEnabled = process.env.NEXT_PUBLIC_KIMA_DEMO_ENTRY === "1";
-
-  async function enterDemo() {
-    setDemoBusy(true);
-    try {
-      const res = await fetch("/api/demo/link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale }) });
-      if (!res.ok) return;
-      const body = (await res.json()) as { url?: string };
-      if (body.url) window.location.assign(body.url);
-    } finally {
-      setDemoBusy(false);
-    }
-  }
-
   useEffect(() => {
     let alive = true;
     const unsubscribe = subscribeFirmSession((next: FirmSession | null) => {
@@ -72,16 +55,6 @@ export function FirmSessionBar({ locale, t }: { locale: "fr" | "en"; t: Labels }
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-amber/50 bg-amber-soft px-4 py-3">
         <p className="text-sm text-amber-text">{t.signedOut}</p>
-        {demoEnabled ? (
-          <button
-            type="button"
-            onClick={() => void enterDemo()}
-            disabled={demoBusy}
-            className="inline-flex min-h-[44px] items-center rounded-lg border border-amber/60 px-4 text-sm font-semibold text-amber-text disabled:opacity-60"
-          >
-            {t.demoEnter ?? "Demo"}
-          </button>
-        ) : null}
         <Link
           href={`/${locale}/firm-login`}
           className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90"

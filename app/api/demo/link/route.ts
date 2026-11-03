@@ -26,7 +26,12 @@ export async function POST(request: Request) {
   // that URL is the production ref.
   const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const onProductionProject = projectUrl.includes("vhrnrbnjhmxrygvyfirf");
-  if (!allowed || !sameOrigin || onProductionProject) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  // Same-origin is not identity: an approved tester must also hold the key,
+  // which lives only in the deployment environment, never in the client bundle.
+  const key = process.env.KIMA_DEMO_KEY ?? "";
+  const presentedKey = (request.headers.get("x-kima-demo-key") ?? "").trim();
+  const authorisedTester = key.length >= 16 && presentedKey === key;
+  if (!allowed || !sameOrigin || onProductionProject || !authorisedTester) return NextResponse.json({ error: "not_authorised" }, { status: 404 })
 
   if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: "not_configured" }, { status: 503 });
 
