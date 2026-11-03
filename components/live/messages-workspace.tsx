@@ -67,6 +67,33 @@ function FirmMessagesView({
   const [assignments, setAssignments] = useState<
     { taxpayer_id: string; assigned_to: string | null }[]
   >([]);
+  const [refreshEpoch, setRefreshEpoch] = useState(0);
+
+  // Revalidate the current member and active engagements after the tab regains
+  // focus and at a bounded interval. Clear the old snapshot before each check:
+  // revoked clients must not remain on screen while access is being verified.
+  // Database RLS remains the final authorization boundary for reads and writes.
+  useEffect(() => {
+    const refreshAccess = () => {
+      setClients(null);
+      setPreviews({});
+      setActive(null);
+      setAssignments([]);
+      setOffline(false);
+      setRefreshEpoch((epoch) => epoch + 1);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshAccess();
+    };
+    const timer = window.setInterval(refreshAccess, 60_000);
+    window.addEventListener("focus", refreshAccess);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshAccess);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [session.memberId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,7 +233,7 @@ function FirmMessagesView({
       cancelled = true;
       if (channel) void db.removeChannel(channel);
     };
-  }, [session.memberId]);
+  }, [session.memberId, refreshEpoch]);
 
   const sorted = useMemo(() => {
     if (!clients) return null;
