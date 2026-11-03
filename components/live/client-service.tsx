@@ -69,6 +69,8 @@ export function ClientService({
   const pending = useRef<string | null>(null);
   const loadEpoch = useRef(0);
   const authEpoch = useRef(0);
+  // React busy state is not synchronous; prevent rapid duplicate consent inserts.
+  const approvalInFlight = useRef<{ caseId: string; epoch: number } | null>(null);
   const identityRef = useRef<string | null | undefined>(undefined);
   // Updated during render: route changes invalidate prior-case mutation completions
   // even before effect cleanup runs.
@@ -79,6 +81,7 @@ export function ClientService({
     setBusy(null);
     setFailed(null);
     pending.current = null;
+    approvalInFlight.current = null;
   }
   const today = todayInDouala();
 
@@ -192,6 +195,7 @@ export function ClientService({
       setBusy(null);
       setFailed(null);
       pending.current = null;
+      approvalInFlight.current = null;
       if (fileRef.current) fileRef.current.value = "";
       if (timer) clearTimeout(timer);
       // Avoid awaiting Supabase requests inside the auth callback.
@@ -263,10 +267,14 @@ export function ClientService({
     if (loadedCaseId !== caseId || row.id !== caseId) return;
     const epoch = authEpoch.current;
     const actionCaseId = caseId;
+    // Acquire before the first await, independent of React's delayed busy render.
+    if (approvalInFlight.current) return;
+    const action = { caseId: actionCaseId, epoch };
+    approvalInFlight.current = action;
     setBusy("client-approval");
     setFailed(null);
-    const db = supabase();
     try {
+      const db = supabase();
       const { data: auth, error: authError } = await db.auth.getUser();
       if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
       if (authError || !auth.user || auth.user.id !== identityRef.current) {
@@ -327,7 +335,12 @@ export function ClientService({
     } catch {
       if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");
     } finally {
-      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
+      // An old completion cannot unlock a newer case/account's approval attempt.
+      const ownsApproval = approvalInFlight.current === action;
+      if (approvalInFlight.current === action) approvalInFlight.current = null;
+      if (ownsApproval) {
+        if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
+      }
     }
   }
 
