@@ -154,6 +154,7 @@ export function ClientDashboard({
       // Supabase requests must run outside the auth callback.
       timer = setTimeout(() => { void load(); }, 0);
     });
+
     return () => {
       ++authEpoch.current;
       ++loadEpoch.current;
@@ -304,7 +305,7 @@ export function ClientDashboard({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-[1.65rem] font-semibold tracking-tight text-fg">
-            {copy.welcome}, {clientName}
+            {copy.welcome}{clientName ? `, ${clientName}` : ""}
           </h1>
           <p className="mt-1 text-sm text-fg-muted">{copy.overview}</p>
         </div>

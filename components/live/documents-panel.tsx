@@ -72,6 +72,7 @@ export function DocumentsPanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  const [noClient, setNoClient] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const fileInput = useRef<HTMLInputElement>(null);
   const pendingFor = useRef<string | null>(null);
@@ -81,6 +82,7 @@ export function DocumentsPanel({
     const db = supabase();
     const resolved = await demoIds();
     if (!resolved) {
+      setNoClient(true);
       setError(true);
       return;
     }
@@ -168,6 +170,27 @@ export function DocumentsPanel({
       return dueBucket(r.due_on, today) === filter;
     });
   }, [requests, filter, today]);
+
+  if (noClient) {
+    return (
+      <section className="max-w-2xl rounded-card border border-border bg-surface p-6">
+        <h1 className="font-display text-xl font-semibold text-fg">
+          {locale === "fr" ? "Espace documents" : "Documents"}
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-fg-muted">
+          {locale === "fr"
+            ? "Aucun accès client n'est rattaché à ce compte. Les documents d'un contribuable s'affichent ici une fois le compte invité par son cabinet."
+            : "No client access is linked to this account. A taxpayer's documents appear here once the account is invited by its firm."}
+        </p>
+        <a
+          href={locale === "fr" ? "/fr/workspace" : "/en/workspace"}
+          className="mt-5 inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-surface hover:opacity-90"
+        >
+          {locale === "fr" ? "Ouvrir l'espace cabinet" : "Open the firm workspace"}
+        </a>
+      </section>
+    );
+  }
 
   if (error) {
     return (

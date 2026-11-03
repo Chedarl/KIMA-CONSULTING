@@ -39,7 +39,7 @@ export function MarketingHeader({
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-6">
-        <Link href={`/${locale}`} className="inline-flex min-h-[44px] items-center" aria-label="KIMA CONSULTING">
+        <Link href={`/${locale}`} className="inline-flex shrink-0 min-h-[44px] items-center" aria-label="KIMA CONSULTING">
           <KimaWordmark
             tone={inverse ? "light" : "dark"}
             className="max-sm:max-w-[6.5rem]"

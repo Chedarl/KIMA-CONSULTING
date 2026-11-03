@@ -13,7 +13,7 @@ export default function ClientPortalHome({ params }: { params: { locale: string 
     <ClientDashboard
       locale={locale}
       t={w.clientDash}
-      fallbackName={w.client.title}
+      fallbackName=""
       documentsHref={`/${locale}/app/documents`}
     />
   );
