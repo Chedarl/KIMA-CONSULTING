@@ -7,6 +7,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { useRealtime } from "@/lib/use-realtime";
+import { WorkDrawer, type DrawerItem } from "@/components/live/work-drawer";
 import { Card, CardHeader } from "@/components/ui";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
@@ -154,6 +155,7 @@ export function FirmDashboard({
   const [offline, setOffline] = useState(false);
   const [live, setLive] = useState(false);
   const toast = useToast();
+  const [drawer, setDrawer] = useState<{ title: string; items: DrawerItem[] } | null>(null);
   const [money, setMoney] = useState<{ billed: number; collected: number; outstanding: number; awaiting: number; overdue: number } | null>(null);
   const [pendingDocs, setPendingDocs] = useState<{ id: string; file_name: string; taxpayer_id: string; created_at: string }[]>([]);
 
@@ -252,6 +254,13 @@ export function FirmDashboard({
     },
   );
 
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawer(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer]);
+
   const today = todayISO();
 
   const metrics = useMemo(() => {
@@ -270,7 +279,9 @@ export function FirmDashboard({
     }).length;
     const weekAgo = daysAgoISO(7);
     const openedThisWeek = open.filter((c) => (c.opened_at ?? "") >= weekAgo).length;
-    return { active: open.length, waiting, review, blocked, openedThisWeek };
+    const overdue = open.filter((c) => risk(c, today) === "overdue").length;
+    const dueSoon = open.filter((c) => risk(c, today) === "due_soon").length;
+    return { active: open.length, waiting, review, blocked, openedThisWeek, overdue, dueSoon };
   }, [rows, requests, tasks, today]);
 
   const ordered = useMemo(() => queueOrder(rows ?? [], today).slice(0, 5), [rows, today]);
@@ -302,6 +313,33 @@ export function FirmDashboard({
   }, [t]);
 
   const nameOf = (c: Row) => c.taxpayer_name ?? names[c.taxpayer_id] ?? t.unnamedClient;
+
+  // Attention rail: each bucket is a query over the same rows and opens the
+  // work drawer — context preserved, no route jump.
+  const buckets = useMemo(() => {
+    const open = rows ?? [];
+    const caseItems = (cs: Row[]) =>
+      cs.map((c) => ({
+        id: c.id,
+        primary: c.taxpayer_name ?? names[c.taxpayer_id] ?? t.unnamedClient,
+        secondary: obligationLabel(c.obligation_code, locale) + " · " + c.period_token,
+        href: `/${locale}/workspace/cases/${c.id}`,
+      }));
+    const waiting = open.filter((c) => awaitingClient(requests[c.id] ?? []));
+    const blocked = open.filter((c) => {
+      const d = deriveBlocker({ tasks: tasks[c.id] ?? [], requests: requests[c.id] ?? [] });
+      return d?.waiting_on === "firm" || (!d && Boolean(c.blocker?.trim()));
+    });
+    return [
+      { key: "active", title: t.activeCases, items: caseItems(open) },
+      { key: "waiting", title: t.waitingOnClients, items: caseItems(waiting) },
+      { key: "review", title: t.pendingReview, items: caseItems(open.filter((c) => c.stage === "review")) },
+      { key: "blocked", title: t.blocked, items: caseItems(blocked) },
+      { key: "dueSoon", title: t.dueSoon, items: caseItems(open.filter((c) => risk(c, today) === "due_soon")) },
+      { key: "overdue", title: t.overdue, items: caseItems(open.filter((c) => risk(c, today) === "overdue")) },
+      { key: "docs", title: t.docsReceived, items: pendingDocs.map((d) => ({ id: d.id, primary: (names[d.taxpayer_id] ?? t.unnamedClient) + " — " + d.file_name, secondary: daysWaiting(d.created_at) + " " + t.reviewDays, href: `/${locale}/workspace/inbox` })) },
+    ];
+  }, [rows, requests, tasks, pendingDocs, names, today, locale, t]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -355,6 +393,24 @@ export function FirmDashboard({
           <Tile label={t.docsReceived} value={pendingDocs.length} tone="neutral" href={`/${locale}/workspace/inbox`} />
         </div>
       )}
+
+      {/* Attention rail — every row opens the work drawer. */}
+      <section className="rounded-card border border-border bg-surface p-3">
+        <h2 className="px-2 text-xs font-semibold uppercase tracking-wide text-fg-subtle">{t.attentionTitle}</h2>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {buckets.map((b) => (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => setDrawer({ title: b.title, items: b.items })}
+              className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface-sunken px-3 text-sm font-medium text-fg hover:border-teal/40 hover:bg-surface"
+            >
+              <span className="tnum font-mono text-xs text-fg-muted">{b.items.length}</span>
+              {b.title}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {/* F2 + F3: the money, and what is ageing in review. */}
       <div className="grid gap-5 lg:grid-cols-2">
@@ -705,6 +761,16 @@ export function FirmDashboard({
           </Card>
         </div>
       </div>
+
+      {drawer && (
+        <WorkDrawer
+          title={drawer.title}
+          items={drawer.items}
+          empty={t.activityEmpty}
+          closeLabel={t.drawerClose}
+          onClose={() => setDrawer(null)}
+        />
+      )}
     </div>
   );
 }
