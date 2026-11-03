@@ -124,7 +124,7 @@ export function ContactForm({ locale, copy }: { locale: "fr" | "en"; copy: Copy 
           aria-invalid={err("kind")}
           className="mt-1 min-h-[44px] w-full rounded-lg border border-border bg-white px-3 text-sm"
         >
-          <option value="">{t.contactKind}</option>
+          <option value="">{locale === "fr" ? "Choisir…" : "Choose…"}</option>
           {KINDS.map((k) => (
             <option key={k} value={k}>
               {t.kinds[k]}
