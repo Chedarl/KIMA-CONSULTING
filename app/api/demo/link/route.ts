@@ -21,7 +21,12 @@ export async function POST(request: Request) {
   // A cross-site scripted POST has no Sec-Fetch-Site, which closes the
   // simplest drive-by route; Vercel preview protection is the outer gate.
   const sameOrigin = (request.headers.get("sec-fetch-site") ?? "") === "same-origin";
-  if (!allowed || !sameOrigin) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  // Even on a preview, this door must never open onto the production project:
+  // a preview deployment carries its own Supabase URL, so refuse outright when
+  // that URL is the production ref.
+  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const onProductionProject = projectUrl.includes("vhrnrbnjhmxrygvyfirf");
+  if (!allowed || !sameOrigin || onProductionProject) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: "not_configured" }, { status: 503 });
 
