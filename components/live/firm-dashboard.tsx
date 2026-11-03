@@ -5,6 +5,8 @@ import { formatXaf } from "@/lib/i18n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/toast";
+import { useRealtime } from "@/lib/use-realtime";
 import { Card, CardHeader } from "@/components/ui";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
@@ -139,6 +141,8 @@ export function FirmDashboard({
   const [events, setEvents] = useState<CaseEvent[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
   const [offline, setOffline] = useState(false);
+  const [live, setLive] = useState(false);
+  const toast = useToast();
   const [money, setMoney] = useState<{ billed: number; collected: number; outstanding: number; awaiting: number; overdue: number } | null>(null);
   const [pendingDocs, setPendingDocs] = useState<{ id: string; file_name: string; taxpayer_id: string; created_at: string }[]>([]);
 
@@ -225,6 +229,18 @@ export function FirmDashboard({
     void load();
   }, [load]);
 
+  // One channel for everything the board reads: any change re-derives the
+  // numbers, so the dashboard can never keep showing yesterday's answer.
+  useRealtime(
+    "firm-dashboard",
+    ["compliance_cases", "document_requests", "documents", "case_tasks", "case_events", "invoices", "service_payments"],
+    ({ table, event }) => {
+      setLive(true);
+      void load();
+      if (table === "documents" && event === "INSERT") toast(t.clientUploaded);
+    },
+  );
+
   const today = todayISO();
 
   const metrics = useMemo(() => {
@@ -283,7 +299,10 @@ export function FirmDashboard({
           <h1 className="font-display text-2xl font-semibold text-fg sm:text-3xl">{greeting}</h1>
           <p className="mt-1 text-sm text-fg-muted">{t.subtitle}</p>
         </div>
-        <p className="tnum font-mono text-xs text-fg-subtle">{today}</p>
+        <p className="flex items-center gap-2">
+          <span className={"h-1.5 w-1.5 rounded-full " + (live ? "bg-teal" : "bg-fg-subtle")} aria-hidden />
+          <span className="tnum font-mono text-xs text-fg-subtle">{live ? t.liveLabel : today}</span>
+        </p>
       </div>
 
       {offline && (
