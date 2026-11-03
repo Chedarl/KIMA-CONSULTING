@@ -831,3 +831,26 @@ assert.ok(rejectedFirmDecision.includes("setInvites([])") &&
   rejectedFirmDecision.includes("await load({ keepError: true });") &&
   rejectedFirmDecision.includes("return;"),
   "rejected firm decision must hide stale tenant data and fail closed");
+
+
+// A taxpayer invitation decision must bind the live RLS-resolved taxpayer
+// to the invitation immediately before the decision RPC. The same signed-in
+// user can switch taxpayer context without a Supabase Auth identity event.
+// Source-contract coverage; authenticated multi-taxpayer and replay tests
+// remain required before release.
+const taxpayerDecisionCheck = liveFirmDecision.indexOf("await sessionTaxpayerId()");
+assert.ok(taxpayerDecisionCheck > 0 && taxpayerDecisionCheck < firmDecisionRpc,
+  "taxpayer invitation decision must re-resolve current taxpayer before RPC");
+assert.ok(liveFirmDecision.includes('if (side === "taxpayer") {'),
+  "taxpayer recheck must only run for taxpayer-side invitation decisions");
+assert.ok(liveFirmDecision.includes("liveTaxpayerId !== taxpayerId") &&
+  liveFirmDecision.includes("liveTaxpayerId !== liveInvite.taxpayer_id"),
+  "taxpayer decision must match both the selected taxpayer and live invitation");
+const rejectedTaxpayerDecision = liveFirmDecision.split("if (!liveTaxpayerId ||")[1]
+  ?.split("\n      }")[0] ?? "";
+assert.ok(rejectedTaxpayerDecision.includes("setInvites([])") &&
+  rejectedTaxpayerDecision.includes("setFirms([])") &&
+  rejectedTaxpayerDecision.includes('setFirm("")') &&
+  rejectedTaxpayerDecision.includes("await load({ keepError: true });") &&
+  rejectedTaxpayerDecision.includes("return;"),
+  "changed taxpayer context must clear stale invitation data and reject the decision");
