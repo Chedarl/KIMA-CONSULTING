@@ -221,7 +221,11 @@ export function completeness(d: RegistrationDraft): Completeness {
 
   // The NIU is useful, never required. An applicant without one is often
   // exactly the person who needs help getting one.
-  check("declared_niu", d.declared_niu.trim().length > 0);
+  // The NIU must look like one the DGI would issue: 14 characters, M or P prefix.
+  if (d.declared_niu.trim()) {
+    const value = normaliseNiu(d.declared_niu);
+    check("declared_niu", value.length === 14 && (value[0] === "M" || value[0] === "P"));
+  }
 
   const total = present.length + missing.length;
   return {
