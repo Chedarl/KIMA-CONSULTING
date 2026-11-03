@@ -353,6 +353,13 @@ export function ClientDashboard({
         </p>
       )}
 
+      {/* Quick actions — the four questions, one tap away. */}
+      <nav aria-label={copy.overview} className="grid gap-3 sm:grid-cols-3">
+        <Link href={`/${locale}/app/requests`} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#18243B] px-4 text-sm font-semibold text-white hover:bg-[#24314d]">{copy.quickUpload}</Link>
+        <Link href={`/${locale}/app/messages`} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken">{copy.quickMessage}</Link>
+        <Link href={`/${locale}/app/declarations`} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken">{copy.quickInvoices}</Link>
+      </nav>
+
       {cases === null ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
@@ -495,6 +502,21 @@ export function ClientDashboard({
           </Link>
         </div>
       </section>
+      <section className="rounded-card border border-border bg-surface p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-base font-semibold text-fg">{copy.contactTitle}</h2>
+            <p className="mt-1 max-w-2xl text-sm text-fg-muted">{copy.contactBody}</p>
+          </div>
+          <Link
+            href={`/${locale}/app/messages`}
+            className="inline-flex min-h-[44px] items-center rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken"
+          >
+            {copy.contactCta}
+          </Link>
+        </div>
+      </section>
+
 
       {featured && featuredStatus ? (
         <div>
