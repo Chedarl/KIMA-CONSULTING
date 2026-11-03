@@ -77,3 +77,10 @@ drop policy if exists "only KIMA administrators view general inquiries" on publi
 create policy "only KIMA administrators view general inquiries" on public.contact_inquiries
   for select to authenticated
   using (private.is_kima_admin());
+
+-- Correct the contact form's column surface: an earlier table-wide INSERT
+-- grant widened the visitor's reach to id and received_at. Visitors write the
+-- message fields, and only those.
+revoke insert on public.contact_inquiries from anon, authenticated;
+grant insert (contact_name, contact_email, contact_phone, inquiry_kind, note, preferred_language)
+  on public.contact_inquiries to anon, authenticated;
