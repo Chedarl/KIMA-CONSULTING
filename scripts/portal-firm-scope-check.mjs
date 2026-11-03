@@ -1705,3 +1705,53 @@ assert.ok(realtimeEffect.includes("let active = true;") &&
   realtimeEffect.includes("if (active) setLive(status ===") &&
   realtimeEffect.includes("active = false;"),
   "old realtime callbacks must not supersede the current case or update live status");
+
+
+// A firm case is not a public case read. A member switch or sign-out must
+// invalidate in-flight snapshots, clear previous-tenant state, and refuse to
+// render sensitive case data without a firm session. The read must also bind
+// the stored firm member to the actual Auth user and the case organization.
+const caseSessionEffect = detail.src.split("// The signed-in member is who you are.")[1]
+  ?.split("// The client acts on these same rows.")[0] ?? "";
+assert.ok(detail.src.includes("const sessionMemberRef = useRef<string | null | undefined>(undefined);"),
+  "case detail must track actual firm member identity, not periodic token updates");
+for (const guard of [
+  "subscribeFirmSession((nextSession) => {",
+  "const nextMemberId = nextSession?.memberId ?? null;",
+  "const previousMemberId = sessionMemberRef.current;",
+  "previousMemberId !== undefined && previousMemberId !== nextMemberId",
+  "++loadEpoch.current;",
+  "setRow(null);",
+  "setTaxpayer(null);",
+  "setEngagement(null);",
+  "setAssignments([]);",
+  "setRequests([]);",
+  "setTasks([]);",
+  "setEvents([]);",
+  "setMembers([]);",
+  "setClientApproved(false);",
+  "setBusy(null);",
+  "setNote(\"\");",
+  "if (nextMemberId) void load();",
+]) assert.ok(caseSessionEffect.includes(guard),
+  "firm session switch must invalidate and clear the previous tenant: " + guard);
+const caseSessionLoad = detail.src.split("const load = useCallback(async () => {")[1]
+  ?.split("\n  useEffect(() => {")[0] ?? "";
+for (const guard of [
+  "const firmSession = readFirmSession();",
+  "if (!firmSession) throw",
+  "await db.auth.getUser()",
+  "if (authError || !user) throw",
+  '.eq("id", firmSession.memberId)',
+  '.eq("auth_user_id", user.id)',
+  '.eq("organization_id", kase.organization_id)',
+  '.eq("active", true)',
+  '.is("deactivated_at", null)',
+  "firmMember.error",
+  "!firmMember.data",
+]) assert.ok(caseSessionLoad.includes(guard),
+  "case read must verify the live Auth-bound firm membership: " + guard);
+const noFirmSessionGuard = detail.src.indexOf("if (!session) {");
+const caseMissingGuard = detail.src.indexOf("if (missing) {");
+assert.ok(noFirmSessionGuard > 0 && noFirmSessionGuard < caseMissingGuard,
+  "no firm session must render a sign-in gate before any case content");
