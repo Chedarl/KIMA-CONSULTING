@@ -231,6 +231,9 @@ export function CaseDetail({
   // A document request is a non-idempotent insert; React busy state alone
   // cannot serialize rapid submissions before the next render.
   const requestInFlight = useRef(false);
+  // A note is a non-idempotent case event; a rapid second click must not
+  // insert another copy before React commits the busy state.
+  const noteInFlight = useRef(false);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -959,6 +962,7 @@ export function CaseDetail({
 
   /** A note's audience is its content, which is why it is chosen and not derived. */
   async function saveNote() {
+    if (noteInFlight.current) return;
     if (!note.trim()) return;
     // A disabled visibility control is not authorization. Never create an
     // internal or client-visible event from a cached, revoked or foreign case.
@@ -973,6 +977,7 @@ export function CaseDetail({
       setRefusedBy(t.notPermitted);
       return;
     }
+    noteInFlight.current = true;
     setBusy("note");
     setFailed(null);
     setRefusedBy(null);
@@ -1034,6 +1039,7 @@ export function CaseDetail({
       setFailed("note");
       setRefusedBy(t.notPermitted);
     } finally {
+      noteInFlight.current = false;
       setBusy(null);
     }
   }
