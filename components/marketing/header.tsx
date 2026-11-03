@@ -67,8 +67,16 @@ export function MarketingHeader({
             {locale.toUpperCase()}
           </a>
           <Link
+            href={`/${locale}/firm-login`}
+            className={`hidden sm:inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold ${
+              inverse ? "border border-white/35 text-white hover:bg-white/10" : "border border-border-strong text-fg hover:bg-surface-sunken"
+            }`}
+          >
+            {labels.signIn}
+          </Link>
+          <Link
             href={ctaHref}
-            className={`inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold text-white ${
+            className={`hidden sm:inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold text-white ${
               inverse ? "public-cta" : "bg-[#0D1B2A] hover:bg-[#15283d]"
             }`}
           >
@@ -105,6 +113,22 @@ export function MarketingHeader({
               </li>
             ))}
           </ul>
+          <div className="mt-2 flex flex-col gap-2 border-t border-white/10 pt-3">
+            <Link
+              href={`/${locale}/firm-login`}
+              className="flex min-h-[44px] items-center rounded-lg border border-white/35 px-4 text-sm font-semibold text-white"
+              onClick={() => setOpen(false)}
+            >
+              {labels.signIn}
+            </Link>
+            <Link
+              href={ctaHref}
+              className="public-cta flex min-h-[44px] items-center justify-center rounded-lg px-4 text-sm font-semibold text-white"
+              onClick={() => setOpen(false)}
+            >
+              {labels.getStarted}
+            </Link>
+          </div>
         </nav>
       )}
     </header>

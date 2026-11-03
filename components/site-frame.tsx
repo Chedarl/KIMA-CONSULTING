@@ -31,6 +31,9 @@ export function SiteFrame({
   const inWorkspace =
     path === `/${locale}/workspace` || path.startsWith(`/${locale}/workspace/`);
 
+  const onFirmLogin =
+    path === `/${locale}/firm-login` || path.startsWith(`/${locale}/firm-login/`);
+
   const firmChrome =
     path === `/${locale}/workspace` ||
     path.startsWith(`/${locale}/workspace/`) ||
@@ -45,7 +48,7 @@ export function SiteFrame({
 
   return (
     <>
-      <Chrome locale={locale} labels={labels} minimal={inWorkspace} />
+      <Chrome locale={locale} labels={labels} minimal={inWorkspace || onFirmLogin} />
       <main id="main" className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
         {children}
       </main>
