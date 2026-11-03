@@ -22,6 +22,7 @@ const fr = {
   nav: {
     overview: "Présentation",
     taxpayer: "Espace client",
+  login: "Connexion",
     workspace: "Espace cabinet",
     design: "Système de design",
     language: "Langue",
@@ -248,6 +249,7 @@ const en: Dictionary = {
   proposition: "Your Tax Compliance Partner",
   nav: {
     overview: "Overview",
+  login: "Sign in",
     taxpayer: "Client portal",
     workspace: "Firm workspace",
     design: "Design system",
