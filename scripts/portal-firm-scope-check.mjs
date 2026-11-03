@@ -730,3 +730,24 @@ assert.ok(firmMessagesEntry.includes("if (authUserId.current !== undefined && ne
 assert.ok(firmMessagesEntry.includes("authUserId.current = nextUserId;") &&
   firmMessagesEntry.includes("subscription.unsubscribe();"),
   "firm inbox must update tracked identity and clean up its auth subscription");
+
+
+// An Auth read failure or a taxpayer session with no RLS-visible taxpayer
+// must not keep a previously authorized invitation inbox, firm directory,
+// draft engagement, or recipient choice visible. Routine successful refreshes
+// still preserve their existing selections. These are source-contract checks;
+// authenticated account-switch/fault-injection acceptance remains required.
+const failedInvitationAuth = invitationLoad.split("if (authError || !auth.user) {")[1]?.split("\n    setUserId(auth.user.id);")[0] ?? "";
+const missingInvitationTaxpayer = invitationLoad.split('if (side === "taxpayer" && !tp) {')[1]?.split("\n    const [rows, directory, engagements]")[0] ?? "";
+for (const [scenario, body] of [
+  ["Auth unavailable", failedInvitationAuth],
+  ["taxpayer unavailable", missingInvitationTaxpayer],
+]) {
+  assert.ok(body, scenario + ": invitation failure branch must exist");
+  for (const cleared of ["setInvites([])", "setDrafts([])", "setFirms([])",
+    'setFirm("")', 'setEngagement("")', 'setRecipientEmail("")']) {
+    assert.ok(body.includes(cleared), scenario + ": clear stale " + cleared);
+  }
+  assert.ok(body.indexOf("setInvites([])") < body.indexOf("setError("),
+    scenario + ": hide prior-tenant rows before reporting the failure");
+}
