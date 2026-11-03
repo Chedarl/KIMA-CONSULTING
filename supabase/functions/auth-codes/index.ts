@@ -42,7 +42,7 @@
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const MAIL_FROM = Deno.env.get("KIMA_MAIL_FROM") ?? "KIMA CONSULTING <onboarding@resend.dev>";
+const MAIL_FROM = Deno.env.get("KIMA_MAIL_FROM") ?? "KIMA OS <no-reply@kimaconsulting.app>";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
