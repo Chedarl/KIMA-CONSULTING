@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, whenSignedIn } from "@/lib/supabase";
 
 type Labels = {
   title: string; subtitle: string; profile: string; name: string; registration: string;
@@ -31,6 +31,7 @@ export function FirmSettings({ t, staffHref }: { t: Labels; staffHref: string })
 
   useEffect(() => {
     (async () => {
+      await whenSignedIn();
       const { data } = await supabase()
         .from("organizations")
         .select("id,name,registration_number,verification_status,preferred_locale,contact_email,contact_phone,address_line,city")

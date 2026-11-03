@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, whenSignedIn } from "@/lib/supabase";
 
 type Labels = {
   title: string; subtitle: string; empty: string; emptyHint: string;
@@ -29,6 +29,7 @@ export function IncidentList({ t }: { t: Labels }) {
   useEffect(() => {
     let alive = true;
     (async () => {
+      await whenSignedIn();
       const { data } = await supabase()
         .from("payment_incidents")
         .select("id,type,status,payment_state,observed_at,amount_minor,reference_masked")
