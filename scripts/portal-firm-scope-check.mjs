@@ -1898,3 +1898,24 @@ assert.ok(stageLockCheck >= 0 &&
   "stage lock must reject overlapping actions, acquire after validation and before auth awaits");
 assert.ok(stageSingleFlightBody.includes("finally {\n      stageInFlight.current = false;"),
   "stage lock must release after success, denied updates and failures");
+
+
+// Phase 3/4: document acceptance and return are competing decisions on the
+// same submitted request. React busy state is asynchronous and cannot prevent
+// rapid opposing clicks from entering the live Auth preflight together.
+// This mounted-screen guard complements the conditional database PATCH;
+// it does not replace server idempotency or authenticated staging replay.
+const reviewSingleFlightBody = detail.src.split('async function settleRequest(r: CaseRequest, to: "accepted" | "returned") {')[1]
+  ?.split("\n  async function createRequest()")[0] ?? "";
+assert.ok(detail.src.includes("const reviewInFlight = useRef(false);"),
+  "document review requires a synchronous single-flight guard");
+const reviewLockCheck = reviewSingleFlightBody.indexOf("if (reviewInFlight.current) return;");
+const reviewLockAcquire = reviewSingleFlightBody.indexOf("reviewInFlight.current = true;");
+const reviewAuthAwait = reviewSingleFlightBody.indexOf("await db.auth.getUser()");
+assert.ok(reviewLockCheck >= 0 && reviewLockCheck < reviewLockAcquire &&
+  reviewLockAcquire < reviewAuthAwait &&
+  reviewSingleFlightBody.indexOf('if (to === "returned" && !reason)') < reviewLockAcquire &&
+  reviewSingleFlightBody.indexOf('!allowed(to === "accepted" ? "document.review" : "request.return").ok') < reviewLockAcquire,
+  "review lock must reject competing decisions and acquire only after capability and reason checks, before async Auth");
+assert.ok(reviewSingleFlightBody.includes("finally {\n      reviewInFlight.current = false;"),
+  "review lock must release after success, denied conditional updates and failures");
