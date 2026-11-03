@@ -1472,3 +1472,66 @@ const replayTaskUpdate = await writerModule.exports.updateById(
 assert.deepEqual(JSON.parse(JSON.stringify(replayTaskUpdate)),
   { ok: false, reason: "not_permitted" });
 assert.equal(stored.completed_at, "2026-11-03T00:00:00Z");
+
+
+// Firm case notes: a cached case and a disabled client-visible checkbox do not
+// authorize an insert. Require live authenticated membership and exact tenant
+// engagement/case scope before creating either internal or client-visible events.
+// Source contracts + real capability-engine probes; authenticated staging
+// revocation, account-switch and two-firm acceptance remain release gates.
+const noteWriteBody = detail.src.split("async function saveNote() {")[1]
+  ?.split("\n  if (missing)")[0] ?? "";
+assert.ok(noteWriteBody.includes('allowed(noteClient ? "note.write_client" : "event.view_internal").ok'),
+  "note insert must recheck its visibility-specific capability");
+for (const guard of [
+  "engagement.id !== row.engagement_id",
+  "engagement.taxpayer_id !== row.taxpayer_id",
+  "engagement.revoked_at",
+  '["authorized", "accepted"].includes(engagement.status)',
+]) assert.ok(noteWriteBody.includes(guard), "note insert missing tenant guard: " + guard);
+const noteInsert = noteWriteBody.indexOf('.from("case_events").insert(event)');
+const noteAuth = noteWriteBody.indexOf("await db.auth.getUser()");
+const noteMember = noteWriteBody.indexOf('.from("firm_members")');
+const noteMemberBinding = noteWriteBody.indexOf('.eq("auth_user_id", user.id)');
+const noteCase = noteWriteBody.indexOf('.from("compliance_cases")');
+const noteEngagement = noteWriteBody.indexOf('.from("engagements")');
+assert.ok(noteAuth >= 0 && noteAuth < noteMember && noteMember < noteMemberBinding &&
+  noteMemberBinding < noteCase && noteCase < noteEngagement &&
+  noteEngagement < noteInsert,
+  "note insert must verify live Auth member, case and engagement before event insertion");
+assert.ok(noteWriteBody.includes('.eq("organization_id", engagement.organization_id)') &&
+  noteWriteBody.includes('.eq("taxpayer_id", row.taxpayer_id)') &&
+  noteWriteBody.includes('.is("revoked_at", null)'),
+  "note preflight must bind the exact firm/taxpayer and reject revoked engagement");
+assert.ok(noteWriteBody.includes('if (authError || !user) throw') &&
+  noteWriteBody.includes('if (memberError || !liveMember') &&
+  noteWriteBody.includes('if (caseError || !liveCase) throw') &&
+  noteWriteBody.includes('if (engagementError || !liveEngagement) throw'),
+  "note preflight must fail closed on missing, denied or stale grants");
+
+const notePermissionsSource = inspect("lib/permissions.ts").src;
+const notePermissionsCjs = ts.transpileModule(notePermissionsSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const notePermissionsModule = { exports: {} };
+runInNewContext(notePermissionsCjs, {
+  module: notePermissionsModule, exports: notePermissionsModule.exports,
+});
+const noteCan = notePermissionsModule.exports.can;
+const noteMemberBase = { id: "member-A", person_label: "A", email: null,
+  active: true, deactivated_at: null };
+const noteActor = (role, assignedTaxpayerIds = []) => ({
+  kind: "firm", member: { ...noteMemberBase, role }, assignedTaxpayerIds,
+});
+assert.equal(noteCan(noteActor("kima_admin"), "note.write_client", "taxpayer-A").ok, false,
+  "platform administrators cannot create client-visible professional notes");
+assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-B"]),
+  "note.write_client", "taxpayer-A").ok, false,
+  "staff cannot create notes outside assigned taxpayers");
+assert.equal(noteCan({ kind: "firm", member: { ...noteMemberBase,
+  role: "firm_staff", active: false }, assignedTaxpayerIds: ["taxpayer-A"] },
+  "note.write_client", "taxpayer-A").ok, false,
+  "deactivated staff cannot create client-visible notes");
+assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-A"]),
+  "note.write_client", "taxpayer-A").ok, true,
+  "assigned active staff retain their existing note capability");
