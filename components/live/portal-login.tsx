@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import type { getPublicCopy } from "@/lib/i18n-public";
 import { regime as regimeDef, taxCentre as centreDef } from "@/lib/rules";
+import { supabase } from "@/lib/supabase";
 import { KimaWordmark } from "@/components/marketing/wordmark";
 import {
   audienceMismatch,
@@ -49,6 +50,9 @@ export function PortalLogin({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<PortalSession | null>(null);
+  const [mode, setMode] = useState<"password" | "code">("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     const existing = readSession();
@@ -77,6 +81,18 @@ export function PortalLogin({
     setReference(result.reference);
     setMasked(result.maskedDestination);
     setDemoCode(result.demoCode);
+  }
+
+  async function signInWithPassword() {
+    setBusy(true);
+    setError(null);
+    const { error: authError } = await supabase().auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (authError) {
+      setError(t.wrongCode);
+      return;
+    }
+    window.location.assign(portalHref);
   }
 
   async function submitCode() {
@@ -136,6 +152,57 @@ export function PortalLogin({
               portalHref={portalHref}
               onSignOut={() => void out()}
             />
+          ) : mode === "password" ? (
+            <div className="mt-6 flex flex-col gap-4">
+              <label htmlFor="portal-email" className="text-sm font-medium text-fg">
+                {auth.emailLabel}
+                <input
+                  id="portal-email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label htmlFor="portal-password" className="text-sm font-medium text-fg">
+                {auth.passwordLabel}
+                <input
+                  id="portal-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !busy) void signInWithPassword();
+                  }}
+                  className={inputClass}
+                />
+              </label>
+              {error && (
+                <p role="alert" className="text-sm text-danger-text">
+                  {error}
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={busy || !email || !password}
+                onClick={() => void signInWithPassword()}
+                className="public-cta min-h-[48px] rounded-lg text-sm font-semibold disabled:opacity-60"
+              >
+                {busy ? t.submitting : auth.passwordSubmit}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("code");
+                  setError(null);
+                }}
+                className="text-center text-sm font-semibold text-teal-text hover:underline"
+              >
+                {auth.useCode}
+              </button>
+            </div>
           ) : reference ? (
             <div className="mt-6 flex flex-col gap-4">
               <p className="text-sm text-fg-muted">
