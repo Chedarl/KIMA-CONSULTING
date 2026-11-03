@@ -115,7 +115,7 @@ export function isWorkspaceKind(value: string | undefined): value is WorkspaceKi
  * firm's members would see every taxpayer (backlog P2-5). Owner decision,
  * 27 Oct 2026 — reopen it when organisation scoping lands.
  */
-export const OPEN_WORKSPACE_KINDS = ["individual", "business"] as const satisfies readonly WorkspaceKind[];
+export const OPEN_WORKSPACE_KINDS = ["individual", "business", "accounting_firm"] as const satisfies readonly WorkspaceKind[];
 export type OpenWorkspaceKind = (typeof OPEN_WORKSPACE_KINDS)[number];
 
 export function isOpenWorkspaceKind(value: string | undefined): value is OpenWorkspaceKind {

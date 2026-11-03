@@ -659,9 +659,9 @@ try {
     assert.equal(onboarding.inviteEmailIssue("a@b.co"), null);
   });
 
-  check("accounting-firm workspaces are not offered until organisation scoping", () => {
-    assert.deepEqual([...onboarding.OPEN_WORKSPACE_KINDS], ["individual", "business"]);
-    assert.equal(onboarding.isOpenWorkspaceKind("accounting_firm"), false);
+  check("the firm workspace is offered again now that organisation scoping landed", () => {
+    assert.deepEqual([...onboarding.OPEN_WORKSPACE_KINDS], ["individual", "business", "accounting_firm"]);
+    assert.equal(onboarding.isOpenWorkspaceKind("accounting_firm"), true);
     assert.equal(onboarding.isOpenWorkspaceKind("business"), true);
     assert.equal(onboarding.isWorkspaceKind("accounting_firm"), true);
   });
