@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { audit, supabase } from "@/lib/supabase";
+import { audit, sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import type { ActorRole } from "@/lib/events";
 
@@ -71,16 +71,46 @@ export function ClientMessageThread({
 }) {
   const [tid, setTid] = useState<string | null>(null);
   const [resolved, setResolved] = useState(false);
+  const authEpoch = useRef(0);
+  const identityRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const { sessionTaxpayerId } = await import("@/lib/supabase");
-      const id = await sessionTaxpayerId();
-      if (!cancelled) { setTid(id); setResolved(true); }
-    })();
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { data: { subscription } } = supabase().auth.onAuthStateChange((event, session) => {
+      if (!active || (event !== "SIGNED_OUT" && event !== "SIGNED_IN" &&
+          event !== "USER_UPDATED" && event !== "INITIAL_SESSION")) return;
+      const nextUserId = event === "SIGNED_OUT" ? null : session?.user?.id ?? null;
+      if (nextUserId === identityRef.current) return;
+      identityRef.current = nextUserId;
+      const epoch = ++authEpoch.current;
+      // Unmount the old taxpayer thread before resolving the next account.
+      setTid(null);
+      setResolved(!nextUserId);
+      if (timer) clearTimeout(timer);
+      if (!nextUserId) return;
+      // Supabase reads must run outside the auth state callback.
+      timer = setTimeout(() => {
+        void (async () => {
+          try {
+            const { sessionTaxpayerId } = await import("@/lib/supabase");
+            const id = await sessionTaxpayerId();
+            if (!active || epoch !== authEpoch.current) return;
+            setTid(id);
+            setResolved(true);
+          } catch {
+            if (!active || epoch !== authEpoch.current) return;
+            setTid(null);
+            setResolved(true);
+          }
+        })();
+      }, 0);
+    });
     return () => {
-      cancelled = true;
+      active = false;
+      ++authEpoch.current;
+      if (timer) clearTimeout(timer);
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -96,6 +126,7 @@ export function ClientMessageThread({
   if (!tid) return <p role="status" className="text-sm text-fg-muted">{labels.signInRequired ?? labels.offline}</p>;
   return (
     <MessageThread
+      key={`${identityRef.current ?? "none"}:${tid}`}
       locale={locale}
       side="taxpayer"
       taxpayerId={tid}
@@ -150,6 +181,11 @@ export function MessageThread({
     if (!taxpayerId) return;
     try {
       const db = supabase();
+      // Recheck the mounted taxpayer against Auth and RLS before any thread read.
+      // A parent wrapper may have been unmounted during an account switch.
+      if (side === "taxpayer" && (await sessionTaxpayerId()) !== taxpayerId) {
+        throw new Error("Taxpayer session unavailable");
+      }
       // Firm staff can message only through their own RLS-visible organisation.
       // Never offer a firm's staff the taxpayer's other active firms as recipients.
       if (side === "firm" && !firmMemberId) {
@@ -161,9 +197,13 @@ export function MessageThread({
       }
       let firmOrgId: string | null = null;
       if (side === "firm") {
+        // A supplied OTP member ID is not proof of the current Auth identity.
+        const { data: { user }, error: authError } = await db.auth.getUser();
+        if (authError || !user) throw new Error("Firm authentication unavailable");
         const { data: member, error: memberError } = await db.from("firm_members")
           .select("organization_id")
           .eq("id", firmMemberId!)
+          .eq("auth_user_id", user.id)
           .eq("active", true)
           .is("deactivated_at", null)
           .maybeSingle();
@@ -282,11 +322,21 @@ export function MessageThread({
 
     try {
       const db = supabase();
+      // An in-flight composer can outlive its original portal identity.
+      // Reject a stale taxpayer before querying grants or inserting a message.
+      if (side === "taxpayer" && (await sessionTaxpayerId()) !== taxpayerId) {
+        throw new Error("Taxpayer session unavailable");
+      }
       if (side === "firm") {
         if (!firmMemberId) throw new Error("Firm session required");
+        // Rebind the member to Auth immediately before the write; a stale OTP
+        // session must not be able to send through another member's firm.
+        const { data: { user }, error: authError } = await db.auth.getUser();
+        if (authError || !user) throw new Error("Firm authentication unavailable");
         const { data: member, error: memberError } = await db.from("firm_members")
           .select("organization_id")
           .eq("id", firmMemberId)
+          .eq("auth_user_id", user.id)
           .eq("active", true)
           .is("deactivated_at", null)
           .maybeSingle();
