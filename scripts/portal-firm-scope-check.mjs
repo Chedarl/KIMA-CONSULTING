@@ -1796,3 +1796,46 @@ for (const guard of [
   "document review live tenant guard missing: " + guard);
 assert.ok(liveReview.includes("setRefusedBy(t.notPermitted);"),
   "document review must report permission denial without claiming success");
+
+
+// Phase 3/4: task completion must not trust a cached OTP member, case or
+// engagement after account switch, deactivation, reassignment or revocation.
+// This source contract supplements the executable conditional-PATCH replay
+// tests; authenticated two-firm/two-taxpayer staging tests are still required.
+const taskLivePreflight = detail.src.split("async function toggleTask(task: CaseTask) {")[1]
+  ?.split("  /** A note's audience")[0] ?? "";
+const taskAuth = taskLivePreflight.indexOf("await db.auth.getUser()");
+const taskMember = taskLivePreflight.indexOf('.from("firm_members")');
+const taskCase = taskLivePreflight.indexOf('.from("compliance_cases")');
+const taskEngagement = taskLivePreflight.indexOf('.from("engagements")');
+const taskRow = taskLivePreflight.indexOf('.from("case_tasks")');
+const taskPatch = taskLivePreflight.indexOf('updateById("case_tasks", task.id, {');
+assert.ok(taskAuth >= 0 && taskAuth < taskMember && taskMember < taskCase &&
+  taskCase < taskEngagement && taskEngagement < taskRow && taskRow < taskPatch,
+  "task write must revalidate live Auth, firm membership, case, engagement and task before PATCH");
+for (const guard of [
+  "if (authError || !user) throw",
+  '.eq("id", member.id)',
+  '.eq("auth_user_id", user.id)',
+  '.eq("organization_id", engagement.organization_id)',
+  '.eq("active", true)',
+  '.is("deactivated_at", null)',
+  "liveMember.role !== member.role",
+  "liveMember.person_label !== member.person_label",
+  '.eq("id", row.id)',
+  '.eq("taxpayer_id", row.taxpayer_id)',
+  '.eq("engagement_id", engagement.id)',
+  "if (caseError || !liveCase) throw",
+  '.eq("id", engagement.id)',
+  '.in("status", ["authorized", "accepted"])',
+  '.is("revoked_at", null)',
+  "if (engagementError || !liveEngagement) throw",
+  "liveEngagement.assigned_to !== member.person_label",
+  "if (!(liveEngagement.authorized_at || liveEngagement.accepted_at)",
+  '.eq("id", task.id)',
+  '.eq("case_id", row.id)',
+  '.eq("state", task.state)',
+  "if (taskError || !liveTask) throw",
+  "state: task.state,",
+]) assert.ok(taskLivePreflight.includes(guard),
+  "task live authorization or stale-state guard missing: " + guard);
