@@ -141,9 +141,22 @@ export async function resolvePortalContext(): Promise<PortalContext> {
 
 export async function demoIds(): Promise<{ taxpayerId: string; organizationId: string } | null> {
   const context = await resolvePortalContext();
-  return context.status === "ready"
-    ? { taxpayerId: context.taxpayerId, organizationId: context.organizationId }
-    : null;
+  if (context.status === "ready") {
+    return { taxpayerId: context.taxpayerId, organizationId: context.organizationId };
+  }
+  // A REAL signed-in client resolves through their own contact binding, via
+  // the definer bridge over private.client_taxpayer_ids(). The demo session
+  // is a fallback, not the only way into the portal.
+  try {
+    const { data } = await supabase().rpc("client_taxpayer_ids");
+    const row = (data as { taxpayer_id: string; organization_id: string | null }[] | null)?.[0];
+    if (row?.taxpayer_id) {
+      return { taxpayerId: row.taxpayer_id, organizationId: row.organization_id ?? "" };
+    }
+  } catch {
+    /* no session, or the caller is not a client */
+  }
+  return null;
 }
 
 /**
