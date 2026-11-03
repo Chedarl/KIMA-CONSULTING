@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { obligationLabel } from "@/lib/cases";
 import { resolvePortalContext, savePortalFirmChoice, supabase } from "@/lib/supabase";
@@ -261,11 +261,13 @@ export function ClientPortalShell({
   const name = biz.find((b) => b.id === activeId)?.legal_name ?? biz[0]?.legal_name ?? "—";
   const initial = name.trim().charAt(0).toUpperCase() || "K";
 
-  const results = useMemo(() => {
+  // The catalogue changes after asynchronous tenant reads without a query edit.
+  // Recompute on render so failed reads cannot leave prior-firm hits memoized.
+  const results = (() => {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];
     return catalogue.current.filter((h) => `${h.title} ${h.detail}`.toLowerCase().includes(q)).slice(0, 8);
-  }, [query]);
+  })();
 
   function active(href: string, exact?: boolean) {
     if (exact) return path === href;
