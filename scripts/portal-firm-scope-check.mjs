@@ -1627,3 +1627,48 @@ assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-B"]),
 assert.equal(noteCan(noteActor("firm_staff", ["taxpayer-A"]),
   "case.advance", "taxpayer-A").ok, true,
   "active assigned staff retain their case-advance capability");
+
+
+// CaseDetail is a multi-tenant read surface, not just a write gate. A denied
+// related-table query must never render a partial or previous tenant snapshot.
+// RLS remains authoritative; this is a fail-closed UI/source-contract check.
+const scopedCaseLoad = detail.src.split("const load = useCallback(async () => {")[1]
+  ?.split("\n  useEffect(() => {")[0] ?? "";
+assert.ok(detail.src.includes("approval_round, owner") &&
+  detail.src.includes("self_approved, organization_id"),
+  "case load must request the owning firm ID with the case");
+for (const guard of [
+  '.eq("id", kase.engagement_id)',
+  '.eq("taxpayer_id", kase.taxpayer_id)',
+  '.eq("organization_id", kase.organization_id)',
+  '.from("firm_members").select("id, person_label, role, active, deactivated_at")',
+  '.from("engagements").select("taxpayer_id, assigned_to")',
+  '.eq("case_id", caseId)',
+  'eng.data.organization_id !== kase.organization_id',
+  'eng.data.taxpayer_id !== kase.taxpayer_id',
+  'if (tp.error ||',
+  'assigned.error',
+  'reqs.error',
+  'tsk.error',
+  'evs.error',
+  'mem.error',
+  'consent.error',
+]) assert.ok(scopedCaseLoad.includes(guard),
+  "case read missing exact tenant, dependent-read or error guard: " + guard);
+assert.ok((scopedCaseLoad.match(/\.eq\("organization_id", kase\.organization_id\)/g) ?? []).length >= 4,
+  "engagement, assignments, document requests and member roster must be scoped to the case firm");
+assert.ok(scopedCaseLoad.indexOf("if (tp.error ||") > 0 &&
+  scopedCaseLoad.indexOf("if (tp.error ||") < scopedCaseLoad.indexOf("setRow(kase)"),
+  "no case details may be published before dependent tenant reads are checked");
+assert.ok(scopedCaseLoad.includes("if (!c) {") &&
+  scopedCaseLoad.includes("setMissing(true);") &&
+  (scopedCaseLoad.match(/setRow\(null\)/g) ?? []).length >= 2 &&
+  scopedCaseLoad.includes("setEngagement(null);") &&
+  scopedCaseLoad.includes("setAssignments([]);") &&
+  scopedCaseLoad.includes("setRequests([]);") &&
+  scopedCaseLoad.includes("setTasks([]);") &&
+  scopedCaseLoad.includes("setEvents([]);") &&
+  scopedCaseLoad.includes("setMembers([]);") &&
+  scopedCaseLoad.includes("setClientApproved(false);") &&
+  scopedCaseLoad.includes("setOffline(false);"),
+  "missing/denied tenant reads must clear sensitive state; successful loads must recover offline state");
