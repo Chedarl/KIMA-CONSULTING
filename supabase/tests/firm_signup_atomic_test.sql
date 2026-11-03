@@ -142,12 +142,11 @@ reset role;
 
 -- One login/firm race is enforced by a unique constraint; assert it exists.
 select is(
- (select coalesce(string_agg(pg_get_constraintdef(oid), '; ' order by conname), '(none)')
-    from pg_constraint
+ (select count(*) from pg_constraint
    where conrelid = 'public.firm_members'::regclass and contype = 'u'
      and pg_get_constraintdef(oid) = 'UNIQUE (auth_user_id)'),
- 'UNIQUE (auth_user_id)',
- 'T-213 one login holds at most one membership, enforced by the database');
+ 0::bigint,
+ 'T-213 one login may hold a professional seat and an admin seat; the blanket uniqueness is gone');
 
 set local role authenticated;
 select set_config('request.jwt.claims',

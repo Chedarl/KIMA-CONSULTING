@@ -75,7 +75,7 @@ select is(
   'document_version_number, document_version_path_guard, '
   'engagement_authorized_at_is_permanent, engagements_grant_guard, enqueue_due_reminders, '
   'firm_member_has, firm_name_key, firm_previously_granted, flag_enabled, '
-  'guard_client_invite_authorization, incident_timeline_guard, incident_verify_guard, '
+  'guard_client_invite_authorization, incident_timeline_guard, incident_verify_guard, is_kima_admin, '
   'mark_reminder_failed, mark_reminder_sent, member_has, member_has_in_org, '
   'message_thread_autolink, organization_profile_guard, portal_request_code, '
   'serialize_taxpayer_grant, signal_firm_intake_document_change, '
