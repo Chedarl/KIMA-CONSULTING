@@ -54,7 +54,7 @@ export async function deliverOneTimeCode(input: {
   audience: "portal" | "firm";
 }): Promise<DeliverCodeResult> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.KIMA_MAIL_FROM ?? "KIMA CONSULTING <onboarding@resend.dev>";
+  const from = process.env.KIMA_MAIL_FROM ?? "KIMA OS <no-reply@kimaconsulting.app>";
   const reveal = mayRevealCode({
     revealFlag: process.env.KIMA_DEMO_OTP_REVEAL,
     vercelEnv: process.env.VERCEL_ENV,
