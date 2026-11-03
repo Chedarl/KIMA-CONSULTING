@@ -25,6 +25,7 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
   const [ids, setIds] = useState<{ taxpayerId: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pending = useRef<string | null>(null);
+  const uploadInFlight = useRef(false);
   const loadEpoch = useRef(0);
   const authEpoch = useRef(0);
   const identityRef = useRef<string | null | undefined>(undefined);
@@ -90,6 +91,7 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
       setOffline(false);
       setBusy(null);
       pending.current = null;
+      uploadInFlight.current = false;
       if (fileRef.current) fileRef.current.value = "";
       if (timer) clearTimeout(timer);
       // Auth callbacks must not synchronously issue Supabase queries.
@@ -98,6 +100,7 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
     return () => {
       ++authEpoch.current;
       ++loadEpoch.current;
+      uploadInFlight.current = false;
       if (timer) clearTimeout(timer);
       subscription.unsubscribe();
     };
@@ -122,6 +125,10 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
     const req = rows?.find((r) => r.id === id);
     if (!req || !ids || req.taxpayer_id !== ids.taxpayerId) return;
     if (!(requestIsOutstanding(req.status) && waitsOn(req) === "client")) return;
+    // File change events can fire before React commits busy state.
+    // Serialize uploads across every request in this tenant view.
+    if (uploadInFlight.current) return;
+    uploadInFlight.current = true;
     const epoch = authEpoch.current;
     setBusy(id);
     try {
@@ -160,7 +167,10 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
     } catch {
       if (epoch === authEpoch.current) toast(copy.requestServiceFailed, "error");
     } finally {
-      if (epoch === authEpoch.current) setBusy(null);
+      if (epoch === authEpoch.current) {
+        uploadInFlight.current = false;
+        setBusy(null);
+      }
     }
   }
 
@@ -231,7 +241,7 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
                     </div>
                     {open && (
                       <PrimaryButton
-                        disabled={busy === r.id}
+                        disabled={busy !== null}
                         onClick={() => {
                           pending.current = r.id;
                           fileRef.current?.click();
