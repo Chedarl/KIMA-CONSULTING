@@ -200,3 +200,32 @@ export async function audit(entry: {
     });
   return error ? { ok: false, error: error.message } : { ok: true };
 }
+
+/**
+ * Resolve once a Supabase session exists.
+ *
+ * A page opened directly with an access token in the URL hash (a magic link, a
+ * deep link, a refreshed tab) renders its client components before the client
+ * has restored that session. Queries fired at that moment run unauthenticated
+ * and return empty, so a board looks empty on the navigation a signed-in user
+ * is most likely to make. Components that load on mount await this first.
+ */
+export async function whenSignedIn(timeoutMs = 4000): Promise<boolean> {
+  const client = supabase();
+  const { data } = await client.auth.getSession();
+  if (data.session) return true;
+
+  return await new Promise<boolean>((resolve) => {
+    const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        clearTimeout(timer);
+        sub.subscription.unsubscribe();
+        resolve(true);
+      }
+    });
+    const timer = setTimeout(() => {
+      sub.subscription.unsubscribe();
+      resolve(false);
+    }, timeoutMs);
+  });
+}
