@@ -3,6 +3,7 @@ import { isLocale } from "@/lib/i18n";
 import { getPortalDictionary } from "@/lib/i18n-portal";
 import { PortalCopyProvider } from "@/components/client-portal/copy";
 import { ClientPortalShell } from "@/components/client-portal/shell";
+import { ThemeRoot } from "@/components/theme-root";
 
 /**
  * Client portal chrome. Firm workspace keeps components/shell.tsx.
@@ -20,8 +21,10 @@ export default function ClientLayout({
   const copy = getPortalDictionary(locale);
 
   return (
+    <ThemeRoot>
     <PortalCopyProvider copy={copy}>
       <ClientPortalShell locale={locale}>{children}</ClientPortalShell>
     </PortalCopyProvider>
+    </ThemeRoot>
   );
 }
