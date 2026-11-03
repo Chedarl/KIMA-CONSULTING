@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const key = process.env.KIMA_DEMO_KEY ?? "";
   const presentedKey = (request.headers.get("x-kima-demo-key") ?? "").trim();
   const authorisedTester = key.length >= 16 && presentedKey === key;
-  if (!allowed || !sameOrigin || onProductionProject || !authorisedTester) return NextResponse
+  if (!allowed || !sameOrigin || onProductionProject || !authorisedTester) return NextResponse.json({ error: "not_authorised" }, { status: 404 })
 
   if (!isSupabaseAdminConfigured()) return NextResponse.json({ error: "not_configured" }, { status: 503 });
 
