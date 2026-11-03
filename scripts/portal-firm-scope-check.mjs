@@ -1672,3 +1672,36 @@ assert.ok(scopedCaseLoad.includes("if (!c) {") &&
   scopedCaseLoad.includes("setClientApproved(false);") &&
   scopedCaseLoad.includes("setOffline(false);"),
   "missing/denied tenant reads must clear sensitive state; successful loads must recover offline state");
+
+
+// Realtime reloads and route changes can overlap. A late result (including
+// an RLS-denied result) must not overwrite the latest case's snapshot or
+// offline state. Cleanup must invalidate a pending request on unmount.
+const epochLoad = detail.src.split("const load = useCallback(async () => {")[1]
+  ?.split("\n  useEffect(() => {")[0] ?? "";
+const epochFirst = epochLoad.indexOf("const epoch = ++loadEpoch.current;");
+const epochMissing = epochLoad.indexOf("if (!c) {");
+const epochPublish = epochLoad.indexOf("setRow(kase);");
+const epochFanout = epochLoad.indexOf("await Promise.all([");
+const epochChecks = [...epochLoad.matchAll(/if \(epoch !== loadEpoch\.current\) return;/g)]
+  .map((match) => match.index);
+assert.ok(detail.src.includes('useRef') &&
+  detail.src.includes("const loadEpoch = useRef(0);") && epochFirst >= 0,
+  "case detail must allocate a monotonically increasing request generation");
+assert.ok(epochChecks.some((index) => index > epochFirst && index < epochMissing),
+  "stale missing/RLS-denied case reads must not clear a newer case");
+assert.ok(epochChecks.some((index) => index > epochFanout && index < epochPublish),
+  "stale dependent tenant reads must not publish an older case");
+assert.match(epochLoad, /} catch \{\s*if \(epoch !== loadEpoch\.current\) return;/,
+  "stale read errors must not overwrite newer success with offline state");
+const epochEffect = detail.src.split("  useEffect(() => {\n    void load();")[1]
+  ?.split("\n  // The signed-in member")[0] ?? "";
+assert.ok(epochEffect.includes("++loadEpoch.current;"),
+  "case switch or unmount must invalidate outstanding load responses");
+const realtimeEffect = detail.src.split("// The client acts on these same rows.")[1]
+  ?.split("\n  const member = useMemo")[0] ?? "";
+assert.ok(realtimeEffect.includes("let active = true;") &&
+  realtimeEffect.includes("if (active) void load()") &&
+  realtimeEffect.includes("if (active) setLive(status ===") &&
+  realtimeEffect.includes("active = false;"),
+  "old realtime callbacks must not supersede the current case or update live status");
