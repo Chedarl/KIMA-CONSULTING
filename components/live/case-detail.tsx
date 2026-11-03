@@ -484,6 +484,21 @@ export function CaseDetail({
    */
   async function settleRequest(r: CaseRequest, to: "accepted" | "returned") {
     if (!row || !member) return;
+    // The button's visibility is not authorization. Bind the review to the
+    // exact submitted request, live case tenant, and active firm engagement.
+    // RLS remains authoritative for the actual write.
+    if (r.status !== "submitted" || r.case_id !== row.id ||
+        r.taxpayer_id !== row.taxpayer_id || !engagement ||
+        engagement.id !== row.engagement_id ||
+        engagement.taxpayer_id !== row.taxpayer_id ||
+        engagement.revoked_at ||
+        !["authorized", "accepted"].includes(engagement.status) ||
+        !(engagement.authorized_at || engagement.accepted_at) ||
+        !allowed(to === "accepted" ? "document.review" : "request.return").ok) {
+      setFailed(r.id);
+      setRefusedBy(t.notPermitted);
+      return;
+    }
     const reason = (reasons[r.id] ?? "").trim();
     if (to === "returned" && !reason) {
       setFailed(r.id);
@@ -495,7 +510,16 @@ export function CaseDetail({
     try {
       const patch =
         to === "returned" ? { status: to, returned_count: r.returned_count + 1 } : { status: to };
-      const written = await updateById("document_requests", r.id, patch);
+      // Status and return count form a submission-version check. A stale
+      // review must not overwrite a concurrent decision or an ABA resubmission.
+      const written = await updateById("document_requests", r.id, patch, {
+        case_id: row.id,
+        taxpayer_id: row.taxpayer_id,
+        organization_id: engagement.organization_id,
+        status: "submitted",
+        returned_count: r.returned_count,
+        responsible: r.responsible,
+      });
       if (!written.ok) {
         setFailed(r.id);
         setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
