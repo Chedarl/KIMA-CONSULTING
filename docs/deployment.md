@@ -309,3 +309,24 @@ supabase stop
 
 Requires Docker. Never point local development at the production project — use
 the local stack, and keep the production ref out of `.env` files.
+
+
+## Staging first (3 Nov 2026)
+
+Every schema change now reaches production by exactly one route: merged to `main`,
+then applied by the migration workflow. That makes **a merge a production DDL
+event**, and the project has no point-in-time recovery. Two rules follow.
+
+1. **Apply and probe on staging before the pull request.** `usrnjhuwmhxelkpqgyox`
+   is isolated, holds only synthetic data, and is where RLS is actually exercised
+   as real identities (`set local role authenticated` plus JWT claims). A policy
+   that has not refused the wrong tenant on staging has not been tested.
+2. **Probe with the identity that should be refused.** Every change in this
+   period was verified that way first: cross-tenant reads returning zero, a
+   second firm refused on a write, an anonymous caller refused outright. A green
+   `Verify migrations` run proves the SQL replays; it does not prove the policy
+   refuses the right caller.
+
+Preview deployments still point at production, so a preview is not a staging
+substitute. Until point-in-time recovery is enabled or a separate staging
+pipeline exists, treat every migration pull request as irreversible.
