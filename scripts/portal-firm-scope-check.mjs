@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
+import { runInNewContext } from "node:vm";
 
 function inspect(path) {
   const src = readFileSync(path, "utf8");
@@ -1053,3 +1054,48 @@ assert.ok(uploadWriter.includes("if (statusError || !changed?.length)"),
   "a failed or zero-row conditional update must fail closed");
 assert.ok(!uploadWriter.includes('updateById("document_requests"'),
   "upload must not use an ID-only update that can overwrite later review decisions");
+
+
+// Phase 4 executable regression: an accepted/submitted document request must
+// never be reopened by a direct or stale caller of the shared upload helper.
+// Exercise the actual TypeScript function with a mocked Supabase boundary so
+// disallowed transitions are rejected BEFORE any storage/database access.
+const uploadStatusGuardSource = readFileSync("lib/submit-request.ts", "utf8");
+const uploadStatusGuardCjs = ts.transpileModule(uploadStatusGuardSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const uploadStatusGuardModule = { exports: {} };
+let uploadStatusGuardDbCalls = 0;
+runInNewContext(uploadStatusGuardCjs, {
+  module: uploadStatusGuardModule,
+  exports: uploadStatusGuardModule.exports,
+  require: (id) => {
+    if (id === "./record-event") return { recordCaseEvent: async () => {} };
+    if (id === "./supabase") return {
+      supabase: () => { uploadStatusGuardDbCalls++; throw new Error("Mock DB boundary"); },
+      audit: async () => {},
+    };
+    throw new Error("Unexpected dependency: " + id);
+  },
+});
+for (const [previousStatus, expectedReason] of [
+  ["accepted", "status"],
+  ["submitted", "status"],
+  ["unexpected", "status"],
+  ["requested", "error"],
+]) {
+  const result = await uploadStatusGuardModule.exports.submitRequestFile({
+    requestId: "request-1",
+    file: { name: "proof.pdf", size: 10, type: "application/pdf" },
+    taxpayerId: "taxpayer-1",
+    organizationId: "firm-1",
+    caseId: "case-1",
+    label: "Proof",
+    actorLabel: "Client",
+    previousStatus,
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), { ok: false, reason: expectedReason },
+    "upload status guard must fail closed for " + previousStatus);
+}
+assert.equal(uploadStatusGuardDbCalls, 1,
+  "only an eligible status may reach the storage/database boundary");
