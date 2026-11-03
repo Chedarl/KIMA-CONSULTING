@@ -20,7 +20,7 @@ if (r.status !== 0) {
   throw new Error("tsc failed");
 }
 const { mapAccount, normaliseAccount, mapAccounts } = createRequire(import.meta.url)(join(out, "dsf-mapping.js"));
-const { importLedger, detectColumns, parseXaf } = createRequire(import.meta.url)(join(out, "dsf-import.js"));
+const { importLedger, detectColumns, parseXaf, exportLedgerCsv } = createRequire(import.meta.url)(join(out, "dsf-import.js"));
 
 const table = { "70": "Ventes", "701": "Ventes de marchandises", "7011": "Ventes au comptant" };
 let count = 0;
@@ -82,6 +82,18 @@ check("a quoted label keeps its separator", () => {
   const csv = ['Compte,Libellé,Débit,Crédit', '7011,"Ventes, comptant",0,100'].join("\n");
   const res = importLedger(csv, table);
   assert.equal(res.rows[0].label, "Ventes, comptant");
+});
+
+check("export keeps the mapping decision and the defects", () => {
+  const csv = ["Compte;Libellé;Débit;Crédit", '7011000;"Ventes, comptant";0;2500000', "9999;X;abc;0"].join("\n");
+  const res = importLedger(csv, table);
+  const out2 = exportLedgerCsv(res.rows);
+  const lines = out2.trim().split("\n");
+  assert.equal(lines.length, 3);
+  assert.ok(lines[0].startsWith("line,account,label"));
+  assert.ok(lines[1].includes('"Ventes, comptant"'));
+  assert.ok(lines[1].includes("7011,Ventes au comptant"));
+  assert.ok(lines[2].includes("amount_not_integer"));
 });
 
 console.log("\n" + count + " assertions passed");

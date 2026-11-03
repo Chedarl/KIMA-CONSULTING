@@ -116,3 +116,35 @@ export function importLedger(csv: string, scheduleByRoot: Record<string, string>
 
   return { rows, totalDebitXaf, totalCreditXaf, unmappedCount, invalidCount };
 }
+
+/**
+ * Export the imported ledger as CSV, with the mapping decision carried as its
+ * own columns.
+ *
+ * This is not the DSF workbook: Kima fills the DGI's own locked template and
+ * must not invent a format. What it produces is the working pack a preparer
+ * takes into that template — every row, its account, its mapped schedule (or
+ * empty), and the issues found, so nothing is silently repaired on the way out.
+ */
+export function exportLedgerCsv(rows: ImportedRow[]): string {
+  const header = ["line", "account", "label", "debit_xaf", "credit_xaf", "root", "schedule", "issues"];
+  const cell = (value: string) => {
+    const needsQuotes = /[",;\n]/.test(value);
+    const escaped = value.replace(/"/g, '""');
+    return needsQuotes ? '"' + escaped + '"' : escaped;
+  };
+  const lines = [header.join(",")];
+  for (const row of rows) {
+    lines.push([
+      String(row.line),
+      cell(row.account),
+      cell(row.label),
+      String(row.debitXaf),
+      String(row.creditXaf),
+      row.mapping.root ?? "",
+      cell(row.mapping.schedule ?? ""),
+      cell(row.issues.join("|")),
+    ].join(","));
+  }
+  return lines.join("\n") + "\n";
+}

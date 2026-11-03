@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { importLedger } from "@/lib/dsf-import";
+import { exportLedgerCsv, importLedger } from "@/lib/dsf-import";
 
 export const runtime = "nodejs";
 
@@ -40,6 +40,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ...result,
+    export: exportLedgerCsv(result.rows),
     // Echo the first few rows only: the screen renders a preview, not the file.
     rows: result.rows.slice(0, 200),
   });

@@ -189,6 +189,7 @@ const fr = {
     noChart: "Aucun plan de comptes n'est encore enregistré : chaque compte ressort donc « à rattacher ». C'est le comportement voulu — nous ne devinons pas un plan.",
     failed: "Le fichier n'a pas pu être lu.",
     empty: "Aucune ligne lue.",
+    download: "Télécharger le pack de travail (CSV)",
   },
   incidents: {
     title: "Incidents de paiement",
@@ -1321,6 +1322,7 @@ const en: WorkspaceDictionary = {
     noChart: "No chart of accounts is stored yet, so every account comes back 'to map'. That is intended: we do not guess a chart.",
     failed: "The file could not be read.",
     empty: "No line was read.",
+    download: "Download the working pack (CSV)",
   },
   incidents: {
     title: "Payment incidents",
