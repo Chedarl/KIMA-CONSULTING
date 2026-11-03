@@ -4,6 +4,7 @@ import "../fonts.css";
 import "../globals.css";
 import { Footer } from "@/components/footer";
 import { SiteFrame } from "@/components/site-frame";
+import { AuthBootstrap } from "@/components/auth-bootstrap";
 import { ToastProvider } from "@/components/toast";
 import { getDictionary, isLocale, locales, type Locale } from "@/lib/i18n";
 import { getPublicCopy } from "@/lib/i18n-public";
@@ -80,6 +81,7 @@ export default function LocaleLayout({
         <a href="#main" className="skip-link">
           {t.nav.skip}
         </a>
+        <AuthBootstrap />
         <ToastProvider>
           <SiteFrame
             locale={locale}
