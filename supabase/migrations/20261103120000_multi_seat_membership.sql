@@ -48,12 +48,15 @@ as $$
    limit 1
 $$;
 
--- The general-inquiries view must accept a dual-seat caller too: a KIMA admin
--- whose professional seat resolves first still holds the admin seat.
-drop policy if exists "only KIMA administrators view general inquiries" on public.contact_inquiries;
-create policy "only KIMA administrators view general inquiries" on public.contact_inquiries
-  for select to authenticated
-  using (exists (
+-- Whether the caller holds an admin seat, across ALL their memberships. The
+-- policy expressions below run as the querying role, which holds no grant on
+-- firm_members, so the check lives behind this definer helper like every other
+-- policy helper.
+create or replace function private.is_kima_admin()
+returns boolean
+language sql stable security definer set search_path to 'public'
+as $$
+  select exists (
     select 1
       from public.firm_members fm
       join public.organizations o on o.id = fm.organization_id
@@ -63,4 +66,14 @@ create policy "only KIMA administrators view general inquiries" on public.contac
        and fm.deactivated_at is null
        and o.kind = 'kima'
        and o.suspended_at is null
-  ));
+  );
+$$;
+
+revoke all on function private.is_kima_admin() from public, anon;
+grant execute on function private.is_kima_admin() to authenticated;
+
+-- The general-inquiries view must accept a dual-seat caller too.
+drop policy if exists "only KIMA administrators view general inquiries" on public.contact_inquiries;
+create policy "only KIMA administrators view general inquiries" on public.contact_inquiries
+  for select to authenticated
+  using (private.is_kima_admin());
