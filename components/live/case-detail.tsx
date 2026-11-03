@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -225,8 +225,10 @@ export function CaseDetail({
   const [live, setLive] = useState(false);
   const [offline, setOffline] = useState(false);
   const [missing, setMissing] = useState(false);
+  const loadEpoch = useRef(0);
 
   const load = useCallback(async () => {
+    const epoch = ++loadEpoch.current;
     try {
       const db = supabase();
       const { data: c, error } = await db
@@ -235,6 +237,7 @@ export function CaseDetail({
         .eq("id", caseId)
         .maybeSingle();
       if (error) throw error;
+      if (epoch !== loadEpoch.current) return;
       if (!c) {
         // A missing or RLS-denied case must not leave the previous case visible.
         setRow(null);
@@ -301,6 +304,7 @@ export function CaseDetail({
           .eq("case_id", caseId).eq("approval_round", kase.approval_round)
           .maybeSingle(),
       ]);
+      if (epoch !== loadEpoch.current) return;
 
       // Never publish a partial tenant snapshot when RLS denies any
       // dependent read. In particular, a foreign engagement or roster cannot
@@ -332,6 +336,7 @@ export function CaseDetail({
       }));
       setMembers(roster);
     } catch {
+      if (epoch !== loadEpoch.current) return;
       // Denied or failed related reads cannot preserve a previous case's
       // taxpayer, document, event or staff data on this professional screen.
       setRow(null);
@@ -350,6 +355,10 @@ export function CaseDetail({
 
   useEffect(() => {
     void load();
+    return () => {
+      // A previous case or unmounted screen must never publish a late result.
+      ++loadEpoch.current;
+    };
   }, [load]);
 
   // The signed-in member is who you are. There is no stand-in selector.
@@ -358,28 +367,32 @@ export function CaseDetail({
   // The client acts on these same rows. A document arriving while an accountant
   // has the case open should appear without a refresh.
   useEffect(() => {
+    let active = true;
     let channel: ReturnType<ReturnType<typeof supabase>["channel"]> | null = null;
     try {
       const db = supabase();
       channel = db
         .channel(`case-${caseId}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "document_requests" }, () =>
-          void load(),
-        )
-        .on("postgres_changes", { event: "*", schema: "public", table: "case_events" }, () =>
-          void load(),
-        )
-        .on("postgres_changes", { event: "*", schema: "public", table: "compliance_cases" }, () =>
-          void load(),
-        )
-        .on("postgres_changes", { event: "*", schema: "public", table: "case_tasks" }, () =>
-          void load(),
-        )
-        .subscribe((status) => setLive(status === "SUBSCRIBED"));
+        .on("postgres_changes", { event: "*", schema: "public", table: "document_requests" }, () => {
+          if (active) void load();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "case_events" }, () => {
+          if (active) void load();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "compliance_cases" }, () => {
+          if (active) void load();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "case_tasks" }, () => {
+          if (active) void load();
+        })
+        .subscribe((status) => {
+          if (active) setLive(status === "SUBSCRIBED");
+        });
     } catch {
-      setLive(false);
+      if (active) setLive(false);
     }
     return () => {
+      active = false;
       if (channel) void channel.unsubscribe();
     };
   }, [caseId, load]);
