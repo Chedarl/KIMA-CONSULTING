@@ -526,6 +526,13 @@ export function InboxWorkspace({
       ) : (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
         <ul className="flex flex-col gap-2">
+          <li aria-hidden className="hidden grid-cols-[1.5rem_minmax(0,1fr)_7rem_8rem_auto] items-center gap-2 px-3 text-[11px] font-semibold uppercase tracking-wide text-fg-subtle sm:grid">
+            <span />
+            <span>{locale === "fr" ? "Nom du document" : "Document"}</span>
+            <span>{locale === "fr" ? "Statut" : "Status"}</span>
+            <span>{locale === "fr" ? "Période" : "Period"}</span>
+            <span>{locale === "fr" ? "Actions" : "Actions"}</span>
+          </li>
           {shown.map((d, i) => {
             const client = clients[d.taxpayer_id];
             const checked = sel.has(d.id);
@@ -534,71 +541,62 @@ export function InboxWorkspace({
             return (
               <li
                 key={d.id}
-                className={`rise-in rounded-card border bg-surface p-3 ${open ? "border-navy" : "border-border"}`}
+                className={`rise-in grid gap-2 rounded-card border bg-surface p-3 sm:grid-cols-[1.5rem_minmax(0,1fr)_7rem_8rem_auto] sm:items-start ${open ? "border-navy" : "border-border"}`}
                 style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
               >
-                <div className="flex flex-wrap items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    aria-label={d.file_name}
-                    onChange={(e) =>
-                      setSel((prev) => {
-                        const next = new Set(prev);
-                        if (e.target.checked) next.add(d.id);
-                        else next.delete(d.id);
-                        return next;
-                      })
-                    }
-                    className="h-5 w-5 shrink-0"
-                  />
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  aria-label={d.file_name}
+                  onChange={(e) =>
+                    setSel((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(d.id);
+                      else next.delete(d.id);
+                      return next;
+                    })
+                  }
+                  className="mt-3 h-5 w-5 shrink-0"
+                />
+                <div className="min-w-0">
                   <button
                     type="button"
                     onClick={() => setSelectedId(d.id)}
-                    className="min-h-[44px] min-w-0 flex-1 text-left"
+                    className="min-h-[44px] w-full text-left"
                   >
                     <span className="block truncate font-mono text-sm text-fg">{d.file_name}</span>
                     <span className="block truncate text-xs text-fg-subtle">
                       {client?.legal_name ?? labels.unbound} ·{" "}
-                      {d.byte_size ? `${Math.round(d.byte_size / 1024)} kB` : "—"}
+                      {d.byte_size ? `${Math.round(d.byte_size / 1024)} kB` : "—"} ·{" "}
+                      {(d.file_name.split(".").pop() ?? "?").toUpperCase()}
                     </span>
                   </button>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                      d.review_status === "accepted"
-                        ? "bg-success-soft text-success-text"
-                        : d.review_status === "returned"
-                          ? "bg-danger-soft text-danger-text"
-                          : "bg-amber-soft text-amber-text"
-                    }`}
-                  >
-                    {d.review_status === "pending" && d.acceptance
-                      ? labels.verdictsRecorded
-                      : (labels.status[d.review_status] ?? d.review_status)}
-                  </span>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {stored.length === 0 ? (
+                      <span className="text-xs text-fg-subtle">{labels.awaitingVerdicts}</span>
+                    ) : (
+                      stored.map((v) => (
+                        <span
+                          key={v.kind}
+                          className="rounded-full bg-surface-sunken px-2 py-1 text-xs font-medium text-fg"
+                        >
+                          {locale === "fr" ? verdictLabel[v.kind].fr : verdictLabel[v.kind].en}
+                          {": "}
+                          {locale === "fr" ? valueLabel[v.value].fr : valueLabel[v.value].en}
+                        </span>
+                      ))
+                    )}
+                  </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {stored.length === 0 ? (
-                    <span className="text-xs text-fg-subtle">{labels.awaitingVerdicts}</span>
-                  ) : (
-                    stored.map((v) => (
-                      <span
-                        key={v.kind}
-                        className="rounded-full bg-surface-sunken px-2 py-1 text-xs font-medium text-fg"
-                      >
-                        {locale === "fr" ? verdictLabel[v.kind].fr : verdictLabel[v.kind].en}
-                        {": "}
-                        {locale === "fr" ? valueLabel[v.value].fr : valueLabel[v.value].en}
-                      </span>
-                    ))
-                  )}
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${d.review_status === "accepted" ? "bg-success-soft text-success-text" : d.review_status === "returned" ? "bg-danger-soft text-danger-text" : "bg-amber-soft text-amber-text"}`}>
+                  {d.review_status === "pending" && d.acceptance ? labels.verdictsRecorded : (labels.status[d.review_status] ?? d.review_status)}
+                </span>
+                <span className="tnum font-mono text-xs text-fg-subtle">{d.created_at.slice(0, 10)}</span>
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => void preview(d)}
-                    className="min-h-[44px] rounded-lg border border-border px-2.5 text-xs font-semibold text-fg-muted hover:bg-surface-sunken"
+                    className="min-h-[44px] rounded-lg border border-border px-2.5 text-xs font-semibold text-fg hover:bg-surface-sunken"
                   >
                     {labels.preview}
                   </button>
@@ -606,7 +604,7 @@ export function InboxWorkspace({
                     type="button"
                     disabled={busy}
                     onClick={() => void rename(d)}
-                    className="min-h-[44px] rounded-lg border border-border px-2.5 text-xs font-semibold text-fg-muted hover:bg-surface-sunken disabled:opacity-60"
+                    className="min-h-[44px] rounded-lg border border-border px-2.5 text-xs font-semibold text-fg hover:bg-surface-sunken disabled:opacity-50"
                   >
                     {labels.rename}
                   </button>
