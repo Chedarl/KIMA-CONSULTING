@@ -26,7 +26,7 @@ const progress = (stage: CaseStage) => {
 export function WorkflowsBoard({ locale, t }: { locale: "fr" | "en"; t: C }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
-  const [view, setView] = useState<"kanban" | "list">("kanban");
+  const [view, setView] = useState<"kanban" | "list" | "calendar" | "models" | "automations">("kanban");
   const [owner, setOwner] = useState("");
 
   useEffect(() => {
@@ -59,6 +59,7 @@ export function WorkflowsBoard({ locale, t }: { locale: "fr" | "en"; t: C }) {
       <p className="mt-1 flex items-center gap-2 text-[11px] text-fg-subtle">
         <span className="tnum font-mono">{r.due_on?.slice(0, 10) ?? "—"}</span>
         {r.owner ? <span className="truncate">{r.owner}</span> : null}
+        <span aria-hidden className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-[9px] font-bold text-fg-muted">{(r.owner ?? "—").slice(0, 2).toUpperCase()}</span>
       </p>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-sunken">
         <div className="h-full rounded-full bg-teal" style={{ width: progress(r.stage) + "%" }} />
@@ -70,10 +71,12 @@ export function WorkflowsBoard({ locale, t }: { locale: "fr" | "en"; t: C }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <div role="group" aria-label={t.title} className="flex rounded-lg border border-border p-0.5">
-          <button type="button" onClick={() => setView("kanban")} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (view === "kanban" ? "bg-surface-sunken text-fg" : "text-fg-muted")}>{t.kanban}</button>
-          <button type="button" onClick={() => setView("list")} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (view === "list" ? "bg-surface-sunken text-fg" : "text-fg-muted")}>{t.list}</button>
+        <div role="group" aria-label={t.title} className="flex flex-wrap rounded-lg border border-border p-0.5">
+          {[["kanban", t.kanban], ["list", t.list], ["calendar", t.calendar], ["models", t.models], ["automations", t.automations]].map(([id, label]) => (
+            <button key={id} type="button" onClick={() => setView(id as typeof view)} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (view === id ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{label}</button>
+          ))}
         </div>
+        <Link href={`/${locale}/workspace/templates`} className="inline-flex min-h-[40px] items-center rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d]">+ {t.newWorkflow}</Link>
         <select value={owner} onChange={(e) => setOwner(e.target.value)} className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
           <option value="">{t.allOwners}</option>
           {owners.map((o) => (<option key={o} value={o}>{o}</option>))}
@@ -83,7 +86,22 @@ export function WorkflowsBoard({ locale, t }: { locale: "fr" | "en"; t: C }) {
 
       {rows === null ? (
         <p className="text-sm text-fg-muted">{t.loading}</p>
-      ) : view === "kanban" ? (
+) : view === "calendar" ? (
+        <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-5">
+          <p className="text-sm text-fg-muted">{t.calendarHint}</p>
+          <Link href={`/${locale}/workspace/calendar`} className="inline-flex min-h-[44px] w-fit items-center rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.openCalendar}</Link>
+        </div>
+) : view === "models" ? (
+        <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-5">
+          <p className="text-sm text-fg-muted">{t.modelsHint}</p>
+          <Link href={`/${locale}/workspace/templates`} className="inline-flex min-h-[44px] w-fit items-center rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.openModels}</Link>
+        </div>
+) : view === "automations" ? (
+        <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-5">
+          <p className="text-sm text-fg-muted">{t.automationsHint}</p>
+          <Link href={`/${locale}/workspace/templates`} className="inline-flex min-h-[44px] w-fit items-center rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.openModels}</Link>
+        </div>
+) : view === "kanban" ? (
         <div className="flex gap-3 overflow-x-auto pb-2">
           {grouped.map((b) => (
             <section key={b.key} className="flex w-[16rem] shrink-0 flex-col gap-2 rounded-xl border border-border bg-surface-sunken/60 p-2.5">
