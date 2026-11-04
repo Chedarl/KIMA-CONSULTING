@@ -15,9 +15,15 @@ insert into firm_members (id, organization_id, person_label, email, role, auth_u
    'Atomic Partner', 'partner@atomic.test', 'firm_partner', '00000000-0000-4000-e300-0000000000f1');
 insert into taxpayers (id, legal_name) values
   ('00000000-0000-4000-e300-0000000000f3', 'Atomic Client');
-insert into compliance_cases (id, organization_id, taxpayer_id, obligation_code, period_token, stage)
+-- case_stage_guard requires an active, accepted/authorized engagement scoped to
+-- the taxpayer, so the case fixture must carry one.
+insert into engagements (id, organization_id, taxpayer_id, status, authorized_at) values
+  ('00000000-0000-4000-e300-0000000000f5', '00000000-0000-4000-e300-0000000000f0',
+   '00000000-0000-4000-e300-0000000000f3', 'authorized', now());
+insert into compliance_cases (id, organization_id, taxpayer_id, engagement_id, obligation_code, period_token, stage)
   values ('00000000-0000-4000-e300-0000000000f4', '00000000-0000-4000-e300-0000000000f0',
-          '00000000-0000-4000-e300-0000000000f3', 'vat', '2026M09', 'documents');
+          '00000000-0000-4000-e300-0000000000f3', '00000000-0000-4000-e300-0000000000f5',
+          'vat', '2026M09', 'documents');
 
 set local role authenticated;
 select set_config('request.jwt.claims',
