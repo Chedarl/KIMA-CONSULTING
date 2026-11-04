@@ -25,6 +25,10 @@ yarn-error.log*
 .env*.local
 .env.production
 .env*.backup
+.env*.prodbackup
+
+# local tooling cache (jiti etc.)
+.tmp/
 
 # typescript
 *.tsbuildinfo
