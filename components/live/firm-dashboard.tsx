@@ -87,6 +87,47 @@ function Donut({ segments, center }: { segments: { value: number; color: string 
   );
 }
 
+/** The 12-week deadline heat horizon — KIMA's compliance-first signature. Each
+ *  bar is a week; its height is how many obligations fall that week, and its
+ *  colour is the worst risk in that week. Derived from the same rows as the
+ *  rest of the dashboard; an empty week is an empty bar, not a zero of data. */
+function DeadlineHorizon({ rows, today, locale, t }: { rows: Row[]; today: string; locale: "fr" | "en"; t: Dict["dashboard"] }) {
+  const WEEKS = 12;
+  const horizon = useMemo(() => {
+    const base = Date.parse(today) || Date.now();
+    const week = 7 * 86_400_000;
+    const buckets = Array.from({ length: WEEKS }, () => ({ count: 0, tone: "unknown" as Risk }));
+    for (const c of rows) {
+      if (!c.due_on) continue;
+      const due = Date.parse(c.due_on);
+      if (Number.isNaN(due)) continue;
+      const i = Math.floor((due - base) / week);
+      if (i < 0 || i >= WEEKS) continue;
+      buckets[i].count += 1;
+      const r = risk(c, today);
+      const rank: Record<Risk, number> = { overdue: 0, due_soon: 1, unknown: 2, on_track: 3 };
+      if (rank[r] < rank[buckets[i].tone]) buckets[i].tone = r;
+    }
+    return buckets;
+  }, [rows, today]);
+  const max = Math.max(1, ...horizon.map((h) => h.count));
+  const fill = (tone: Risk) =>
+    tone === "overdue" ? "rgb(var(--danger))" : tone === "due_soon" ? "rgb(var(--amber))" : tone === "on_track" ? "rgb(var(--success))" : "rgb(var(--border-strong))";
+  return (
+    <Card>
+      <CardHeader title={t.deadlinesTitle} action={<Link href={`/${locale}/workspace/calendar`} className="text-xs font-semibold text-teal-text">{t.viewAll}</Link>} />
+      <div className="flex items-end gap-1.5 p-4 sm:p-5">
+        {horizon.map((h, i) => (
+          <div key={i} className="flex flex-1 flex-col items-center gap-1" title={String(h.count)}>
+            <div className="w-full rounded-sm" style={{ height: Math.max(6, (h.count / max) * 72), background: fill(h.tone) }} />
+            <span className="text-[10px] text-fg-subtle">{i + 1}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 function groupByCase<T extends { case_id: string | null }>(rows: T[]): Record<string, T[]> {
   const out: Record<string, T[]> = {};
   for (const r of rows) {
@@ -490,6 +531,8 @@ export function FirmDashboard({
           <Kpi icon="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" label={t.kpiDue30} value={kpi.due30} href={`/${locale}/workspace/calendar`} />
           <Kpi icon="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" label={t.kpiRevenue} value={formatXaf(kpi.revenue, locale)} href={`/${locale}/workspace/billing`} />
         </div>
+
+        <DeadlineHorizon rows={rows} today={today} locale={locale} t={t} />
 
         <div className="grid gap-5 lg:grid-cols-3">
           <Card>
