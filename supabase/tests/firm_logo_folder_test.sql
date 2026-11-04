@@ -88,11 +88,32 @@ select throws_ok($$update storage.objects
   '42501', null,
   'T-352 nor rename its logo into a taxpayer folder');
 
--- T-353 the firm can delete its own logo, so a replacement is possible. There
--- was no DELETE policy before 20261104090000.
-select lives_ok($$delete from storage.objects
-   where name = 'branding/00000000-0000-4000-b100-0000000000c1/logo.svg'$$,
-  'T-353 a firm member deletes its own logo so it can be replaced');
+-- T-353 a DELETE policy exists, anchored the same way, so the Storage API can
+-- remove the old logo when a firm replaces it. There was none before
+-- 20261104090000.
+--
+-- Asserted structurally rather than by deleting, because real Supabase carries
+-- a `protect_objects_delete` trigger on storage.objects whose protect_delete()
+-- raises 42501 for ANY direct SQL delete: "Direct deletion from storage tables
+-- is not allowed. Use the Storage API instead." Deletion is only reachable
+-- through that API, which pgTAP cannot call, so a lives_ok here would be
+-- asserting Supabase's trigger and not this migration. The policy predicate is
+-- what the migration adds and what the API path is gated by, so that is what
+-- this pins -- including the `branding` anchor, which is the whole point of
+-- the change.
+--
+-- The local shim has no such trigger, so a raw delete succeeds there. That gap
+-- is exactly why this assertion is structural: the first version of this test
+-- passed locally and failed in CI.
+select is(
+  (select count(*)::int from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and policyname = 'firm deletes its logo'
+      and cmd = 'DELETE'
+      and qual like '%''branding''::text%'
+      and qual like '%current_firm_member%'),
+  1,
+  'T-353 a DELETE policy exists, anchored to branding, so a logo can be replaced');
 
 -- ---------------------------------------------------------------------------
 -- T-354 the victim firm's view is unchanged: it sees its own client's files and
