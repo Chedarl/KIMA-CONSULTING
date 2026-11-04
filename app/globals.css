@@ -46,7 +46,7 @@
   --amber: 245 166 35; /* #F5A623 — fills only */
   --amber-text: 146 64 14; /* 7.0:1 */
   --gold: 201 162 39; /* #C9A227 - shapes and rules, on white only */
-  --gold-text: 138 109 18; /* #8A6D12 - gold as TEXT, 5.9:1 on white */
+  --gold-text: 138 109 18; /* #8A6D12 - gold as TEXT. 4.9:1 on white, 4.4:1 on surface-sunken: never on sunken. */
   --amber-soft: 253 244 227;
 
   --danger: 214 69 69; /* #D64545 */
@@ -102,7 +102,7 @@
     --amber: 245 180 90;
     --amber-text: 242 196 120;
     --gold: 201 162 39; /* #C9A227 - shapes and rules */
-    --gold-text: 212 175 55; /* lifted for dark; 8.9:1 on surface */
+    --gold-text: 212 175 55; /* #D4AF37, lifted for dark; 7.9:1 on surface */
     --amber-soft: 50 36 14;
 
     --danger: 239 120 120;
@@ -139,7 +139,7 @@
   --amber: 245 180 90;
   --amber-text: 242 196 120;
   --gold: 201 162 39; /* #C9A227 - shapes and rules */
-  --gold-text: 212 175 55; /* lifted for dark; 8.9:1 on surface */
+  --gold-text: 212 175 55; /* #D4AF37, lifted for dark; 7.9:1 on surface */
   --amber-soft: 50 36 14;
 
   --danger: 239 120 120;
@@ -571,7 +571,7 @@ h1, h2, h3, .font-display {
   --amber: 217 149 40;
   --amber-text: 146 64 14;
   --gold: 201 162 39; /* #C9A227 - shapes and rules, on white only */
-  --gold-text: 138 109 18; /* #8A6D12 - gold as TEXT, 5.9:1 on white */
+  --gold-text: 138 109 18; /* #8A6D12 - gold as TEXT. 4.9:1 on white, 4.4:1 on surface-sunken: never on sunken. */
   --amber-soft: 255 246 232;
   --success: 21 128 61; /* #15803D fill */
   --success-text: 22 101 52; /* #166534 — 7.1:1 on white */
@@ -630,7 +630,7 @@ h1, h2, h3, .font-display {
   --amber: 217 149 40;
   --amber-text: 146 64 14;
   --gold: 201 162 39; /* #C9A227 - shapes and rules, on white only */
-  --gold-text: 138 109 18; /* #8A6D12 - gold as TEXT, 5.9:1 on white */
+  --gold-text: 138 109 18; /* #8A6D12 - gold as TEXT. 4.9:1 on white, 4.4:1 on surface-sunken: never on sunken. */
   --amber-soft: 255 246 232;
   --success: 21 128 61; /* #15803D fill */
   --success-text: 22 101 52; /* #166534 — 7.1:1 on white */
