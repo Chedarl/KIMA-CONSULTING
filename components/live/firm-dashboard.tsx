@@ -332,8 +332,24 @@ export function FirmDashboard({
     } catch {
       // Nothing rather than stale numbers: a dashboard that keeps showing the
       // last good figure during an outage is how a deadline gets missed.
+      //
+      // That contract needs every server-derived slice, not just the cases.
+      // Clearing rows alone emptied the board while the money, the pending
+      // documents, the activity feed and the client names kept rendering
+      // their last good values, so an outage looked like a firm with no work
+      // and a full ledger.
+      //
+      // User state -- the filters, the saved views, the open drawer -- is
+      // deliberately kept. It is not stale server data, and losing it on one
+      // dropped request would be its own defect.
       setOffline(true);
       setRows([]);
+      setRequests({});
+      setTasks({});
+      setEvents([]);
+      setNames({});
+      setMoney(null);
+      setPendingDocs([]);
     }
   }, []);
 
@@ -411,7 +427,11 @@ export function FirmDashboard({
         stage,
         cases: filteredRows.filter((c) => c.stage === stage),
       })),
-    [rows],
+    // filteredRows, not rows: the board is a view of the FILTERED set, and
+    // depending on rows left the columns on the previous filter until the
+    // cases themselves changed. The list below the board reads filteredRows
+    // directly, so the two halves of the same screen disagreed.
+    [filteredRows],
   );
 
   // The greeting is resolved in Africa/Douala, not in whatever timezone the
