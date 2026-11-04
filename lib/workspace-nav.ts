@@ -45,6 +45,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
     en: "Clients",
     tabs: [
       { path: "/clients", tabKey: "clients" },
+      { path: "/crm", tabKey: "crm" },
       { path: "/leads", tabKey: "leads" },
       { path: "/routing", tabKey: "routing" },
       { path: "/engagements", tabKey: "engagements" },
