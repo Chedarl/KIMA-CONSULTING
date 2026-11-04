@@ -218,6 +218,10 @@ const fr = {
     noTemplates: "Aucun modèle.",
     inbuilt: "Intégré",
     firm: "Votre cabinet",
+    apply: "Appliquer",
+    applyTo: "Choisir un client…",
+    applied: "Mission créée.",
+    applyFailed: "Échec de l'application.",
   },
   kima: {
     name: "Kima",
@@ -1466,6 +1470,10 @@ const en: WorkspaceDictionary = {
     noTemplates: "No templates.",
     inbuilt: "Built-in",
     firm: "Your firm",
+    apply: "Apply",
+    applyTo: "Choose a client…",
+    applied: "Engagement created.",
+    applyFailed: "Applying failed.",
   },
   kima: {
     name: "Kima",

@@ -18,10 +18,19 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
   const [editId, setEditId] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [showForm, setShowForm] = useState(false);
+  const [clients, setClients] = useState<{ id: string; legal_name: string }[]>([]);
+  const [applyId, setApplyId] = useState<string | null>(null);
+  const [applyClient, setApplyClient] = useState("");
+  const [applyStatus, setApplyStatus] = useState<"idle" | "applied" | "failed">("idle");
 
   async function load() {
-    const { data } = await supabase().from("engagement_templates").select("id, name, kind, services, stage_flow, letter").order("name");
-    setRows((data ?? []) as Row[]);
+    const db = supabase();
+    const [tpl, tps] = await Promise.all([
+      db.from("engagement_templates").select("id, name, kind, services, stage_flow, letter").order("name"),
+      db.from("taxpayers").select("id, legal_name").order("legal_name"),
+    ]);
+    setRows((tpl.data ?? []) as Row[]);
+    setClients((tps.data ?? []) as { id: string; legal_name: string }[]);
   }
 
   useEffect(() => { void load(); }, []);
@@ -38,6 +47,14 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
   async function duplicate(r: Row) {
     await supabase().rpc("upsert_engagement_template", { p_id: null, p_name: r.name + " (copie)", p_services: r.services ?? [], p_stage_flow: r.stage_flow ?? [], p_letter: r.letter ?? {} });
     await load();
+  }
+
+  async function apply(r: Row) {
+    if (!applyClient) return;
+    setApplyStatus("idle");
+    const { error } = await supabase().rpc("instantiate_engagement_template", { p_template: r.id, p_taxpayer: applyClient });
+    setApplyStatus(error ? "failed" : "applied");
+    if (!error) { setApplyId(null); setApplyClient(""); await load(); }
   }
 
   async function save() {
@@ -94,9 +111,23 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
               {r.kind === "inbuilt" ? (
                 <button type="button" onClick={() => duplicate(r)} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.duplicate}</button>
               ) : (
-                <button type="button" onClick={() => startEdit(r)} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.edit}</button>
+                <>
+                  <button type="button" onClick={() => { setApplyId(applyId === r.id ? null : r.id); setApplyStatus("idle"); }} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.apply}</button>
+                  <button type="button" onClick={() => startEdit(r)} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.edit}</button>
+                </>
               )}
             </div>
+            {applyId === r.id ? (
+              <div className="flex w-full flex-wrap items-center gap-2 pt-1">
+                <select value={applyClient} onChange={(e) => setApplyClient(e.target.value)} className="min-h-[40px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+                  <option value="">{t.applyTo}</option>
+                  {clients.map((c) => (<option key={c.id} value={c.id}>{c.legal_name}</option>))}
+                </select>
+                <button type="button" onClick={() => apply(r)} disabled={!applyClient} className="min-h-[40px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d] disabled:opacity-50">{t.apply}</button>
+                {applyStatus === "applied" && <span className="text-sm text-success-text">{t.applied}</span>}
+                {applyStatus === "failed" && <span className="text-sm text-danger-text">{t.applyFailed}</span>}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
