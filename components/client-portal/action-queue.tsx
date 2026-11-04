@@ -9,14 +9,11 @@ import { StatusPill } from "@/components/ui/status-pill";
 /**
  * "À traiter" -- the portal home as a queue of things to do.
  *
- * The three reference portals are three generations of one idea: a flat
- * chronological To-Do, then the same items GROUPED by what they are, then
- * grouped and aggregated across every account a person holds.
- *
- * Grouping is what makes it readable -- eleven unread documents and six unpaid
- * invoices in one flat list read as noise. And none of it is a dashboard: no
- * chart, every row ending in a verb, because the question is "what do you need
- * from me", not "how am I doing".
+ * The three reference portals are three generations of one idea: a flat To-Do,
+ * then the same items GROUPED by what they are, then grouped and aggregated
+ * across every account a person holds. Grouping is what makes it readable, and
+ * none of it is a dashboard: no chart, every row ending in a verb, because the
+ * question is "what do you need from me", not "how am I doing".
  *
  * The portal home reads three tables today, so a task assigned to the client,
  * an unread message and an unpaid invoice were all invisible on the screen
@@ -104,7 +101,7 @@ export function ActionQueue({
       for (const k of (tasks.data ?? []) as {
         id: string; title: string; assigned_to: string | null; state: string; due_on: string | null;
       }[]) {
-        // Only what the client themselves owes. A firm task is not their work.
+        // Only the client's own work; a firm task is not theirs.
         if (k.state !== "open" || k.assigned_to !== "client") continue;
         out.push({
           id: `t-${k.id}`,
