@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { stageLabel, type CaseStage } from "@/lib/cases";
+import { PageHeading } from "@/components/ui";
 
 const STAGES: CaseStage[] = ["documents", "accounting", "preparation", "review", "filing", "evidence", "client_approval", "delivered"];
 
@@ -70,13 +71,7 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-fg">{t.title}</h1>
-          <p className="mt-1 text-sm text-fg-muted">{t.subtitle}</p>
-        </div>
-        <button type="button" onClick={() => { setShowForm((v) => !v); setEditId(null); setName(""); setServices(""); setStages(["documents", "preparation", "review", "filing"]); setScope(""); }} className="inline-flex min-h-[44px] items-center rounded-lg bg-[#18243B] px-4 text-sm font-semibold text-white hover:bg-[#24314d]">{t.new}</button>
-      </div>
+      <PageHeading title={t.title} lede={t.subtitle} actions={<button type="button" onClick={() => { setShowForm((v) => !v); setEditId(null); setName(""); setServices(""); setStages(["documents", "preparation", "review", "filing"]); setScope(""); }} className="inline-flex min-h-[44px] items-center rounded-lg bg-[#18243B] px-4 text-sm font-semibold text-white hover:bg-[#24314d]">{t.new}</button>} />
 
       {showForm && (
         <section className="rounded-card border border-border bg-surface p-5">
