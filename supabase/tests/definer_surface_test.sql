@@ -64,6 +64,9 @@ select is(
 -- (20261102200000 .. 20261102230000); each is a trigger body or a service-role-only
 -- entry point, so none is reachable through PostgREST.
 -- contact_source_key and contact_inbox_ceiling arrived with the contact-inbox
+-- my_contact_id arrived with the client's own settings (20261105090000). It
+-- resolves contacts.auth_user_id = auth.uid() and is the only thing the two
+-- public settings entry points need, so it stays private.
 -- ceiling (20261103140000). The first is EXECUTE-granted to anon and
 -- authenticated on purpose -- it is the DEFAULT on contact_inquiries.source_key,
 -- so the inserting role has to be able to call it -- and it returns only a
@@ -85,7 +88,7 @@ select is(
   'firm_member_has, firm_name_key, firm_previously_granted, flag_enabled, '
   'guard_client_invite_authorization, incident_timeline_guard, incident_verify_guard, is_kima_admin, '
   'mark_reminder_failed, mark_reminder_sent, member_has, member_has_in_org, '
-  'message_thread_autolink, organization_profile_guard, portal_request_code, '
+  'message_thread_autolink, my_contact_id, organization_profile_guard, portal_request_code, '
   'serialize_taxpayer_grant, signal_firm_intake_document_change, '
   'taxpayer_held_by_another_firm, taxpayer_id_for_niu',
   'T-52 every moved helper is in private, and nothing else is'
@@ -107,6 +110,14 @@ select is(
 -- route_unassigned_registration() (20261101000000) both re-check the bound
 -- kima_admin inside and raise 42501 for anyone else, so EXECUTE alone buys a
 -- caller nothing.
+-- update_my_contact_details() and set_my_file_notifications()
+-- (20261105090000) are the client's own two settings writes. Each resolves the
+-- caller through private.my_contact_id() and touches nothing else: the first
+-- takes email and phone and no other column, so full_name (half the sign-in
+-- identifier) and organization_id (which firm holds the record) are not
+-- reachable through it; the second is scoped to the caller's own links. They
+-- exist as functions precisely BECAUSE an update policy would have granted
+-- every column. EXECUTE buys a caller only their own row.
 select is(
   (select coalesce(string_agg(p.proname, ', ' order by p.proname), '(none)')
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -115,7 +126,8 @@ select is(
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
   'admin_review_firm, advance_case, can_write_client_note, client_taxpayer_ids, current_firm_member, firm_directory, instantiate_engagement_template, '
-  'list_unassigned_registrations, manage_firm_staff, record_time_entry, route_unassigned_registration, sign_up_firm, upsert_branding, upsert_engagement_template',
+  'list_unassigned_registrations, manage_firm_staff, record_time_entry, route_unassigned_registration, set_my_file_notifications, sign_up_firm, '
+  'update_my_contact_details, upsert_branding, upsert_engagement_template',
   'T-53 only the definer functions named here stay callable in public'
 );
 
