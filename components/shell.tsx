@@ -40,6 +40,8 @@ export type NavItem = {
   label: string;
   icon: IconName;
   ready: boolean;
+  /** A heading inside the rail, not a destination. */
+  section?: boolean;
 };
 
 export function Shell({
@@ -115,6 +117,13 @@ export function Shell({
             </li>
           )}
           {nav.map((item) => {
+            if (item.section) {
+              return (
+                <li key={`sec-${item.label}`} className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wide text-rail-muted">
+                  {item.label}
+                </li>
+              );
+            }
             // Overview is a prefix of every firm route, so only an exact
             // match counts. A section lights up on its own detail routes.
             const isPrefix = nav.some(
