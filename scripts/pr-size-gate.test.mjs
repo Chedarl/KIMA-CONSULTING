@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { changedLines, validatePullRequest, runGate } from './pr-size-gate.mjs';
+import { changedLines, validatePullRequest, runGate, generatedLines } from './pr-size-gate.mjs';
 
 test('counts additions plus deletions (not just additions)', () => {
   assert.equal(changedLines({ additions: 175, deletions: 125 }), 300);
@@ -57,8 +57,70 @@ test('unexpected PR identity fails closed', async () => {
     ok: true, json: async () => ({ number: 68, additions: 2, deletions: 3 }),
   })), /Unexpected PR identity/);
 });
+// The gate now asks for the file list too, so a mock has to answer both calls.
+const stub = (pr, files = []) => async (url) =>
+  String(url).includes('/files')
+    ? { ok: true, json: async () => files }
+    : { ok: true, json: async () => pr };
+
 test('live lookup rejects an oversized PR', async () => {
-  await assert.rejects(runGate(env, async () => ({
-    ok: true, json: async () => ({ number: 67, additions: 301, deletions: 0 }),
-  })), /301.*300/);
+  await assert.rejects(
+    runGate(env, stub({ number: 67, additions: 301, deletions: 0 })),
+    /301.*300/,
+  );
+});
+
+test('a lock file does not spend the review budget', async () => {
+  const count = await runGate(
+    env,
+    stub({ number: 67, additions: 480, deletions: 79 }, [
+      { filename: 'package-lock.json', additions: 435, deletions: 75 },
+      { filename: 'lib/utils.ts', additions: 14, deletions: 0 },
+      { filename: 'package.json', additions: 7, deletions: 2 },
+      { filename: 'tailwind.config.ts', additions: 4, deletions: 1 },
+      { filename: 'components.json', additions: 20, deletions: 0 },
+    ]),
+  );
+  assert.equal(count, 49);
+});
+
+test('excluding a lock file cannot rescue an oversized source diff', async () => {
+  await assert.rejects(
+    runGate(
+      env,
+      stub({ number: 67, additions: 900, deletions: 0 }, [
+        { filename: 'package-lock.json', additions: 500, deletions: 0 },
+        { filename: 'app/huge.tsx', additions: 400, deletions: 0 },
+      ]),
+    ),
+    /400.*300/,
+  );
+});
+
+test('only exact generated names are exempt', () => {
+  assert.equal(generatedLines([{ filename: 'package-lock.json', additions: 10, deletions: 5 }]), 15);
+  assert.equal(generatedLines([{ filename: 'docs/package-lock.json.md', additions: 10, deletions: 5 }]), 0);
+  assert.equal(generatedLines([{ filename: 'src/lock.ts', additions: 10, deletions: 5 }]), 0);
+  assert.equal(generatedLines(undefined), 0);
+});
+
+test('a malformed generated-file entry fails closed', () => {
+  assert.throws(() => generatedLines([{ filename: 'package-lock.json', additions: '10', deletions: 5 }]));
+  assert.throws(() => generatedLines([{ filename: 'yarn.lock', additions: -1, deletions: 0 }]));
+  assert.throws(() => validatePullRequest({ number: 1, additions: 10, deletions: 0 }, -5));
+});
+
+test('a generated count larger than the diff cannot go negative', () => {
+  assert.equal(validatePullRequest({ number: 1, additions: 10, deletions: 0 }, 999), 0);
+});
+
+test('a failed file lookup fails closed', async () => {
+  await assert.rejects(
+    runGate(env, async (url) =>
+      String(url).includes('/files')
+        ? { ok: false, status: 502 }
+        : { ok: true, json: async () => ({ number: 67, additions: 10, deletions: 0 }) },
+    ),
+    /files lookup failed: HTTP 502/,
+  );
 });
