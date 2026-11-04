@@ -33,6 +33,7 @@ export default function FirmLayout({
     { href: `${base}/leads`, label: w.firm.nav.leads, icon: "user", ready: true },
     { href: `${base}/routing`, label: w.firm.nav.routing, icon: "inbox", ready: true },
     { href: `${base}/clients`, label: w.firm.nav.clients, icon: "people", ready: true },
+    { href: `${base}/workflows`, label: w.firm.nav.workflows, icon: "queue", ready: true },
     { href: `${base}/staff`, label: w.firm.nav.staff, icon: "people", ready: true },
     { href: `${base}/engagements`, label: w.firm.nav.engagements, icon: "folder", ready: true },
     { href: `${base}/queue`, label: w.firm.nav.queue, icon: "queue", ready: true },
