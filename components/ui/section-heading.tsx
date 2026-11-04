@@ -11,9 +11,14 @@ import { cn } from "@/lib/utils";
  * run of cards.
  *
  * The rule is `border-gold`, never `text-gold`. #C9A227 as text on white is
- * 2.3:1 and fails; gold text is the darker #8A6D12. That is why the token map
+ * 2.4:1 and fails; gold text is the darker #8A6D12. That is why the token map
  * keeps `gold` and `gold-text` apart -- so the rule colour cannot quietly be
- * reached for as a text colour.
+ * reached for as a text colour. As a decorative underline beneath real heading
+ * text, gold at full strength is fine: nothing is read from it.
+ *
+ * `gold-text` itself is 4.9:1 on white and 4.4:1 on surface-sunken, so it must
+ * not be used on a sunken surface. Measured, not assumed -- an earlier comment
+ * here claimed 5.9:1 by copying a neighbouring token's figure.
  *
  * `action` is the "Voir tout →" the dashboard spec puts opposite the title.
  */

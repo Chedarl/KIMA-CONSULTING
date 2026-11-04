@@ -174,7 +174,14 @@ export function KimaAssistant({ locale, t }: { locale: GuideLocale; t: KimaLabel
                   <ol className="mt-1 flex flex-col gap-1.5">
                     {guide.steps[locale].map((s, i) => (
                       <li key={i} className="flex gap-2 text-sm text-fg">
-                        <span className="font-mono text-xs text-gold">{i + 1}</span>
+                        {/*
+                          gold-text, not gold. #C9A227 is a shape colour and is
+                          2.3:1 on white; the readable gold is #8A6D12. This
+                          read `text-gold` while no gold token existed, so it
+                          inherited and looked fine -- defining the token is
+                          what would have made it fail.
+                        */}
+                        <span className="font-mono text-xs text-gold-text">{i + 1}</span>
                         <span>{s}</span>
                       </li>
                     ))}
