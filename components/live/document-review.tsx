@@ -74,7 +74,10 @@ export function DocumentReview({ docId, locale, t }: { docId: string; locale: "f
         <section className="min-h-[24rem] rounded-card border border-border bg-surface p-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-subtle">{t.preview}</p>
           {url && isPdf ? <iframe src={url} title={doc.file_name} className="h-[32rem] w-full rounded-lg border border-border" />
-            : url && isImage ? <img src={url} alt={doc.file_name} className="max-h-[32rem] w-full rounded-lg object-contain" />
+            : url && isImage ? (
+              // eslint-disable-next-line @next/next/no-img-element -- a signed storage file, not a local asset
+              <img src={url} alt={doc.file_name} className="max-h-[32rem] w-full rounded-lg object-contain" />
+            )
             : <p className="text-sm text-fg-muted">{t.noPreview}</p>}
           {url ? <a href={url} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-[40px] items-center text-sm font-semibold text-teal-text hover:underline">{t.download}</a> : null}
         </section>
