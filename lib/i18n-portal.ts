@@ -199,6 +199,10 @@ const fr = {
   contacts: "Personnes à contacter",
   preferences: "Préférences",
   security: "Sécurité",
+  nameHeldByFirm:
+    "Le nom et le numéro figurant sur votre dossier sont ceux que le cabinet détient. Pour les corriger, écrivez au cabinet : une correction doit suivre vos pièces d'état civil ou votre attestation d'immatriculation.",
+  emailIsWhereCodeGoes:
+    "C'est à cette adresse que votre code de connexion à 8 chiffres est envoyé. Si vous la changez, le prochain code arrivera à la nouvelle adresse et le cabinet en est informé.",
   legalName: "Raison sociale",
   niu: "NIU",
   niuLocked: "Le cabinet met à jour le NIU. Il n'est pas modifiable ici.",
@@ -421,6 +425,10 @@ const en: typeof fr = {
   contacts: "Contact persons",
   preferences: "Preferences",
   security: "Security",
+  nameHeldByFirm:
+    "The name and number on your file are the ones the firm holds. To correct them, write to the firm: a correction has to follow your civil-status documents or your registration certificate.",
+  emailIsWhereCodeGoes:
+    "This is the address your 8-digit sign-in code is sent to. If you change it, the next code arrives at the new address and the firm is told.",
   legalName: "Legal name",
   niu: "NIU",
   niuLocked: "Your firm updates the NIU. It cannot be edited here.",

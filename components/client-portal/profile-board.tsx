@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { LoadingRows, OfflineNote, PageHeading, PrimaryButton } from "@/components/client-portal/ui";
 import type { Contact, ContactLink } from "@/lib/crm";
-import { updateById } from "@/lib/db-write";
+import { clearSession } from "@/lib/portal-auth";
 import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 
@@ -16,9 +16,32 @@ type Taxpayer = {
 };
 
 /**
- * Profile reads the taxpayer and the linked contact. NIU stays read-only.
+ * "Profil et paramètres" -- the settings screen for a client.
+ *
+ * It had a Save button that could never save. The three writes went through
+ * `updateById` to `taxpayers`, `contacts` and `contact_account_links`, and
+ * none of those tables carried a client update policy: the only non-firm
+ * update on `taxpayers` is `to anon`, which an authenticated client is not.
+ * Every save matched zero rows and reported "Enregistrement refusé". The
+ * screen looked editable and was not.
+ *
+ * It also loaded the WRONG PERSON. It took the links for the taxpayer and
+ * picked `is_primary`, so a director signing in saw -- and would have
+ * edited -- the primary contact's email address rather than their own. The
+ * contact is now resolved by `auth_user_id`, the same binding RLS uses.
+ *
+ * What a client may change is deliberately narrow:
+ *
+ *   email, phone                    theirs, through update_my_contact_details
+ *   notices on this file            theirs, through set_my_file_notifications
+ *   legal_name, full_name, NIU      the firm's record of what the DGI holds
+ *
+ * `legal_name` was editable here. It is the name on the taxpayer's file; a
+ * client retyping it would put the firm's record out of step with the DGI's
+ * without the firm being told. It is now read-only, like the NIU, and the
+ * page already says the firm holds these.
+ *
  * SMS is not a channel we store, so that switch stays off and explains why.
- * A refused save is shown as a refusal — the firm holds the record.
  */
 export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
   const copy = usePortalCopy();
@@ -52,21 +75,35 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
       const row = (tp.data as Taxpayer | null) ?? null;
       setTaxpayer(row);
       setLegalName(row?.legal_name ?? "");
-      const links = await db
-        .from("contact_account_links")
-        .select("id, contact_id, taxpayer_id, relationship, portal_access, notifications, is_primary")
-        .eq("taxpayer_id", ids.taxpayerId);
-      const list = (links.data ?? []) as ContactLink[];
-      const primary = list.find((l) => l.is_primary) ?? list[0] ?? null;
-      setLink(primary);
-      setEmailOn(Boolean(primary?.notifications));
-      if (primary) {
-        const person = await db.from("contacts").select("id, full_name, email, phone").eq("id", primary.contact_id).maybeSingle();
-        const c = (person.data as Contact | null) ?? null;
-        setContact(c);
-        setFullName(c?.full_name ?? "");
-        setPhone(c?.phone ?? "");
-        setEmail(c?.email ?? "");
+      // The signed-in person, by the binding every policy uses. Picking the
+      // taxpayer's is_primary link instead showed a director someone else's
+      // email address and offered to edit it.
+      const { data: auth } = await db.auth.getUser();
+      const mine = auth.user
+        ? await db
+            .from("contacts")
+            .select("id, full_name, email, phone")
+            .eq("auth_user_id", auth.user.id)
+            .maybeSingle()
+        : { data: null };
+      const c = (mine.data as Contact | null) ?? null;
+      setContact(c);
+      setFullName(c?.full_name ?? "");
+      setPhone(c?.phone ?? "");
+      setEmail(c?.email ?? "");
+
+      if (c) {
+        const links = await db
+          .from("contact_account_links")
+          .select("id, contact_id, taxpayer_id, relationship, portal_access, notifications, is_primary")
+          .eq("taxpayer_id", ids.taxpayerId)
+          .eq("contact_id", c.id);
+        const own = ((links.data ?? []) as ContactLink[])[0] ?? null;
+        setLink(own);
+        setEmailOn(Boolean(own?.notifications));
+      } else {
+        setLink(null);
+        setEmailOn(false);
       }
       setOffline(false);
     } catch {
@@ -82,14 +119,10 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
 
   async function save() {
     if (!taxpayer) return;
-    const dirtyName = legalName.trim() !== taxpayer.legal_name;
-    const dirtyContact =
-      contact &&
-      (fullName.trim() !== (contact.full_name ?? "") ||
-        phone.trim() !== (contact.phone ?? "") ||
-        email.trim() !== (contact.email ?? ""));
+    const dirtyDetails =
+      contact && (phone.trim() !== (contact.phone ?? "") || email.trim() !== (contact.email ?? ""));
     const dirtyNotes = link && emailOn !== Boolean(link.notifications);
-    if (!dirtyName && !dirtyContact && !dirtyNotes) {
+    if (!dirtyDetails && !dirtyNotes) {
       toast(copy.nothingToSave);
       return;
     }
@@ -97,26 +130,29 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
     let failed = 0;
     let tried = 0;
     try {
-      // updateById asks for the changed rows back: a write RLS refused matches
-      // zero rows and returns no error, and must not be shown as "Saved".
-      if (dirtyName) {
+      const db = supabase();
+      // Two definer functions, not table updates. `contacts` has no client
+      // update policy and must not get one: an update grant covers every
+      // column, and full_name is half the sign-in identifier while
+      // organization_id is which firm holds the record.
+      if (dirtyDetails && contact) {
         tried += 1;
-        const r = await updateById("taxpayers", taxpayer.id, { legal_name: legalName.trim() });
-        if (!r.ok) failed += 1;
-      }
-      if (dirtyContact && contact) {
-        tried += 1;
-        const r = await updateById("contacts", contact.id, {
-          full_name: fullName.trim(),
-          phone: phone.trim() || null,
-          email: email.trim() || null,
+        const { data, error } = await db.rpc("update_my_contact_details", {
+          p_email: email.trim(),
+          p_phone: phone.trim(),
         });
-        if (!r.ok) failed += 1;
+        const stored = ((data ?? []) as { email: string | null; phone: string | null }[])[0];
+        if (error || !stored) failed += 1;
       }
       if (dirtyNotes && link) {
         tried += 1;
-        const r = await updateById("contact_account_links", link.id, { notifications: emailOn });
-        if (!r.ok) failed += 1;
+        // The function returns the stored value, so a refusal cannot read as
+        // success: it comes back as the opposite of what was asked.
+        const { data, error } = await db.rpc("set_my_file_notifications", {
+          p_taxpayer_id: link.taxpayer_id,
+          p_on: emailOn,
+        });
+        if (error || data !== emailOn) failed += 1;
       }
       if (failed === 0) toast(copy.saved);
       else if (failed < tried) toast(copy.savePartial, "error");
@@ -125,6 +161,11 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function signOut() {
+    await clearSession();
+    window.location.assign(`/${locale}/login`);
   }
 
   const field = "mt-1 min-h-[44px] w-full rounded-lg border border-border bg-white px-3 text-sm text-fg";
@@ -142,13 +183,14 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
               <h2 className="font-display text-base font-semibold text-fg">{copy.business}</h2>
               <label className="mt-4 block text-sm font-medium text-fg">
                 {copy.legalName}
-                <input value={legalName} onChange={(e) => setLegalName(e.target.value)} className={field} />
+                <input value={legalName} readOnly className={`${field} bg-surface-sunken`} />
               </label>
               <label className="mt-3 block text-sm font-medium text-fg">
                 {copy.niu}
                 <input value={taxpayer?.niu ?? ""} readOnly className={`${field} bg-surface-sunken`} />
               </label>
               <p className="mt-1 text-xs text-fg-muted">{copy.niuLocked}</p>
+              <p className="mt-2 text-xs text-fg-muted">{copy.nameHeldByFirm}</p>
             </section>
 
             <section className="rounded-card border border-border bg-white p-5 shadow-card">
@@ -159,7 +201,7 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
                 <>
                   <label className="mt-4 block text-sm font-medium text-fg">
                     {copy.contactName}
-                    <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={field} />
+                    <input value={fullName} readOnly className={`${field} bg-surface-sunken`} />
                   </label>
                   <label className="mt-3 block text-sm font-medium text-fg">
                     {copy.phone}
@@ -169,6 +211,7 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
                     {copy.email}
                     <input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" className={field} />
                   </label>
+                  <p className="mt-1 text-xs text-fg-muted">{copy.emailIsWhereCodeGoes}</p>
                 </>
               )}
             </section>
@@ -206,12 +249,26 @@ export function ProfileBoard({ locale }: { locale: "fr" | "en" }) {
               <h2 className="font-display text-base font-semibold text-fg">{copy.security}</h2>
               <p className="mt-2 text-sm font-medium text-fg">{copy.otpTitle}</p>
               <p className="mt-1 text-sm text-fg-muted">{copy.otpBody}</p>
-              <Link
-                href={`/${locale}/login`}
-                className="mt-4 inline-flex min-h-[44px] items-center rounded-lg border border-border px-4 text-sm font-semibold text-fg hover:bg-surface-sunken"
-              >
-                {copy.requestCode}
-              </Link>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href={`/${locale}/login`}
+                  className="inline-flex min-h-[44px] items-center rounded-lg border border-border px-4 text-sm font-semibold text-fg hover:bg-surface-sunken"
+                >
+                  {copy.requestCode}
+                </Link>
+                {/*
+                  Sign-out also lives in the account dropdown (#394). It is
+                  repeated here because the settings page is where a person
+                  looks for it, and a second affordance costs nothing.
+                */}
+                <button
+                  type="button"
+                  onClick={() => void signOut()}
+                  className="inline-flex min-h-[44px] items-center rounded-lg border border-danger-text/30 bg-danger-soft px-4 text-sm font-semibold text-danger-text hover:bg-danger-soft/70"
+                >
+                  {copy.signOut}
+                </button>
+              </div>
             </section>
           </div>
           <div className="flex justify-end">
