@@ -29,6 +29,11 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 /** Unknown locales 404 at the router rather than rendering a shell first. */
 export const dynamicParams = false;
 
+// Every page below this layout is per-request. A prerendered shell can be
+// cached at an edge or an ISP far from the build, which is how a region ends up
+// seeing yesterday's dashboard while another sees today's.
+export const dynamic = "force-dynamic";
+
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
