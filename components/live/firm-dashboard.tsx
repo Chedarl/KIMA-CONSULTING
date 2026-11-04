@@ -210,16 +210,36 @@ function UnknownFigure({ label }: { label: string }) {
   );
 }
 
-function Kpi({ icon, label, value, delta, href }: { icon: string; label: string; value: ReactNode; delta?: string; href: string }) {
+/**
+ * A tile carries its own tone and says what it counts.
+ *
+ * The supplied references all tint each metric and put a second line under
+ * the label. Theirs is a delta -- "+12.5% from last month" -- which KIMA
+ * cannot draw honestly without having read a prior period. The second line
+ * is therefore the figure's SCOPE: what is counted and over what window, so
+ * the number still answers "of what?" without inventing a trend.
+ *
+ * Each tone pairs a `-soft` background with its `-text` foreground, and both
+ * flip in dark mode, so the contrast holds in either theme. Tone is never the
+ * only carrier of meaning -- the label and scope say it in words.
+ */
+const KPI_TONES = {
+  indigo: "bg-teal-soft text-teal-text",
+  navy: "bg-navy-soft text-navy",
+  amber: "bg-amber-soft text-amber-text",
+  success: "bg-success-soft text-success-text",
+} as const;
+
+function Kpi({ icon, label, value, scope, tone = "indigo", href }: { icon: string; label: string; value: ReactNode; scope?: string; tone?: keyof typeof KPI_TONES; href: string }) {
   return (
     <Link href={href} className="flex items-center gap-3 rounded-card border border-border bg-surface p-4 transition hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-raised">
-      <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-teal-text">
+      <span aria-hidden className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${KPI_TONES[tone]}`}>
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={icon} /></svg>
       </span>
       <span className="min-w-0">
         <span className="block tnum font-display text-2xl font-semibold leading-none text-fg">{value}</span>
         <span className="mt-1 block truncate text-xs text-fg-muted">{label}</span>
-        {delta ? <span className="mt-0.5 block text-[11px] text-success-text">{delta}</span> : null}
+        {scope ? <span className="mt-0.5 block truncate text-[11px] text-fg-subtle">{scope}</span> : null}
       </span>
     </Link>
   );
@@ -562,10 +582,10 @@ export function FirmDashboard({
       ) : (
         <>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Kpi icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" label={t.kpiClients} value={kpi.clients} href={`/${locale}/workspace/clients`} />
-          <Kpi icon="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" label={t.kpiTasks} value={kpi.tasks} href={`/${locale}/workspace/tasks`} />
-          <Kpi icon="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" label={t.kpiDue30} value={kpi.due30} href={`/${locale}/workspace/calendar`} />
-          <Kpi icon="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" label={t.kpiRevenue} value={kpi.revenue ?? <UnknownFigure label={t.moneyUnknown} />} href={`/${locale}/workspace/billing`} />
+          <Kpi icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" label={t.kpiClients} scope={t.kpiClientsScope} tone="indigo" value={kpi.clients} href={`/${locale}/workspace/clients`} />
+          <Kpi icon="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" label={t.kpiTasks} scope={t.kpiTasksScope} tone="navy" value={kpi.tasks} href={`/${locale}/workspace/tasks`} />
+          <Kpi icon="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" label={t.kpiDue30} scope={t.kpiDue30Scope} tone="amber" value={kpi.due30} href={`/${locale}/workspace/calendar`} />
+          <Kpi icon="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" label={t.kpiRevenue} scope={t.kpiRevenueScope} tone="success" value={kpi.revenue ?? <UnknownFigure label={t.moneyUnknown} />} href={`/${locale}/workspace/billing`} />
         </div>
 
         <DeadlineHorizon rows={rows} today={today} locale={locale} t={t} />
