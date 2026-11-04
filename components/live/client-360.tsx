@@ -27,9 +27,12 @@ import { linkedFiles, unreachable, type Contact, type ContactLink } from "@/lib/
  * this is the firm's screen and the client vocabulary is what the portal
  * will say.
  */
+const FLOW = ["documents", "accounting", "preparation", "review", "filing", "evidence", "client_approval", "delivered"];
+const progressOf = (stage: string) => { const i = FLOW.indexOf(stage); return i < 0 ? 0 : Math.round(((i + 1) / FLOW.length) * 100); };
+
 type Dict = ReturnType<typeof getWorkspaceDictionary>["client360"];
 
-type Tab = "overview" | "documents" | "engagements" | "messages" | "notes" | "billing";
+type Tab = "overview" | "tasks" | "documents" | "tax" | "accounting" | "billing" | "notes";
 
 type Taxpayer = {
   id: string;
@@ -201,11 +204,12 @@ export function Client360({
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "overview", label: t.overview },
+    { id: "tasks", label: t.tabTasks },
     { id: "documents", label: t.documents },
-    { id: "engagements", label: t.engagements },
-    { id: "messages", label: t.messages },
-    { id: "notes", label: t.notes },
+    { id: "tax", label: t.tabTax },
+    { id: "accounting", label: t.tabAccounting },
     { id: "billing", label: t.billing },
+    { id: "notes", label: t.tabNotes },
   ];
 
   if (taxpayer === undefined) {
@@ -256,25 +260,27 @@ export function Client360({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link href={backHref} className="text-sm font-semibold text-navy">
-            {t.back}
-          </Link>
-          <h2 className="mt-1 font-display text-2xl font-semibold text-fg">{taxpayer.legal_name}</h2>
-          <p className="text-sm text-fg-muted">
-            {taxpayer.contact_name ?? ""}
-            {taxpayer.contact_email ? ` · ${taxpayer.contact_email}` : ""}
-          </p>
+        <div className="flex items-start gap-3">
+          <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy font-display text-lg font-bold text-surface">
+            {taxpayer.legal_name.slice(0, 2).toUpperCase()}
+          </span>
+          <div>
+            <Link href={backHref} className="text-sm font-semibold text-navy">{t.back}</Link>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h2 className="font-display text-2xl font-semibold text-fg">{taxpayer.legal_name}</h2>
+              <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${taxpayer.profile_verified ? "border-success/40 bg-success-soft text-success-text" : "border-dashed border-amber-text/40 bg-amber-soft text-amber-text"}`}>
+                {taxpayer.profile_verified ? t.verified : t.unverified}
+              </span>
+            </div>
+            <p className="text-sm text-fg-muted">
+              {[taxpayer.niu ? "NIU " + taxpayer.niu : null, taxpayer.tax_centre, taxpayer.taxpayer_type].filter(Boolean).join(" · ")}
+            </p>
+          </div>
         </div>
-        <span
-          className={`rounded-full border px-2 py-1 text-xs font-semibold ${
-            taxpayer.profile_verified
-              ? "border-success/40 bg-success-soft text-success-text"
-              : "border-dashed border-amber-text/40 bg-amber-soft text-amber-text"
-          }`}
-        >
-          {taxpayer.profile_verified ? t.verified : t.unverified}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={`/${locale}/workspace/tasks`} className="inline-flex min-h-[40px] items-center rounded-lg border border-border-strong px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.createTask}</Link>
+          <Link href={`/${locale}/workspace/messages`} className="inline-flex min-h-[40px] items-center rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d]">{t.shareClient}</Link>
+        </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto" role="tablist">
@@ -295,91 +301,67 @@ export function Client360({
       </div>
 
       {tab === "overview" && (
-        <div className="flex flex-col gap-4">
+        <div className="grid gap-4 lg:grid-cols-3">
           <section className="rounded-card border border-border bg-surface">
             <h3 className="border-b border-border px-4 py-3 font-display text-base font-semibold">{t.profile}</h3>
-            <dl className="grid gap-px bg-border sm:grid-cols-2">
-              <div className="bg-surface px-4 py-3">
-                <dt className="text-xs uppercase tracking-wide text-fg-subtle">NIU</dt>
-                <dd className="tnum mt-1 font-mono text-sm">{taxpayer.niu ?? "—"}</dd>
-              </div>
-              <div className="bg-surface px-4 py-3">
-                <dt className="text-xs uppercase tracking-wide text-fg-subtle">{t.axes}</dt>
-                <dd className="mt-1 text-xs text-fg-subtle">{t.axesHint}</dd>
-              </div>
-              {axes.map((row) => (
-                <div key={row.label} className="bg-surface px-4 py-3">
-                  <dt className="text-xs uppercase tracking-wide text-fg-subtle">{row.label}</dt>
-                  <dd className="mt-1 text-sm font-medium text-fg">{row.value}</dd>
-                </div>
-              ))}
+            <dl className="flex flex-col gap-3 px-4 py-4 text-sm">
+              <div><dt className="text-xs uppercase tracking-wide text-fg-subtle">NIU</dt><dd className="tnum mt-0.5 font-mono">{taxpayer.niu ?? "—"}</dd></div>
+              <div><dt className="text-xs uppercase tracking-wide text-fg-subtle">{t.contactPrincipal}</dt><dd className="mt-0.5">{taxpayer.contact_name ?? "—"}</dd></div>
+              <div><dt className="text-xs uppercase tracking-wide text-fg-subtle">Email</dt><dd className="mt-0.5 break-all">{taxpayer.contact_email ?? "—"}</dd></div>
+              {contacts[0]?.phone ? <div><dt className="text-xs uppercase tracking-wide text-fg-subtle">{"Téléphone"}</dt><dd className="mt-0.5">{contacts[0].phone}</dd></div> : null}
             </dl>
           </section>
-
           <section className="rounded-card border border-border bg-surface">
-            <h3 className="border-b border-border px-4 py-3 font-display text-base font-semibold">{t.contacts}</h3>
-            {unreachable(links, contacts, taxpayer.id) && (
-              <p className="border-b border-amber/40 bg-amber-soft px-4 py-3 text-sm text-amber-text">
-                {t.unreachable}
-              </p>
-            )}
-            {contacts.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-fg-muted">{t.noContacts}</p>
-            ) : (
+            <h3 className="border-b border-border px-4 py-3 font-display text-base font-semibold">{t.cases}</h3>
+            {cases.length === 0 ? <p className="px-4 py-4 text-sm text-fg-muted">{t.noCases}</p> : (
               <ul className="divide-y divide-border">
-                {contacts.map((person) => {
-                  const others = linkedFiles(person.id, links, taxpayer.id);
+                {cases.slice(0, 4).map((c) => {
+                  const seen = clientStatus(c, awaitingClient(byCase[c.id] ?? []));
                   return (
-                    <li key={person.id} className="px-4 py-3">
-                      <p className="text-sm font-medium text-fg">{person.full_name}</p>
-                      <p className="text-xs text-fg-muted">
-                        {[person.email, person.phone].filter(Boolean).join(" · ") || "—"}
-                      </p>
-                      {others.length > 0 && (
-                        <p className="mt-1 text-xs text-fg-subtle">
-                          {t.alsoLinked}: {others.length}
-                        </p>
-                      )}
+                    <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                      <span className="min-w-0"><span className="block truncate font-medium text-fg">{obligationLabel(c.obligation_code, locale)}</span><span className="tnum block font-mono text-xs text-fg-subtle">{c.due_on ?? "—"}</span></span>
+                      <span className="shrink-0 rounded-full bg-surface-sunken px-2 py-0.5 text-xs font-semibold text-fg-muted">{clientStatusLabel(seen, locale)}</span>
                     </li>
                   );
                 })}
               </ul>
             )}
           </section>
-
           <section className="rounded-card border border-border bg-surface">
-            <h3 className="border-b border-border px-4 py-3 font-display text-base font-semibold">{t.cases}</h3>
-            {cases.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-fg-muted">{t.noCases}</p>
-            ) : (
-              <ul className="divide-y divide-border">
-                {cases.map((c) => {
-                  const seen = clientStatus(c, awaitingClient(byCase[c.id] ?? []));
-                  return (
-                    <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-fg">
-                          {obligationLabel(c.obligation_code, locale)}
-                        </p>
-                        <p className="tnum font-mono text-xs text-fg-subtle">{c.period_token}</p>
-                        <p className="mt-1 text-xs text-fg-muted">
-                          {t.firmStage}: {stageLabel(c.stage, locale)} · {t.clientSees}:{" "}
-                          {clientStatusLabel(seen, locale)}
-                        </p>
-                      </div>
-                      <Link
-                        href={`/${locale}/workspace/cases/${c.id}`}
-                        className="inline-flex min-h-[44px] items-center text-sm font-semibold text-teal-text"
-                      >
-                        {t.openCase}
-                      </Link>
-                    </li>
-                  );
-                })}
+            <h3 className="border-b border-border px-4 py-3 font-display text-base font-semibold">{t.engagements}</h3>
+            {cases.length === 0 ? <p className="px-4 py-4 text-sm text-fg-muted">{t.noCases}</p> : (
+              <ul className="flex flex-col gap-3 px-4 py-4">
+                {cases.slice(0, 4).map((c) => (
+                  <li key={c.id}>
+                    <div className="flex items-center justify-between text-sm"><span className="truncate font-medium text-fg">{obligationLabel(c.obligation_code, locale)}</span><span className="tnum text-xs text-fg-subtle">{progressOf(c.stage)}%</span></div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-sunken"><div className="h-full rounded-full bg-teal" style={{ width: progressOf(c.stage) + "%" }} /></div>
+                  </li>
+                ))}
               </ul>
             )}
           </section>
         </div>
+      )}
+
+      {tab === "tax" && (
+        <ul className="flex flex-col gap-2">
+          {cases.length === 0 ? (
+            <li className="text-sm text-fg-muted">{t.noTax}</li>
+          ) : (
+            cases.map((c) => {
+              const seen = clientStatus(c, awaitingClient(byCase[c.id] ?? []));
+              return (
+                <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-fg">{obligationLabel(c.obligation_code, locale)}</span>
+                    <span className="tnum block font-mono text-xs text-fg-subtle">{c.period_token} · {c.due_on ?? "—"}</span>
+                  </span>
+                  <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-xs font-semibold text-fg-muted">{clientStatusLabel(seen, locale)}</span>
+                </li>
+              );
+            })
+          )}
+        </ul>
       )}
 
       {tab === "documents" && (
@@ -399,7 +381,7 @@ export function Client360({
         </ul>
       )}
 
-      {tab === "engagements" && (
+      {tab === "accounting" && (
         <ul className="flex flex-col gap-2">
           {engagements.length === 0 ? (
             <li className="text-sm text-fg-muted">{t.noEngagements}</li>
@@ -419,17 +401,18 @@ export function Client360({
         </ul>
       )}
 
-      {tab === "messages" && (
+      {tab === "tasks" && (
         <ul className="flex flex-col gap-2">
-          {messages.length === 0 ? (
-            <li className="text-sm text-fg-muted">{t.noMessages}</li>
+          {requests.length === 0 ? (
+            <li className="text-sm text-fg-muted">{t.noTasks}</li>
           ) : (
-            messages.map((m) => (
-              <li key={m.id} className="rounded-card border border-border bg-surface px-4 py-3">
-                <p className="whitespace-pre-wrap text-sm text-fg">{m.body}</p>
-                <p className="mt-1 text-xs text-fg-subtle">
-                  {m.sender} · {m.created_at.slice(0, 10)}
-                </p>
+            requests.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-3">
+                <span className="min-w-0 text-sm font-medium text-fg">{locale === "fr" ? r.label_fr : r.label_en}</span>
+                <span className="flex items-center gap-3 text-xs text-fg-muted">
+                  <span className="rounded-full bg-surface-sunken px-2 py-0.5 font-semibold">{r.status}</span>
+                  <span className="tnum font-mono">{r.due_on ?? "—"}</span>
+                </span>
               </li>
             ))
           )}
