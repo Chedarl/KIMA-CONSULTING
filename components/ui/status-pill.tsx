@@ -39,6 +39,7 @@ export type StatusTone =
   | "attention"
   | "estimated"
   | "neutral"
+  | "returned"
   | "refused";
 
 const TONES: Record<StatusTone, string> = {
@@ -47,6 +48,11 @@ const TONES: Record<StatusTone, string> = {
   attention: "border-amber-text/30 bg-amber-soft text-amber-text",
   estimated: "border-dashed border-amber-text/50 bg-transparent text-amber-text",
   neutral: "border-border bg-surface-sunken text-fg-muted",
+  // Renvoyé. Indigo, and NOT refused: the owner's UX principles make returned
+  // a separate outcome that always carries a motif -- the work came back to be
+  // corrected, it was not thrown out. Drawn with a solid ring rather than a
+  // soft fill so it cannot be mistaken for `awaiting`, which is indigo too.
+  returned: "border-teal-text bg-surface text-teal-text",
   refused: "border-danger-text/30 bg-danger-soft text-danger-text",
 };
 
