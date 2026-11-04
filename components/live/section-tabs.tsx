@@ -13,10 +13,8 @@ export type TabSection = { key: string; path: string; tabs: TabLink[] };
  * left the rail keep a visible way in. This is that way in: the active
  * section's sibling screens, as a strip under the header.
  *
- * These are links between routes, not ARIA tabs. The tab role requires a
- * tabpanel the control owns, and these navigate the page instead, so this is a
- * labelled nav with aria-current on the current screen. Announcing it as a
- * tablist would promise a widget that is not here.
+ * These are links between routes, not ARIA tabs: the tab role requires a
+ * tabpanel the control owns, so this is a labelled nav with aria-current.
  *
  * Sections with a single screen render nothing rather than a strip of one.
  */

@@ -148,7 +148,7 @@ const fr = {
       overview: "Vue d'ensemble",
       leads: "Prospects et accueil",
       clients: "Clients",
-      engagements: "Missions",
+      engagements: "Engagements",
       inbox: "Réception des pièces",
       filing: "Cadre de classement",
       queue: "File de travail",

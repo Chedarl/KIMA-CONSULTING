@@ -4,9 +4,8 @@ import type { IconName } from "@/components/shell";
  * The firm workspace information architecture, in one place.
  *
  * The rail had grown to 21 destinations across 7 headings against a specified
- * IA of 10. This is the nine the 4 Nov UI/UX audit asked for: every existing
- * screen kept, every screen still reachable, and no URL changed -- a section's
- * `tabs` are routes that already exist. The tab strip is what replaces a rail
+ * IA of 10. This is the nine the 4 Nov UI/UX audit asked for: every screen kept,
+ * still reachable, and no URL changed. The tab strip is what replaces a rail
  * entry, which is the only reason collapsing the rail is safe.
  *
  * `tabKey` indexes the firm nav dictionary, so FR/EN parity is already covered.
