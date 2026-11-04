@@ -8,6 +8,7 @@ import { todayInDouala } from "@/lib/dates";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { Pill, PrimaryButton, StatusStepper } from "@/components/client-portal/ui";
 import { ActionQueue } from "@/components/client-portal/action-queue";
+import { PortalAside } from "@/components/client-portal/portal-aside";
 import { SectionHeading } from "@/components/ui/section-heading";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
@@ -350,7 +351,7 @@ export function ClientDashboard({
       */}
       <section>
         <SectionHeading>{copy.requests}</SectionHeading>
-        <div className="mt-3">
+        <div className="mt-3 grid gap-6 lg:grid-cols-[1fr_17rem]">
           <ActionQueue
             locale={locale}
             taxpayerId={ids?.taxpayerId ?? null}
@@ -371,6 +372,21 @@ export function ClientDashboard({
               unpaid: copy.nav.payments,
               unread: copy.unread,
               toSend: copy.upload,
+            }}
+          />
+          <PortalAside
+            locale={locale}
+            taxpayerId={ids?.taxpayerId ?? null}
+            t={{
+              quickTitle: copy.nav.dashboard,
+              upload: copy.upload,
+              message: copy.nav.messages,
+              feesTitle: copy.paymentsTitle,
+              // The dictionary already draws the line this block depends on:
+              // "Les honoraires de Kima... Ce ne sont pas vos impôts."
+              feesScope: copy.noInvoicesHint,
+              feesUnavailable: copy.offline,
+              taxNote: copy.paymentsNote,
             }}
           />
         </div>
