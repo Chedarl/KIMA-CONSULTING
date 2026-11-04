@@ -19,5 +19,12 @@ export function BrandMark({ size = 28, className = "h-7 w-7 shrink-0" }: { size?
     })();
     return () => { alive = false; };
   }, []);
+  // A raw <img>, not next/image, and the rule is disabled rather than worked
+  // around: `src` is a short-lived signed URL for a private bucket object, so
+  // the optimizer would have to be given the Supabase host in
+  // `images.remotePatterns` and would then cache a URL that expires in 24h.
+  // The mark renders at 28px, so there is no LCP or bandwidth argument to
+  // answer. Same treatment, and the same reason, as marketing/wordmark.tsx.
+  // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt="" width={size} height={size} className={className} />;
 }
