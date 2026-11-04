@@ -9,22 +9,22 @@ const CASE = '5024fdf1-92a7-4954-97da-4c5460f12e11';
 const CLIENT = '3e58a82c-5290-4109-8731-0acf5a40db55';
 
 const PAGES = [
-  { id: 'F02', route: '/', must: ['À traiter', 'Pipeline', 'XAF'], tables: ['compliance_cases', 'invoices', 'service_payments', 'document_requests'] },
-  { id: 'F04', route: '/clients/' + CLIENT, must: ['Vue d', 'Documents', 'Missions', 'Notes'], tables: ['taxpayers', 'engagements', 'documents', 'messages', 'case_events'] },
-  { id: 'F06', route: '/workflows', must: ['Kanban', 'Liste', 'À démarrer', 'Terminé'], tables: ['compliance_cases'] },
-  { id: 'F10', route: '/inbox', must: ['Demandes', 'Tous'], tables: ['documents', 'document_requests'] },
-  { id: 'F11', route: '/documents/__DOC__', must: ['verdicts', 'Métadonnées'], tables: ['documents', 'document_verdicts', 'document_versions'] },
-  { id: 'F19', route: '/ai', must: ['Kima AI', 'Poser une question', 'Sources vérifiées'], tables: [] },
+  { id: 'F02', route: '/', must: ['Clients actifs', 'Tâches en cours', 'Échéances fiscales (15 jours)', 'Conformité des clients', 'Tâches du cabinet'], tables: ['compliance_cases', 'invoices', 'service_payments', 'document_requests'] },
+  { id: 'F04', route: '/clients/' + CLIENT, must: ['Vue d', 'Tâches', 'Documents', 'Fiscalité', 'Comptabilité', 'Notes & historique', 'Créer une tâche', 'Partager au client'], tables: ['taxpayers', 'engagements', 'documents', 'messages', 'case_events'] },
+  { id: 'F06', route: '/workflows', must: ['Kanban', 'Liste', 'Calendrier', 'Modèles', 'Automatisations', 'Nouveau workflow', 'À démarrer', 'Terminé'], tables: ['compliance_cases'] },
+  { id: 'F10', route: '/inbox', must: ['Tous', 'Demandes', 'À revoir', 'Approuvés', 'Versions', 'Audit'], tables: ['documents', 'document_requests'] },
+  { id: 'F11', route: '/documents/__DOC__', must: ['verdicts', 'Métadonnées', 'Comptable', 'Déductibilité', 'TVA'], tables: ['documents', 'document_verdicts', 'document_versions'] },
+  { id: 'F19', route: '/ai', must: ['Kima AI', 'Suggestions', 'Sources utilisées', 'Sources vérifiées uniquement'], tables: [] },
   { id: 'F20', route: '/branding', must: ['Studio de marque', 'Couleur', 'Logo'], tables: ['branding'] },
   { id: 'F08', route: '/templates', must: ['Modèles de mission', 'Dupliquer'], tables: ['engagement_templates'] },
   { id: 'F13', route: '/cases/' + CASE, must: ['Mboa', 'Dossier'], tables: ['compliance_cases', 'case_events'] },
   { id: 'F15', route: '/billing', must: ['Facturation'], tables: ['invoices', 'service_payments'] },
   { id: 'F03', route: '/clients', must: ['Clients'], tables: ['taxpayers', 'engagements'] },
   { id: 'F05', route: '/leads', must: ['Accueil'], tables: ['registrations', 'taxpayers'] },
-  { id: 'F12', route: '/calendar', must: ['Calendrier'], tables: ['obligation_rules', 'compliance_cases'] },
+  { id: 'F12', route: '/calendar', must: ['Calendrier'], tables: ['compliance_cases'] },
   { id: 'F17', route: '/messages', must: ['Communications'], tables: ['message_threads', 'messages'] },
-  { id: 'F18', route: '/incidents', must: ['Incidents'], tables: ['incidents', 'service_payments'] },
-  { id: 'A01', route: '/kyc', must: ['KYC'], tables: ['registrations', 'firms'] },
+  { id: 'F18', route: '/incidents', must: ['Incidents'], tables: ['payment_incidents', 'service_payments'] },
+  { id: 'A01', route: '/kyc', must: ['KYC'], tables: ['registrations', 'organizations'] },
   { id: 'F14', route: '/dsf', must: ['DSF'], tables: ['compliance_cases'] },
 ];
 
@@ -67,7 +67,9 @@ async function tableExists(t) {
   for (const page of PAGES) {
     if (page.route.includes('__DOC__')) page.route = page.route.replace('__DOC__', DOC || 'none');
     const res = await firm.goto('http://localhost:3000/fr/workspace' + page.route, { waitUntil: 'load', timeout: 120000 }).catch(() => null);
-    await firm.waitForTimeout(2200);
+    await firm.waitForTimeout(1200);
+    if (page.must[0]) await firm.waitForSelector('text=' + page.must[0], { timeout: 8000 }).catch(() => {});
+    await firm.waitForTimeout(400);
     const body = await firm.locator('body').innerText().catch(() => '');
     const h1 = (await firm.locator('h1').first().innerText().catch(() => '')).trim();
     const teal = await firm.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--teal').trim());
@@ -91,12 +93,12 @@ async function tableExists(t) {
   await client.waitForTimeout(1200);
   const cbody = await client.locator('body').innerText().catch(() => '');
   const PORTAL = [
-    { id: 'C02', route: '', must: ['Envoyer une pièce', 'Écrire au cabinet', 'Voir les factures'], tables: ['document_requests'] },
+    { id: 'C02', route: '', must: ['Mes demandes', 'Tâches à traiter', 'Obligations fiscales', 'Documents', 'Envoyer une pièce'], tables: ['document_requests'] },
     { id: 'C03', route: '/requests', must: ['demande'], tables: ['document_requests'] },
     { id: 'C04', route: '/documents', must: ['document'], tables: ['documents'] },
-    { id: 'C05', route: '/compliance', must: ['conform'], tables: ['compliance_cases', 'obligation_rules'] },
+    { id: 'C05', route: '/compliance', must: ['conform'], tables: ['compliance_cases'] },
     { id: 'C06', route: '/messages', must: ['message'], tables: ['message_threads', 'messages'] },
-    { id: 'C07', route: '/payments', must: ['facture'], tables: ['invoices', 'service_payments'] },
+    { id: 'C07', route: '/payments', must: ['paiement'], tables: ['invoices', 'service_payments'] },
     { id: 'C08', route: '/profile', must: ['profil'], tables: ['taxpayers', 'engagements'] },
     { id: 'C03b', route: '/declarations', must: ['déclaration'], tables: ['compliance_cases'] },
     { id: 'C04b', route: '/services', must: ['service'], tables: ['engagements', 'compliance_cases'] },

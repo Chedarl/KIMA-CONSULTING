@@ -1,34 +1,50 @@
-# Screen conformance — spec, design system and backend wiring
+# Screen conformance — spec, design system, backend wiring, and mockup ties
 
-Date: 4 November 2026. Method: `scripts/screen-conformance.cjs` signs in as the demo
-firm (and the demo taxpayer for the portal), visits each page, and asserts:
+Date: 4 November 2026. 26 pages audited, all passing.
 
-1. **Spec elements** — the signature strings of that page from the design spec.
+## Method
+
+`scripts/screen-conformance.cjs` signs in as the demo firm (and the demo taxpayer for the
+portal), visits each page and asserts:
+
+1. **Spec elements** — the signature strings of that page, now including the mockup's
+   KPI labels, tab sets, panel titles and actions.
 2. **Design system** — the KIMA theme variable resolves, exactly one main landmark,
    the shared shell and cards render.
-3. **Backend wiring** — each table the page must read exists in the production schema.
+3. **Backend wiring** — every table the page must read exists in production.
 
-Run: `SUPABASE_MGMT_TOKEN=... node scripts/screen-conformance.cjs`.
+The audit waits for the first expected string before reading the page, because a
+skeleton at read time is not a pass.
 
-## Result (all pass)
+## Mockup ties (the five core screens)
 
-| ID | Screen | Status | Spec elements | Tables verified |
-|---|---|---|---|---|
-| F02 | Firm command center | 200 | ok | compliance_cases, invoices, service_payments, document_requests |
-| F04 | Client 360° | 200 | ok | taxpayers, engagements, documents, messages, case_events |
-| F06 | Workflows board | 200 | ok | compliance_cases |
-| F10 | Documents inbox | 200 | ok | documents, document_requests |
-| F11 | Document review | 200 | ok | documents, document_verdicts, document_versions |
-| F19 | Kima AI | 200 | ok | (verified corpus, no table) |
-| F20 | Brand studio | 200 | ok | branding |
-| F08 | Templates | 200 | ok | engagement_templates |
-| F13 | Compliance case | 200 | ok | compliance_cases, case_events |
-| F15 | Billing | 200 | ok | invoices, service_payments |
-| C02 | Taxpayer home | 200 | ok | document_requests |
+| Screen | Mockup elements asserted |
+|---|---|
+| Firm command center (F02) | Clients actifs · Tâches en cours · Échéances fiscales (15 jours) · Conformité des clients · Tâches du cabinet |
+| Client 360 (F04) | Vue d'ensemble · Tâches · Documents · Fiscalité · Comptabilité · Notes & historique · Créer une tâche · Partager au client |
+| Workflows (F06) | Kanban · Liste · Calendrier · Modèles · Automatisations · Nouveau workflow · À démarrer · Terminé |
+| Documents (F10) | Tous · Demandes · À revoir · Approuvés · Versions · Audit |
+| Document review (F11) | verdicts · Métadonnées · Comptable · Déductibilité · TVA |
+| Kima AI (F19) | Kima AI · Suggestions · Sources utilisées · Sources vérifiées uniquement |
+| Taxpayer home (C02) | Mes demandes · Tâches à traiter · Obligations fiscales · Documents · Envoyer une pièce |
 
-## Notes
+## Full matrix (all passing)
 
-- The audit is case-insensitive because headings are CSS-uppercased.
-- F11 needs a real document row; the audit creates a temporary one and deletes it.
-- Pages not yet audited (F03, F05, F07, F09, F12, F14, F16, F17, F18, A01, A02, P01, P02,
-  C01, C03-C08) are extensions of the same check: add an entry to the PAGES array.
+Firm: F02, F03, F04, F05, F06, F08, F10, F11, F12, F13, F14, F15, F17, F18, F19, F20,
+A01 — all 200, spec elements present, tables wired.
+Portal: C02, C03, C04, C05, C06, C07, C08, plus the declarations and services pages —
+all 200.
+
+## Corrections made to the audit itself
+
+- The dashboard read too early (skeleton), fixed by waiting for the first expected string.
+- `obligation_rules` does not exist; the compliance surfaces read `compliance_cases`.
+- `incidents` is `payment_incidents`; `firms` is `organizations`.
+- C07 expects `paiement`, which is the word the page uses.
+
+## Known gaps (next)
+
+- The Documents inbox is a list, not yet the mockup's column table (Nom, Type, Statut,
+  Auteur, Période, Actions). The tabs and status chips are in place.
+- Pages outside the current set (F07 split from F13, F09 capacity, F16 time, A02 rules,
+  P01/P02, C01) still need their own conformance entries.
