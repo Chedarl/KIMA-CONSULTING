@@ -107,7 +107,7 @@ select is(
       and (has_function_privilege('anon', p.oid, 'EXECUTE')
            or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
   'admin_review_firm, can_write_client_note, client_taxpayer_ids, current_firm_member, firm_directory, '
-  'list_unassigned_registrations, manage_firm_staff, route_unassigned_registration, sign_up_firm, upsert_branding, upsert_engagement_template',
+  'list_unassigned_registrations, manage_firm_staff, route_unassigned_registration, sign_up_firm, upsert_branding, upsert_engagement_template, instantiate_engagement_template',
   'T-53 only the definer functions named here stay callable in public'
 );
 
