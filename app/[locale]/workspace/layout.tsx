@@ -10,6 +10,8 @@ import { CommandPalette } from "@/components/live/command-palette";
 import { ThemeRoot } from "@/components/theme-root";
 import { LiveRefresh } from "@/components/live/live-refresh";
 import { FreshOnFocus } from "@/components/live/fresh-on-focus";
+import { SectionTabs, type TabSection } from "@/components/live/section-tabs";
+import { WORKSPACE_SECTIONS } from "@/lib/workspace-nav";
 
 /**
  * Firm workspace chrome.
@@ -30,39 +32,25 @@ export default function FirmLayout({
   const w = getWorkspaceDictionary(locale);
   const base = `/${locale}/workspace`;
 
-  const nav: NavItem[] = [
-    { href: "#", label: locale === "fr" ? "Pilotage" : "Overview", icon: "grid", ready: true, section: true },
-    { href: base, label: w.firm.nav.overview, icon: "grid", ready: true },
-    { href: `${base}/ai`, label: w.firm.nav.ai, icon: "chat", ready: true },
-    { href: "#", label: locale === "fr" ? "Clients" : "Clients", icon: "grid", ready: true, section: true },
-    { href: `${base}/leads`, label: w.firm.nav.leads, icon: "user", ready: true },
-    { href: `${base}/routing`, label: w.firm.nav.routing, icon: "inbox", ready: true },
-    { href: `${base}/clients`, label: w.firm.nav.clients, icon: "people", ready: true },
-    { href: `${base}/engagements`, label: w.firm.nav.engagements, icon: "folder", ready: true },
-    { href: `${base}/templates`, label: w.firm.nav.templates, icon: "folder", ready: true },
-    { href: "#", label: locale === "fr" ? "Travail" : "Work", icon: "grid", ready: true, section: true },
-    { href: `${base}/workflows`, label: w.firm.nav.workflows, icon: "queue", ready: true },
-    { href: `${base}/reviews`, label: w.firm.nav.reviews, icon: "check", ready: true },
-    { href: "#", label: locale === "fr" ? "Conformité" : "Compliance", icon: "grid", ready: true, section: true },
-    { href: `${base}/calendar`, label: w.firm.nav.calendar, icon: "calendar", ready: true },
-    { href: `${base}/dsf`, label: w.firm.nav.dsf, icon: "file", ready: true },
-    { href: `${base}/cases`, label: w.firm.nav.cases, icon: "file", ready: true },
-    { href: `${base}/filing`, label: w.firm.nav.filing, icon: "archive", ready: true },
-    { href: `${base}/incidents`, label: w.firm.nav.incidents, icon: "shield", ready: true },
-    { href: `${base}/kyc`, label: w.firm.nav.kyc, icon: "shield", ready: true },
-    { href: "#", label: locale === "fr" ? "Documents" : "Documents", icon: "grid", ready: true, section: true },
-    { href: `${base}/inbox`, label: w.firm.nav.inbox, icon: "inbox", ready: true },
-    { href: `${base}/vault`, label: w.firm.nav.vault, icon: "archive", ready: true },
-    { href: `${base}/messages`, label: w.firm.nav.messages, icon: "chat", ready: true },
-    { href: "#", label: locale === "fr" ? "Finances" : "Finances", icon: "grid", ready: true, section: true },
-    { href: `${base}/billing`, label: w.firm.nav.billing, icon: "card", ready: true },
-    { href: `${base}/time`, label: locale === "fr" ? "Temps" : "Time", icon: "chart", ready: true },
-    { href: `${base}/reports`, label: w.firm.nav.reports, icon: "chart", ready: false },
-    { href: "#", label: locale === "fr" ? "Cabinet" : "Firm", icon: "grid", ready: true, section: true },
-    { href: `${base}/staff`, label: w.firm.nav.staff, icon: "people", ready: true },
-    { href: `${base}/branding`, label: w.firm.nav.branding, icon: "chart", ready: true },
-    { href: `${base}/settings`, label: w.firm.nav.admin, icon: "cog", ready: true },
-  ];
+  // Nine destinations, from lib/workspace-nav.ts. The screens that left the
+  // rail are reached through the tab strip below the header, so nothing became
+  // unreachable and no URL changed.
+  const nav: NavItem[] = WORKSPACE_SECTIONS.map((section) => ({
+    href: `${base}${section.path}`,
+    label: locale === "fr" ? section.fr : section.en,
+    icon: section.icon,
+    ready: true,
+  }));
+
+  const tabSections: TabSection[] = WORKSPACE_SECTIONS.map((section) => ({
+    key: section.key,
+    path: section.path,
+    tabs: section.tabs.map((tab) => ({
+      href: `${base}${tab.path}`,
+      label: (w.firm.nav as Record<string, string>)[tab.tabKey] ?? tab.tabKey,
+      ready: tab.ready !== false,
+    })),
+  }));
 
   return (
     <ThemeRoot>
@@ -77,6 +65,11 @@ export default function FirmLayout({
       <LiveRefresh />
       <div className="mb-4 flex flex-col gap-3">
         <FirmSessionBar locale={locale} t={w.firmLogin} />
+        <SectionTabs
+          base={base}
+          sections={tabSections}
+          label={locale === "fr" ? "Pages de cette rubrique" : "Pages in this section"}
+        />
         <KimaAssistant locale={locale} t={w.firm.kima} />
         <CommandPalette
           locale={locale}
