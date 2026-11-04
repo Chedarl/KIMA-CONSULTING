@@ -83,11 +83,11 @@ export function WorkflowsBoard({ locale, t }: { locale: "fr" | "en"; t: C }) {
       <div className="flex flex-wrap items-center gap-2">
         <div role="group" aria-label={t.title} className="flex flex-wrap rounded-lg border border-border p-0.5">
           {[["kanban", t.kanban], ["list", t.list], ["calendar", t.calendar], ["models", t.models], ["automations", t.automations]].map(([id, label]) => (
-            <button key={id} type="button" onClick={() => setView(id as typeof view)} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (view === id ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{label}</button>
+            <button key={id} type="button" onClick={() => setView(id as typeof view)} className={"inline-flex min-h-[44px] items-center rounded-md px-3 text-xs font-semibold " + (view === id ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{label}</button>
           ))}
         </div>
-        <Link href={`/${locale}/workspace/templates`} className="inline-flex min-h-[40px] items-center rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d]">+ {t.newWorkflow}</Link>
-        <select value={owner} onChange={(e) => setOwner(e.target.value)} className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+        <Link href={`/${locale}/workspace/templates`} className="inline-flex min-h-[44px] items-center rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d]">+ {t.newWorkflow}</Link>
+        <select value={owner} onChange={(e) => setOwner(e.target.value)} className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
           <option value="">{t.allOwners}</option>
           {owners.map((o) => (<option key={o} value={o}>{o}</option>))}
         </select>

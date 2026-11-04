@@ -438,7 +438,7 @@ export function InboxWorkspace({
         </select>
         <div role="group" aria-label={locale === "fr" ? "Filtres" : "Filters"} className="flex flex-wrap gap-1 rounded-lg border border-border p-0.5">
           {[["all", "Tous", "All"], ["requests", "Demandes", "Requests"], ["review", "À revoir", "To review"], ["approved", "Approuvés", "Approved"], ["versions", "Versions", "Versions"], ["audit", "Audit", "Audit"]].map(([id, fr, en]) => (
-            <button key={id} type="button" onClick={() => { setTab(id); setStatusFilter(id === "review" ? "pending" : id === "approved" ? "accepted" : ""); }} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (tab === id ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{locale === "fr" ? fr : en}</button>
+            <button key={id} type="button" onClick={() => { setTab(id); setStatusFilter(id === "review" ? "pending" : id === "approved" ? "accepted" : ""); }} className={"inline-flex min-h-[44px] items-center rounded-md px-3 text-xs font-semibold " + (tab === id ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{locale === "fr" ? fr : en}</button>
           ))}
         </div>
         <span className="ml-auto text-xs text-fg-subtle">{labels.latest}</span>
@@ -517,7 +517,7 @@ export function InboxWorkspace({
       ) : tab === "audit" ? (
         <div className="rounded-card border border-border bg-surface p-5">
           <p className="text-sm text-fg-muted">{locale === "fr" ? "La piste d'audit s'écrit à chaque revue : qui a décidé, quand, et pourquoi." : "The audit trail is written on every review: who decided, when, and why."}</p>
-          <a href={`/${locale}/workspace/ai`} className="mt-3 inline-flex min-h-[40px] items-center text-sm font-semibold text-teal-text hover:underline">{locale === "fr" ? "Demander à Kima" : "Ask Kima"}</a>
+          <a href={`/${locale}/workspace/ai`} className="mt-3 inline-flex min-h-[44px] items-center text-sm font-semibold text-teal-text hover:underline">{locale === "fr" ? "Demander à Kima" : "Ask Kima"}</a>
         </div>
       ) : shown.length === 0 ? (
         <p className="rounded-card border border-border bg-surface px-4 py-6 text-sm text-fg-muted">

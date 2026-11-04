@@ -82,7 +82,7 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
           <label className="mt-4 block text-sm font-semibold text-fg">{t.stages}</label>
           <div className="mt-2 flex flex-wrap gap-2">
             {STAGES.map((s) => (
-              <button key={s} type="button" onClick={() => toggle(s)} className={"inline-flex min-h-[36px] items-center rounded-full border px-3 text-xs font-medium " + (stages.includes(s) ? "border-teal/40 bg-surface-sunken text-fg" : "border-border text-fg-muted")}>{stageLabel(s, locale)}</button>
+              <button key={s} type="button" onClick={() => toggle(s)} className={"inline-flex min-h-[44px] items-center rounded-full border px-3 text-xs font-medium " + (stages.includes(s) ? "border-teal/40 bg-surface-sunken text-fg" : "border-border text-fg-muted")}>{stageLabel(s, locale)}</button>
             ))}
           </div>
           <label className="mt-4 block text-sm font-semibold text-fg">{t.scope}</label>
@@ -104,21 +104,21 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
             </div>
             <div className="flex items-center gap-2">
               {r.kind === "inbuilt" ? (
-                <button type="button" onClick={() => duplicate(r)} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.duplicate}</button>
+                <button type="button" onClick={() => duplicate(r)} className="min-h-[44px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.duplicate}</button>
               ) : (
                 <>
-                  <button type="button" onClick={() => { setApplyId(applyId === r.id ? null : r.id); setApplyStatus("idle"); }} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.apply}</button>
-                  <button type="button" onClick={() => startEdit(r)} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.edit}</button>
+                  <button type="button" onClick={() => { setApplyId(applyId === r.id ? null : r.id); setApplyStatus("idle"); }} className="min-h-[44px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.apply}</button>
+                  <button type="button" onClick={() => startEdit(r)} className="min-h-[44px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.edit}</button>
                 </>
               )}
             </div>
             {applyId === r.id ? (
               <div className="flex w-full flex-wrap items-center gap-2 pt-1">
-                <select value={applyClient} onChange={(e) => setApplyClient(e.target.value)} className="min-h-[40px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+                <select value={applyClient} onChange={(e) => setApplyClient(e.target.value)} className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
                   <option value="">{t.applyTo}</option>
                   {clients.map((c) => (<option key={c.id} value={c.id}>{c.legal_name}</option>))}
                 </select>
-                <button type="button" onClick={() => apply(r)} disabled={!applyClient} className="min-h-[40px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d] disabled:opacity-50">{t.apply}</button>
+                <button type="button" onClick={() => apply(r)} disabled={!applyClient} className="min-h-[44px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d] disabled:opacity-50">{t.apply}</button>
                 {applyStatus === "applied" && <span className="text-sm text-success-text">{t.applied}</span>}
                 {applyStatus === "failed" && <span className="text-sm text-danger-text">{t.applyFailed}</span>}
               </div>

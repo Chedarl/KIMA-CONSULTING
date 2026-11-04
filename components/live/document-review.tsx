@@ -79,7 +79,7 @@ export function DocumentReview({ docId, locale, t }: { docId: string; locale: "f
               <img src={url} alt={doc.file_name} className="max-h-[32rem] w-full rounded-lg object-contain" />
             )
             : <p className="text-sm text-fg-muted">{t.noPreview}</p>}
-          {url ? <a href={url} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-[40px] items-center text-sm font-semibold text-teal-text hover:underline">{t.download}</a> : null}
+          {url ? <a href={url} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-[44px] items-center text-sm font-semibold text-teal-text hover:underline">{t.download}</a> : null}
         </section>
 
         <div className="flex flex-col gap-4">
@@ -104,7 +104,7 @@ export function DocumentReview({ docId, locale, t }: { docId: string; locale: "f
                   <li key={k} className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-sm font-medium text-fg">{t[k] ?? k}</span>
                     <span className="flex items-center gap-2">
-                      <select defaultValue={v?.value ?? ""} onChange={(e) => void record(k, e.target.value)} disabled={busy} className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+                      <select defaultValue={v?.value ?? ""} onChange={(e) => void record(k, e.target.value)} disabled={busy} className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
                         <option value="" disabled>{t.notSet}</option>
                         {VALUES.map((x) => (<option key={x} value={x}>{t["val_" + x] ?? x}</option>))}
                       </select>

@@ -612,8 +612,8 @@ export function FirmDashboard({
           action={
             <div className="flex items-center gap-3">
               <div role="group" aria-label={t.pipelineTitle} className="flex rounded-lg border border-border p-0.5">
-                <button type="button" onClick={() => setView("kanban")} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (view === "kanban" ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{t.viewKanban}</button>
-                <button type="button" onClick={() => setView("list")} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (view === "list" ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{t.viewList}</button>
+                <button type="button" onClick={() => setView("kanban")} className={"inline-flex min-h-[44px] items-center rounded-md px-3 text-xs font-semibold " + (view === "kanban" ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{t.viewKanban}</button>
+                <button type="button" onClick={() => setView("list")} className={"inline-flex min-h-[44px] items-center rounded-md px-3 text-xs font-semibold " + (view === "list" ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{t.viewList}</button>
               </div>
               <Link href={queueHref} className="inline-flex min-h-[44px] items-center text-xs font-semibold text-teal-text underline-offset-2 hover:underline">{t.viewAll}</Link>
             </div>
@@ -622,12 +622,12 @@ export function FirmDashboard({
         <div className="p-4 sm:p-5">
           <p className="text-sm text-fg-muted">{t.pipelineHint}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <input value={clientQ} onChange={(e) => setClientQ(e.target.value)} placeholder={t.filterPlaceholder} className="min-h-[36px] rounded-lg border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-teal/40" />
-            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as CaseStage | "")} className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+            <input value={clientQ} onChange={(e) => setClientQ(e.target.value)} placeholder={t.filterPlaceholder} className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-teal/40" />
+            <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as CaseStage | "")} className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
               <option value="">{t.stageAll}</option>
               {PIPELINE_STAGES.map((s) => (<option key={s} value={s}>{stageLabel(s, locale)}</option>))}
             </select>
-            <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value as Risk | "")} className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+            <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value as Risk | "")} className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
               <option value="">{t.riskAll}</option>
               <option value="overdue">{t.overdue}</option>
               <option value="due_soon">{t.dueSoon}</option>
@@ -635,9 +635,9 @@ export function FirmDashboard({
               <option value="unknown">{t.riskUnknown}</option>
             </select>
             <span className="text-fg-subtle" aria-hidden>|</span>
-            <input value={viewName} onChange={(e) => setViewName(e.target.value)} placeholder={t.viewName} className="min-h-[36px] w-36 rounded-lg border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-teal/40" />
-            <button type="button" onClick={() => { const next = { ...savedViews, [viewName]: { clientQ, stage: stageFilter, risk: riskFilter } }; setSavedViews(next); localStorage.setItem("kima.pipeline.views", JSON.stringify(next)); setViewName(""); }} className="min-h-[36px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d]">{t.saveView}</button>
-            <select value="" onChange={(e) => { const v = savedViews[e.target.value]; if (v) { setClientQ(v.clientQ); setStageFilter(v.stage); setRiskFilter(v.risk); } }} className="min-h-[36px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+            <input value={viewName} onChange={(e) => setViewName(e.target.value)} placeholder={t.viewName} className="min-h-[44px] w-36 rounded-lg border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-teal/40" />
+            <button type="button" onClick={() => { const next = { ...savedViews, [viewName]: { clientQ, stage: stageFilter, risk: riskFilter } }; setSavedViews(next); localStorage.setItem("kima.pipeline.views", JSON.stringify(next)); setViewName(""); }} className="min-h-[44px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d]">{t.saveView}</button>
+            <select value="" onChange={(e) => { const v = savedViews[e.target.value]; if (v) { setClientQ(v.clientQ); setStageFilter(v.stage); setRiskFilter(v.risk); } }} className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
               <option value="">{t.savedViews}</option>
               {Object.keys(savedViews).map((k) => (<option key={k} value={k}>{k}</option>))}
             </select>

@@ -145,7 +145,7 @@ export function KimaAssistant({ locale, t }: { locale: GuideLocale; t: KimaLabel
                 type="button"
                 onClick={() => setTab(id)}
                 className={
-                  "min-h-[36px] rounded-t-lg px-3 text-sm font-semibold " +
+                  "min-h-[44px] rounded-t-lg px-3 text-sm font-semibold " +
                   (tab === id
                     ? "border border-b-0 border-border bg-surface text-teal-text"
                     : "text-fg-muted hover:text-fg")
@@ -245,7 +245,7 @@ export function KimaAssistant({ locale, t }: { locale: GuideLocale; t: KimaLabel
             {tab === "ask" ? (
               <div className="flex flex-col gap-3">
                 <input value={askQ} onChange={(e) => setAskQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submitAsk(); }} placeholder={t.askPlaceholder} aria-label={t.askPlaceholder} className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
-                <button type="button" onClick={() => void submitAsk()} disabled={asking} className="min-h-[40px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d] disabled:opacity-50">{asking ? t.asking : t.askSubmit}</button>
+                <button type="button" onClick={() => void submitAsk()} disabled={asking} className="min-h-[44px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d] disabled:opacity-50">{asking ? t.asking : t.askSubmit}</button>
                 {askResult ? (
                   <div className="rounded-lg border border-border p-3">
                     <p className="whitespace-pre-wrap text-sm text-fg">{askResult.text}</p>

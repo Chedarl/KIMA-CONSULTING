@@ -140,7 +140,7 @@ export function CommandPalette({
                     type="button"
                     onMouseEnter={() => setActive(i)}
                     onClick={() => go(n.href)}
-                    className={`flex min-h-[40px] w-full items-center rounded-lg px-3 text-left text-sm ${i === active ? "bg-surface-sunken text-fg" : "text-fg-muted"}`}
+                    className={`flex min-h-[44px] w-full items-center rounded-lg px-3 text-left text-sm ${i === active ? "bg-surface-sunken text-fg" : "text-fg-muted"}`}
                   >
                     {n.label}
                   </button>
@@ -160,7 +160,7 @@ export function CommandPalette({
                         type="button"
                         onMouseEnter={() => setActive(i)}
                         onClick={() => go(`/${locale}/workspace/cases/${c.id}`)}
-                        className={`flex min-h-[40px] w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm ${i === active ? "bg-surface-sunken text-fg" : "text-fg-muted"}`}
+                        className={`flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm ${i === active ? "bg-surface-sunken text-fg" : "text-fg-muted"}`}
                       >
                         <span className="truncate">{c.name}</span>
                         <span className="shrink-0 truncate text-xs text-fg-subtle">{c.label}</span>

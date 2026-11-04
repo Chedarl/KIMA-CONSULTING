@@ -226,7 +226,7 @@ export function ClientsWorkspace({
                   type="button"
                   disabled={sending === c.id}
                   onClick={() => void chase(c.id)}
-                  className="mt-3 inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg transition-colors hover:bg-surface-sunken disabled:opacity-60"
+                  className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg transition-colors hover:bg-surface-sunken disabled:opacity-60"
                 >
                   <svg
                     viewBox="0 0 16 16"
