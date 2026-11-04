@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { readFirmSession } from "@/lib/firm-auth";
 import { hexToRgb, luminance } from "@/lib/theme";
 
 type Copy = { [k: string]: string };
@@ -12,6 +13,7 @@ export function BrandStudio({ t }: { t: Copy }) {
   const [senderEmail, setSenderEmail] = useState("");
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [logoPath, setLogoPath] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -30,12 +32,21 @@ export function BrandStudio({ t }: { t: Copy }) {
   const contrast = rgb ? ((1 + 0.05) / (luminance(accent) + 0.05)) : null;
   const contrastOk = contrast !== null && contrast >= 4.5;
 
+  async function uploadLogo(file: File) {
+    const session = readFirmSession();
+    if (!session) return;
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    const path = `branding/${session.memberId}/logo.${ext}`;
+    const { error } = await supabase().storage.from("kima-demo").upload(path, file, { upsert: true, contentType: file.type });
+    if (!error) setLogoPath(path);
+  }
+
   async function save() {
     setStatus("saving");
     const { error } = await supabase().rpc("upsert_branding", {
       p_scope: "firm",
       p_subject_id: null,
-      p_logo_path: null,
+      p_logo_path: logoPath,
       p_accent: accent,
       p_portal_slug: slug || null,
       p_sender_name: senderName || null,
@@ -69,6 +80,13 @@ export function BrandStudio({ t }: { t: Copy }) {
           <a href="#" style={{ color: accent }} className="text-sm font-semibold">{t.previewLabel}</a>
           <span style={{ backgroundColor: accent }} className="h-2 w-2 rounded-full" aria-hidden />
         </div>
+      </section>
+
+      <section className="rounded-card border border-border bg-surface p-5">
+        <label className="text-sm font-semibold text-fg">{t.logoLabel}</label>
+        <p className="mt-1 text-xs text-fg-muted">{t.logoHint}</p>
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadLogo(f); }} className={`${input} mt-2`} />
+        {logoPath && <p className="mt-2 text-xs text-success-text">Logo pret — enregistrez pour appliquer.</p>}
       </section>
 
       <section className="rounded-card border border-border bg-surface p-5">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { BrandMark } from "@/components/brand-mark";
 
 /**
  * The workspace shell: a persistent left rail plus a content area, after the
@@ -106,7 +107,7 @@ export function Shell({
           {tone === "navy" && (
             <li className="flex items-center gap-2 px-3 pb-2 pt-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/mark-white.svg" alt="" width={28} height={28} className="h-7 w-7 shrink-0" />
+              <BrandMark size={28} className="h-7 w-7 shrink-0" />
               <div className="min-w-0">
                 <p className="font-display text-sm font-bold tracking-wide text-rail-fg">KIMA OS</p>
                 <p className="text-xs text-rail-muted">{title}</p>
