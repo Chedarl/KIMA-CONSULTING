@@ -276,31 +276,17 @@ export function ClientDashboard({
     ? clientStatus(featured, awaitingClient(byCase[featured.id] ?? []))
     : null;
 
+  const dueSoon = (cases ?? []).filter((c) => {
+    if (!c.due_on) return false;
+    const d = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 30);
+    return c.due_on >= new Date().toISOString().slice(0, 10) && c.due_on <= d.toISOString().slice(0, 10);
+  }).length;
+
   const tiles = [
-    {
-      href: `/${locale}/app/services`,
-      value: cases?.length ?? 0,
-      label: (cases?.length ?? 0) === 1 ? copy.activeOne : copy.activeMany,
-      valueClass: "text-fg",
-    },
-    {
-      href: `/${locale}/app/requests`,
-      value: owed.length,
-      label: copy.pending,
-      valueClass: "text-teal-text",
-    },
-    {
-      href: documentsHref,
-      value: sentCount,
-      label: copy.shared,
-      valueClass: "text-success-text",
-    },
-    {
-      href: `/${locale}/app/calendar`,
-      value: overdueCount,
-      label: copy.overdue,
-      valueClass: "text-danger-text",
-    },
+    { href: `/${locale}/app/requests`, value: owed.length, label: copy.requests, hint: copy.pending, icon: "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11", valueClass: "text-teal-text" },
+    { href: `/${locale}/app/services`, value: overdueCount, label: copy.tasks, hint: copy.overdue, icon: "M12 8v4l3 2M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20Z", valueClass: "text-danger-text" },
+    { href: `/${locale}/app/compliance`, value: dueSoon, label: copy.obligations, hint: copy.dueSoon, icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z", valueClass: "text-fg" },
+    { href: documentsHref, value: sentCount, label: copy.documents, hint: copy.shared, icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6", valueClass: "text-success-text" },
   ];
 
   if (noClient) {
@@ -372,10 +358,16 @@ export function ClientDashboard({
             <Link
               key={tile.label}
               href={tile.href}
-              className="rounded-card border border-border bg-white p-5 shadow-card transition-shadow hover:shadow-raised focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-navy"
+              className="flex items-start gap-3 rounded-card border border-border bg-white p-4 shadow-card transition-shadow hover:shadow-raised"
             >
-              <p className={`tnum font-display text-3xl font-semibold leading-none ${tile.valueClass}`}>{tile.value}</p>
-              <p className="mt-2 text-sm text-fg-muted">{tile.label}</p>
+              <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-teal-text">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={tile.icon} /></svg>
+              </span>
+              <span className="min-w-0">
+                <span className={`tnum block font-display text-2xl font-semibold leading-none ${tile.valueClass}`}>{tile.value}</span>
+                <span className="mt-1 block truncate text-sm text-fg-muted">{tile.label}</span>
+                <span className="mt-0.5 block truncate text-[11px] text-fg-subtle">{tile.hint}</span>
+              </span>
             </Link>
           ))}
         </div>
