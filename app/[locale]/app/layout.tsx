@@ -22,7 +22,7 @@ export default function ClientLayout({
 
   return (
     <ThemeRoot>
-    <PortalCopyProvider copy={copy}>
+    <PortalCopyProvider copy={copy} locale={locale}>
       <ClientPortalShell locale={locale}>{children}</ClientPortalShell>
     </PortalCopyProvider>
     </ThemeRoot>
