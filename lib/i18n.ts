@@ -149,8 +149,12 @@ const fr = {
     awaitingEvidenceHelp: "Transmis, mais sans accusé de réception au dossier.",
   },
   footer: {
+    // Same split as home.demoNotice, and for the same reason: the regulatory
+    // half must survive, the "prototype" half stopped being true when real
+    // firms started working here. #335 changed the banner on 21 pages and
+    // missed this one, which renders on every one of them.
     disclaimer:
-      "Prototype d'interface — aucune autorisation, aucun partenariat et aucune intégration de télédéclaration avec la DGI n'est établi ou revendiqué.",
+      "Aucune autorisation, aucun partenariat et aucune intégration de télédéclaration avec la DGI n'est établi ou revendiqué.",
   },
   work: {
     myDay: "À faire",
@@ -378,7 +382,7 @@ const en: Dictionary = {
   },
   footer: {
     disclaimer:
-      "Interface prototype — no DGI authorization, partnership or e-filing integration is established or claimed.",
+      "No tax-authority authorization, partnership or e-filing integration is established or claimed.",
   },
   work: {
     myDay: "To do",

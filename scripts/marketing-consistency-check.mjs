@@ -156,6 +156,26 @@ check("the workspace keeps the regulatory disclaimer it used to carry", () => {
   );
 });
 
+check("the workspace footer carries the disclaimer without the prototype claim", () => {
+  // #335 split home.demoNotice on 21 pages and missed footer.disclaimer, which
+  // renders on all 21 of them -- so production still read "Prototype
+  // d'interface" after that fix shipped. Asserted per locale, by its words, so
+  // the two strings cannot drift apart again.
+  const footers = [...workspace.matchAll(/disclaimer:\s*\n?\s*"([^"]*)"/g)].map((m) => m[1]);
+  eq(footers.length, 2, "expected one footer disclaimer per locale in lib/i18n.ts");
+  for (const line of footers) {
+    ok(
+      !/prototype/i.test(line),
+      `the workspace footer still calls the product a prototype: ${line}`,
+    );
+    ok(
+      /e-filing integration is established or claimed/.test(line) ||
+        /intégration de télédéclaration[\s\S]{0,40}n['’]est établi/.test(line),
+      `the workspace footer lost its authorization/partnership/e-filing disclaimer: ${line}`,
+    );
+  }
+});
+
 check("the workspace no longer calls itself a prototype over demo data", () => {
   // Real firms work in these screens now. A banner on every page telling them
   // the records are demonstration data is both false and corrosive to trust.
