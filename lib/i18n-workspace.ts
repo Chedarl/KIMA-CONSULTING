@@ -762,6 +762,8 @@ const fr = {
     codeIncomplete: "Saisissez le code reçu.",
     noMatch:
       "Ces informations ne correspondent à aucun dossier. Vérifiez l'orthographe du nom et le numéro, puis réessayez.",
+    noAccess:
+      "Ce compte est authentifié mais n'est rattaché à aucun dossier fiscal. Contactez votre cabinet pour faire créer l'accès.",
     error: "Connexion impossible pour le moment. Réessayez dans un instant.",
     notConfigured:
       "La connexion sécurisée n'est pas encore configurée sur cet environnement (clé service manquante).",
@@ -2110,6 +2112,8 @@ const en: WorkspaceDictionary = {
     codeIncomplete: "Enter the code you received.",
     noMatch:
       "These details do not match any file. Check the spelling of the name and the number, then try again.",
+    noAccess:
+      "This account is authenticated but is not attached to any tax file. Ask your firm to create the access.",
     error: "Cannot sign in at the moment. Try again shortly.",
     notConfigured:
       "Secure sign-in is not configured in this environment (service role key missing).",
