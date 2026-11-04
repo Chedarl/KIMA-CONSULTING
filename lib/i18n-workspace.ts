@@ -170,7 +170,9 @@ const fr = {
       branding: "Marque",
       templates: "Modèles",
       workflows: "Workflows",
+      invitations: "Invitations",
       ai: "Kima AI",
+      time: "Temps",
     },
   kyc: {
     title: "Portail KYC",
@@ -1516,7 +1518,9 @@ const en: WorkspaceDictionary = {
       branding: "Brand",
       templates: "Templates",
       workflows: "Workflows",
+      invitations: "Invitations",
       ai: "Kima AI",
+      time: "Time",
     },
   kyc: {
     title: "KYC portal",
