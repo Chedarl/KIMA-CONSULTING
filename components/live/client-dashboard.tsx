@@ -9,6 +9,7 @@ import { usePortalCopy } from "@/components/client-portal/copy";
 import { Pill, PrimaryButton, StatusStepper } from "@/components/client-portal/ui";
 import { ActionQueue } from "@/components/client-portal/action-queue";
 import { PortalAside } from "@/components/client-portal/portal-aside";
+import { MyObligations } from "@/components/client-portal/my-obligations";
 import { SectionHeading } from "@/components/ui/section-heading";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
@@ -387,6 +388,35 @@ export function ClientDashboard({
               feesScope: copy.noInvoicesHint,
               feesUnavailable: copy.offline,
               taxNote: copy.paymentsNote,
+            }}
+          />
+        </div>
+      </section>
+
+      {/*
+        Mes obligations — where the three portals actually differ.
+        Derived from obligationsFor(type, regime), so a business sees six and a
+        salaried individual sees essentially one, without a second screen being
+        written. No date: the verification status only.
+      */}
+      <section>
+        <SectionHeading>{copy.obligations}</SectionHeading>
+        <div className="mt-3">
+          <MyObligations
+            locale={locale}
+            taxpayerId={ids?.taxpayerId ?? null}
+            t={{
+              none: copy.statusCompleted,
+              noneHint: copy.overview,
+              loading: copy.loading,
+              offline: copy.offline,
+              verified: copy.verified,
+              unverified: copy.toVerify,
+              cadence: {
+                monthly: copy.monthly,
+                quarterly: copy.quarterly,
+                annual: copy.annual,
+              },
             }}
           />
         </div>
