@@ -10,6 +10,7 @@ import { Pill, PrimaryButton, StatusStepper } from "@/components/client-portal/u
 import { ActionQueue } from "@/components/client-portal/action-queue";
 import { PortalAside } from "@/components/client-portal/portal-aside";
 import { MyObligations } from "@/components/client-portal/my-obligations";
+import { MyFiles } from "@/components/client-portal/my-files";
 import { SectionHeading } from "@/components/ui/section-heading";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
@@ -391,6 +392,21 @@ export function ClientDashboard({
             }}
           />
         </div>
+      </section>
+
+      {/*
+        The files this person holds. Renders nothing for a single file, so a
+        taxpayer with one dossier never sees a switcher that cannot switch.
+      */}
+      <section>
+        <MyFiles
+          taxpayerId={ids?.taxpayerId ?? null}
+          t={{
+            loading: copy.loading,
+            offline: copy.offline,
+            current: copy.statusCompleted,
+          }}
+        />
       </section>
 
       {/*
