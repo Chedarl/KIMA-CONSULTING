@@ -9,10 +9,10 @@ import {
   LoadingRows,
   OfflineNote,
   PageHeading,
-  Pill,
   PrimaryButton,
   progressPercent,
 } from "@/components/client-portal/ui";
+import { StatusPill } from "@/components/ui/status-pill";
 import {
   awaitingClient,
   clientStatus,
@@ -135,22 +135,26 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
     return true;
   });
 
+  // The one place a service status becomes a tone. A tone says what the state
+  // IS -- attention, awaiting, confirmed -- not what colour to paint; the pill
+  // owns the colour. Keeping the mapping here is what stops a call site
+  // choosing green for something nobody has confirmed.
   function badges(status: CardModel["status"]) {
-    if (status === "not_started") return [{ label: copy.badgeNotStarted, tone: "muted" as const }];
+    if (status === "not_started") return [{ label: copy.badgeNotStarted, tone: "neutral" as const }];
     if (status === "waiting_on_you")
       return [
-        { label: copy.badgeAction, tone: "amber" as const },
-        { label: copy.badgeProgress, tone: "amber-outline" as const },
+        { label: copy.badgeAction, tone: "attention" as const },
+        { label: copy.badgeProgress, tone: "awaiting" as const },
       ];
-    if (status === "in_progress") return [{ label: copy.badgeActive, tone: "green-outline" as const }, { label: copy.badgeProgress, tone: "amber-outline" as const }];
-    if (status === "in_review") return [{ label: copy.badgeReview, tone: "amber-outline" as const }];
-    // Only `complete` earns the green "done" badge. A filing that nobody has
-    // confirmed, or a file closed without finishing, is never shown as done.
-    if (status === "complete") return [{ label: copy.badgeDone, tone: "green" as const }];
-    if (status === "closed") return [{ label: clientStatusLabel(status, locale), tone: "muted" as const }];
+    if (status === "in_progress") return [{ label: copy.badgeActive, tone: "awaiting" as const }, { label: copy.badgeProgress, tone: "awaiting" as const }];
+    if (status === "in_review") return [{ label: copy.badgeReview, tone: "awaiting" as const }];
+    // Only `complete` earns "confirmed". A filing that nobody has confirmed, or
+    // a file closed without finishing, is never shown as done.
+    if (status === "complete") return [{ label: copy.badgeDone, tone: "confirmed" as const }];
+    if (status === "closed") return [{ label: clientStatusLabel(status, locale), tone: "neutral" as const }];
     return [
-      { label: copy.badgeFiling, tone: "amber-outline" as const },
-      { label: clientStatusLabel(status, locale), tone: status === "filing_verified" ? ("green-outline" as const) : ("muted" as const) },
+      { label: copy.badgeFiling, tone: "awaiting" as const },
+      { label: clientStatusLabel(status, locale), tone: status === "filing_verified" ? ("confirmed" as const) : ("neutral" as const) },
     ];
   }
 
@@ -259,9 +263,9 @@ export function ServicesBoard({ locale }: { locale: "fr" | "en" }) {
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {badges(card.status).map((b) => (
-                    <Pill key={b.label} tone={b.tone}>
+                    <StatusPill key={b.label} tone={b.tone}>
                       {b.label}
-                    </Pill>
+                    </StatusPill>
                   ))}
                 </div>
                 <div className="mt-4 flex items-center gap-3">
