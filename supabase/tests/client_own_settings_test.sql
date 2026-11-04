@@ -44,7 +44,7 @@ select is(
   'T-373 a client can correct their own phone number'
 );
 
--- T-374  Passing null for email leaves it alone, rather than clearing it.
+-- T-374  A null parameter leaves that field alone rather than clearing it.
 select is(
   (select email from contacts where id = '00000000-0000-4000-e500-0000000000c1'),
   'awa.old@settings.test',
@@ -111,9 +111,9 @@ select is(
   'T-379b the other file keeps its own setting'
 );
 
--- T-380  A taxpayer the caller has no link to is not reachable: the update
---        matches no row and the function reports false rather than raising,
---        which would otherwise disclose whether such a link exists.
+-- T-380  A taxpayer the caller has no link to is not reachable. The function
+--        reports false rather than raising: raising would disclose whether
+--        such a link exists.
 select is(
   public.set_my_file_notifications('00000000-0000-4000-e500-0000000000bf'::uuid, true),
   false,

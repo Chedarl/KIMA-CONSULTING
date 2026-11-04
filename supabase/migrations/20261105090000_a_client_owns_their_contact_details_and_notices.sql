@@ -2,17 +2,16 @@
 -- send them notices.
 --
 -- WHAT WAS MISSING
--- public.contacts carries a read policy for the person themselves
--- (auth_user_id = auth.uid()) and, since 20261104140000, read/update/delete
--- for the firm that recorded them. The person had no write of any kind. A
--- client whose phone number changed could see the wrong number on their own
--- profile screen and had no way to fix it: the only route was to telephone
--- the firm using the number the firm could not reach them on.
+-- public.contacts gave the person themselves a read (auth_user_id =
+-- auth.uid()) and, since 20261104140000, read/update/delete to the firm that
+-- recorded them -- and the person no write of any kind. A client whose phone
+-- number changed had one route to fix it: telephone the firm on the number
+-- the firm could not reach them on.
 --
--- public.contact_account_links.notifications has existed since
--- 20261022065033 and is per-link by design -- the same person may want
--- notices for their company and not for their personal file. Only the firm
--- could set it. The column recorded a preference its owner could not express.
+-- contact_account_links.notifications (20261022065033) is per link by design
+-- -- the same person may want notices for their company and not for their
+-- personal file -- and only the firm could set it: a column recording a
+-- preference its owner could not express.
 --
 -- WHY FUNCTIONS AND NOT UPDATE POLICIES
 -- An update policy on contacts would let the caller write every column the
@@ -39,17 +38,13 @@
 -- firm sees that it happened and when. Nothing here hides a takeover.
 --
 -- WHAT IS DELIBERATELY ABSENT
--- No delete. A client cannot remove their own contact row: it is the firm's
--- record of a relationship, and the engagement is what ends a relationship.
--- No portal_access write -- who may sign in is the firm's decision.
--- No full_name write, for the reason above.
+-- No delete: the contact row is the firm's record of a relationship, and the
+-- engagement is what ends one. No portal_access write -- who may sign in is
+-- the firm's decision. No full_name write, for the reason above.
 
--- ---------------------------------------------------------------------------
--- 1. The caller's own contact row.
---
--- One auth user resolves to at most one contact: auth_user_id is written by
--- the verify-code endpoint onto exactly the contact that signed in. The
--- limit 1 is defensive, not expected.
+-- 1. The caller's own contact row. One auth user resolves to at most one
+-- contact: auth_user_id is written by the verify-code endpoint onto exactly
+-- the contact that signed in, so the limit 1 is defensive, not expected.
 -- ---------------------------------------------------------------------------
 create or replace function private.my_contact_id()
 returns uuid
