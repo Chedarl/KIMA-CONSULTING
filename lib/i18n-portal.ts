@@ -441,3 +441,46 @@ export type PortalCopy = typeof fr;
 export function getPortalDictionary(locale: "fr" | "en"): PortalCopy {
   return locale === "fr" ? fr : en;
 }
+
+/**
+ * The portal speaks to the taxpayer it belongs to.
+ *
+ * Taxpayer type is the first of the four axes and it drives the portal, but
+ * the shell was addressing everyone as a company: a salarié filing IRPP was
+ * told "Votre entreprise" and offered "Changer d'entreprise". The audience is
+ * already resolved at sign-in (PortalAudience in lib/portal-auth.ts); these are
+ * the words that follow from it.
+ *
+ * Only the nouns change. No screen appears or disappears here -- which
+ * obligations exist is the regime's business, not the type's, and inventing a
+ * different set of surfaces per audience would cross into product scope the
+ * owner has not approved.
+ */
+const individualVoice = {
+  fr: {
+    account: "Votre dossier fiscal",
+    onlyBusiness: "Un seul dossier fiscal est lié à cet accès.",
+    switchBusiness: "Changer de dossier fiscal",
+    business: "Votre identité",
+  },
+  en: {
+    account: "Your tax file",
+    onlyBusiness: "Only one tax file is linked to this access.",
+    switchBusiness: "Switch tax file",
+    business: "Your identity",
+  },
+} as const;
+
+/**
+ * Applies the audience's voice. An unknown audience keeps the dictionary as
+ * written: the business wording is the safer default for a taxpayer whose type
+ * has not been resolved, because it is the one the firm-facing record uses.
+ */
+export function withAudienceVoice(
+  copy: PortalCopy,
+  locale: "fr" | "en",
+  audience: "individual" | "business" | null,
+): PortalCopy {
+  if (audience !== "individual") return copy;
+  return { ...copy, ...individualVoice[locale] };
+}
