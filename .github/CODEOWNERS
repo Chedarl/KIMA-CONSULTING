@@ -1,0 +1,23 @@
+# Code ownership — mirrors AGENTS.md (two-agent model). PRs touching a path
+# should be reviewed by its owner before merge. @Chedarl is the sole owner today;
+# when an independent reviewer joins, add them as a second owner here and the
+# required-review branch protection becomes meaningful.
+
+# Agent A — security and data integrity
+supabase/                @Chedarl
+app/api/                 @Chedarl
+lib/auth-*.ts            @Chedarl
+lib/portal-auth.ts       @Chedarl
+lib/firm-auth.ts         @Chedarl
+lib/supabase*.ts         @Chedarl
+lib/permissions.ts       @Chedarl
+lib/db-write.ts          @Chedarl
+lib/events.ts            @Chedarl
+lib/cases.ts             @Chedarl
+scripts/engine-check.mjs @Chedarl
+.github/workflows/       @Chedarl
+
+# Agent B — taxpayer journey and UI
+components/              @Chedarl
+app/[locale]/            @Chedarl
+lib/i18n*.ts             @Chedarl
