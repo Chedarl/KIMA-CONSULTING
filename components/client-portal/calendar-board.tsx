@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePortalCopy } from "@/components/client-portal/copy";
-import { EmptyState, formatDay, LoadingRows, OfflineNote, PageHeading, Pill } from "@/components/client-portal/ui";
+import { EmptyState, formatDay, LoadingRows, OfflineNote, PageHeading } from "@/components/client-portal/ui";
+import { StatusPill } from "@/components/ui/status-pill";
 import { awaitingClient, clientStatus, obligationLabel, requestIsOutstanding, waitsOn, type CaseRequest, type ComplianceCase } from "@/lib/cases";
 import { todayInDouala } from "@/lib/dates";
 import { supabase } from "@/lib/supabase";
@@ -194,8 +195,16 @@ export function CalendarBoard({ locale }: { locale: "fr" | "en" }) {
                       <li key={item.id}>
                         <Link href={item.href} className="flex min-h-[44px] items-center justify-between gap-2 rounded-lg px-1 hover:bg-surface-sunken">
                           <span className="text-sm text-fg">{item.title}</span>
-                          {item.action && <Pill tone="amber">{copy.badgeAction}</Pill>}
-                          {item.provisional && !item.action && <Pill tone="amber-outline">{copy.provisional}</Pill>}
+                          {item.action && <StatusPill tone="attention">{copy.badgeAction}</StatusPill>}
+                          {/*
+                            A provisional date is an estimate, not a statutory
+                            date, so it reads as one: dashed, hollow marker.
+                            Prorogations are routine, and a date that may move
+                            must not look like a date that will not.
+                          */}
+                          {item.provisional && !item.action && (
+                            <StatusPill tone="estimated">{copy.provisional}</StatusPill>
+                          )}
                         </Link>
                       </li>
                     ))}
@@ -220,7 +229,7 @@ export function CalendarBoard({ locale }: { locale: "fr" | "en" }) {
                         <span className="tnum block text-sm font-semibold text-fg">{formatDay(item.date, locale)}</span>
                         <span className="block text-sm text-fg-muted">{item.title}</span>
                       </span>
-                      {item.action ? <Pill tone="amber">{copy.badgeAction}</Pill> : <span aria-hidden className="h-2 w-2 rounded-full bg-success" />}
+                      {item.action ? <StatusPill tone="attention">{copy.badgeAction}</StatusPill> : <span aria-hidden className="h-2 w-2 rounded-full bg-success" />}
                     </Link>
                   </li>
                 ))}

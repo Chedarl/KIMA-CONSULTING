@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePortalCopy } from "@/components/client-portal/copy";
-import { EmptyState, FilterBar, LoadingRows, OfflineNote, PageHeading, Pill, PrimaryButton } from "@/components/client-portal/ui";
+import { EmptyState, FilterBar, LoadingRows, OfflineNote, PageHeading, PrimaryButton } from "@/components/client-portal/ui";
+import { StatusPill } from "@/components/ui/status-pill";
 import { obligationLabel, requestIsOutstanding, waitsOn, type ComplianceCase } from "@/lib/cases";
 import { sessionTaxpayerId, supabase, type DocumentRequestRow } from "@/lib/supabase";
 import { submitRequestFile } from "@/lib/submit-request";
@@ -156,9 +157,16 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex items-center gap-2">
-                      <Pill tone={kind === "open" ? "amber" : kind === "completed" ? "green-outline" : "muted"}>
+                      {/*
+                        open      the client has to act          -> attention
+                        completed the firm has what it asked for -> confirmed
+                        waiting   correct, and with the firm     -> awaiting
+                      */}
+                      <StatusPill
+                        tone={kind === "open" ? "attention" : kind === "completed" ? "confirmed" : "awaiting"}
+                      >
                         {kind === "open" ? copy.statusOpen : kind === "completed" ? copy.statusCompleted : copy.statusWaiting}
-                      </Pill>
+                      </StatusPill>
                       {open && (
                         <span className="text-xs text-fg-muted">
                           {copy.dueWord} {formatDay(r.due_on, locale)}
