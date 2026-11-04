@@ -51,6 +51,7 @@ export default function FirmLayout({
     { href: `${base}/vault`, label: w.firm.nav.vault, icon: "archive", ready: true },
     { href: `${base}/billing`, label: w.firm.nav.billing, icon: "card", ready: true },
     { href: `${base}/time`, label: locale === "fr" ? "Temps" : "Time", icon: "chart", ready: true },
+    { href: `${base}/capacity`, label: locale === "fr" ? "Capacité" : "Capacity", icon: "people", ready: true },
     { href: `${base}/reports`, label: w.firm.nav.reports, icon: "chart", ready: false },
     { href: `${base}/settings`, label: w.firm.nav.admin, icon: "cog", ready: true },
     { href: `${base}/branding`, label: w.firm.nav.branding, icon: "chart", ready: true },
