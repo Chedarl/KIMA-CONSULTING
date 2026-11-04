@@ -64,6 +64,9 @@ select is(
 -- (20261102200000 .. 20261102230000); each is a trigger body or a service-role-only
 -- entry point, so none is reachable through PostgREST.
 -- contact_source_key and contact_inbox_ceiling arrived with the contact-inbox
+-- engagement_letter_is_immutable (20261105110000) is a trigger body: an
+-- issued letter is not edited, only superseded, and only once. It is reachable
+-- only by updating the table it guards.
 -- my_contact_id arrived with the client's own settings (20261105090000). It
 -- resolves contacts.auth_user_id = auth.uid() and is the only thing the two
 -- public settings entry points need, so it stays private.
@@ -84,7 +87,8 @@ select is(
   'current_member_id, current_member_label, current_member_org, '
   'decide_invitation_internal, delivered_evidence_lock, demo_taxpayer_id, '
   'document_version_number, document_version_path_guard, domain_event_capture, '
-  'engagement_authorized_at_is_permanent, engagements_grant_guard, enqueue_due_reminders, '
+  'engagement_authorized_at_is_permanent, engagement_letter_is_immutable, '
+  'engagements_grant_guard, enqueue_due_reminders, '
   'firm_member_has, firm_name_key, firm_previously_granted, flag_enabled, '
   'guard_client_invite_authorization, incident_timeline_guard, incident_verify_guard, is_kima_admin, '
   'mark_reminder_failed, mark_reminder_sent, member_has, member_has_in_org, '
