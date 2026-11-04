@@ -1,4 +1,5 @@
 "use client";
+import { BrandMark } from "@/components/brand-mark";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -252,7 +253,7 @@ export function ClientPortalShell({
     <div className="flex h-full flex-col bg-[#0D1B2A] text-white">
       <div className="flex items-center gap-2.5 px-4 pb-4 pt-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/mark-white.svg" alt="" width={36} height={36} className="h-9 w-9 shrink-0" />
+        <BrandMark size={36} className="h-9 w-9 shrink-0" />
         <p className="font-display text-base font-bold leading-none tracking-tight">KIMA OS</p>
       </div>
       <nav aria-label={copy.menu} className="flex-1 overflow-y-auto px-3 pb-6">
