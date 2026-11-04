@@ -7,6 +7,9 @@ import { submitRequestFile } from "@/lib/submit-request";
 import { todayInDouala } from "@/lib/dates";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { Pill, PrimaryButton, StatusStepper } from "@/components/client-portal/ui";
+import { ActionQueue } from "@/components/client-portal/action-queue";
+import { PortalAside } from "@/components/client-portal/portal-aside";
+import { SectionHeading } from "@/components/ui/section-heading";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
   awaitingClient,
@@ -338,6 +341,56 @@ export function ClientDashboard({
           {justSent} — {t.sent}
         </p>
       )}
+
+      {/*
+        À traiter — the queue, first and dominant.
+        The reference portals all answer one question here: what does my firm
+        need from me. Grouped by kind with a count per group, because a flat
+        list of every outstanding item reads as noise. It reads the four tables
+        a client actually owes against, not only their cases.
+      */}
+      <section>
+        <SectionHeading>{copy.requests}</SectionHeading>
+        <div className="mt-3 grid gap-6 lg:grid-cols-[1fr_17rem]">
+          <ActionQueue
+            locale={locale}
+            taxpayerId={ids?.taxpayerId ?? null}
+            t={{
+              empty: copy.statusCompleted,
+              emptyHint: copy.overview,
+              offline: copy.offline,
+              loading: copy.loading,
+              seeAll: copy.nav.dashboard,
+              groups: {
+                documents: copy.nav.documents,
+                tasks: copy.tasks,
+                messages: copy.nav.messages,
+                invoices: copy.nav.payments,
+              },
+              open: copy.tasks,
+              returned: copy.returned,
+              unpaid: copy.nav.payments,
+              unread: copy.unread,
+              toSend: copy.upload,
+            }}
+          />
+          <PortalAside
+            locale={locale}
+            taxpayerId={ids?.taxpayerId ?? null}
+            t={{
+              quickTitle: copy.nav.dashboard,
+              upload: copy.upload,
+              message: copy.nav.messages,
+              feesTitle: copy.paymentsTitle,
+              // The dictionary already draws the line this block depends on:
+              // "Les honoraires de Kima... Ce ne sont pas vos impôts."
+              feesScope: copy.noInvoicesHint,
+              feesUnavailable: copy.offline,
+              taxNote: copy.paymentsNote,
+            }}
+          />
+        </div>
+      </section>
 
       {/* Quick actions — the four questions, one tap away. */}
       <nav aria-label={copy.overview} className="grid gap-3 sm:grid-cols-3">
