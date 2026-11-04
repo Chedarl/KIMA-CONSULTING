@@ -14,6 +14,9 @@ export type ClaritySource = {
   citation: string;
   title: string;
   body: string;
+  /** English-localised rendering; falls back to `title`/`body` when absent. */
+  title_en?: string;
+  body_en?: string;
   /** Only a verified source may support an answer. */
   verified: boolean;
   /** Lower-cased terms that should match a question about this source. */
@@ -86,7 +89,7 @@ export function ask(
       kind: "refusal",
       text: locale === "fr"
         ? `La règle « ${best.source.title} » n'est pas encore vérifiée : elle ne peut pas fonder une réponse. Source à confirmer : ${best.source.citation}.`
-        : `The rule "${best.source.title}" is not verified yet, so it cannot support an answer. Source still to confirm: ${best.source.citation}.`,
+        : `The rule "${best.source.title_en ?? best.source.title}" is not verified yet, so it cannot support an answer. Source still to confirm: ${best.source.citation}.`,
       sourceId: best.source.id,
       reason: "unverified",
     };
@@ -94,7 +97,7 @@ export function ask(
 
   return {
     kind: "answer",
-    text: best.source.body + "\n\n" + (locale === "fr" ? "Source : " : "Source: ") + best.source.citation,
+    text: (locale === "en" ? (best.source.body_en ?? best.source.body) : best.source.body) + "\n\n" + (locale === "fr" ? "Source : " : "Source: ") + best.source.citation,
     sourceId: best.source.id,
     reason: "matched",
   };
