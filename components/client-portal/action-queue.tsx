@@ -19,8 +19,7 @@ import { StatusPill } from "@/components/ui/status-pill";
  * an unread message and an unpaid invoice were all invisible on the screen
  * meant to tell them what to do. This reads those too.
  *
- * Loading, empty and offline stay three different facts.
- */
+ * Loading, empty and offline stay three different facts. */
 type Group = "documents" | "tasks" | "messages" | "invoices";
 
 type Item = {
