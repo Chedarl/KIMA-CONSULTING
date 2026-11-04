@@ -93,7 +93,7 @@ export function KycPortal({ t }: { t: Labels }) {
               </span>
               {f.verification_status !== "verified" ? (
                 <span className="flex items-center gap-2">
-                  <button type="button" onClick={() => void verify(f.id)} className="inline-flex min-h-[36px] items-center rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg hover:bg-surface-sunken">
+                  <button type="button" onClick={() => void verify(f.id)} className="inline-flex min-h-[44px] items-center rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg hover:bg-surface-sunken">
                     {t.verify}
                   </button>
                   {note[f.id] === "done" ? <span className="text-xs text-success-text">{t.verifyDone}</span> : null}

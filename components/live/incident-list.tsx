@@ -332,7 +332,7 @@ export function IncidentList({ t }: { t: Labels }) {
                     {r.payment_state === "verified" ? (
                       <span className="text-success-text">{t.paymentVerified}</span>
                     ) : (
-                      <button type="button" onClick={() => void verifyPayment(r.id)} className="inline-flex min-h-[36px] items-center rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg hover:bg-surface-sunken">
+                      <button type="button" onClick={() => void verifyPayment(r.id)} className="inline-flex min-h-[44px] items-center rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg hover:bg-surface-sunken">
                         {t.verify}
                       </button>
                     )}

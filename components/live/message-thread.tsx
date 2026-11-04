@@ -546,7 +546,7 @@ export function MessageThread({
             <select
               value={about}
               onChange={(e) => setAbout(e.target.value)}
-              className="min-h-[40px] rounded-lg border border-border bg-surface px-2 text-sm text-fg"
+              className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-sm text-fg"
             >
               <option value="">{labels.noRequest}</option>
               {visibleRequests.map((r) => (

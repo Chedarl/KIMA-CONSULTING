@@ -268,7 +268,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
                     type="button"
                     disabled={busy === d.id}
                     onClick={() => void decide(d, "accepted")}
-                    className="inline-flex min-h-[36px] items-center rounded-lg bg-teal-text px-2.5 text-xs font-semibold text-surface disabled:opacity-60"
+                    className="inline-flex min-h-[44px] items-center rounded-lg bg-teal-text px-2.5 text-xs font-semibold text-surface disabled:opacity-60"
                   >
                     {labels.accept}
                   </button>
@@ -276,7 +276,7 @@ export function IntakePanel({ locale, labels }: { locale: "fr" | "en"; labels: I
                     type="button"
                     disabled={busy === d.id}
                     onClick={() => void decide(d, "returned")}
-                    className="inline-flex min-h-[36px] items-center rounded-lg border border-border-strong px-2.5 text-xs font-semibold text-fg-muted disabled:opacity-60"
+                    className="inline-flex min-h-[44px] items-center rounded-lg border border-border-strong px-2.5 text-xs font-semibold text-fg-muted disabled:opacity-60"
                   >
                     {labels.returnIt}
                   </button>

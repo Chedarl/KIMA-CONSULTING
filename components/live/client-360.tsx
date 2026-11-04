@@ -278,8 +278,8 @@ export function Client360({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href={`/${locale}/workspace/tasks`} className="inline-flex min-h-[40px] items-center rounded-lg border border-border-strong px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.createTask}</Link>
-          <Link href={`/${locale}/workspace/messages`} className="inline-flex min-h-[40px] items-center rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d]">{t.shareClient}</Link>
+          <Link href={`/${locale}/workspace/tasks`} className="inline-flex min-h-[44px] items-center rounded-lg border border-border-strong px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.createTask}</Link>
+          <Link href={`/${locale}/workspace/messages`} className="inline-flex min-h-[44px] items-center rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d]">{t.shareClient}</Link>
         </div>
       </div>
 

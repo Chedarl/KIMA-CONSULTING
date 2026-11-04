@@ -80,7 +80,7 @@ export function CopilotWorkspace({ locale, t }: { locale: "fr" | "en"; t: C }) {
             <h2 className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">{t.suggestionsTitle}</h2>
             <div className="mt-3 flex flex-col gap-2">
               {suggestions.map((s) => (
-                <button key={s} type="button" onClick={() => void ask(s)} className="min-h-[40px] rounded-lg border border-border bg-surface px-3 text-left text-sm text-fg hover:border-teal/40 hover:bg-surface-sunken">{s}</button>
+                <button key={s} type="button" onClick={() => void ask(s)} className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-left text-sm text-fg hover:border-teal/40 hover:bg-surface-sunken">{s}</button>
               ))}
             </div>
           </section>
