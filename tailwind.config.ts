@@ -73,7 +73,10 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  // shadcn-convention components use animate-in / fade-in utilities. The plugin
+  // supplies those keyframes; it adds no colour, so the token map above stays
+  // the single source of palette truth.
+  plugins: [require("tailwindcss-animate")],
 };
 
 export default config;
