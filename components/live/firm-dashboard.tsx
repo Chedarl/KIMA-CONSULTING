@@ -66,6 +66,27 @@ const PIPELINE_STAGES: CaseStage[] = [
   "delivered",
 ];
 
+function Donut({ segments, center }: { segments: { value: number; color: string }[]; center: string }) {
+  const total = Math.max(1, segments.reduce((s, x) => s + x.value, 0));
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  let offset = 0;
+  return (
+    <svg viewBox="0 0 72 72" className="h-28 w-28" role="img" aria-label={center}>
+      <circle cx="36" cy="36" r={r} fill="none" stroke="rgb(var(--border-strong))" strokeWidth="9" />
+      {segments.map((s, i) => {
+        const len = (s.value / total) * c;
+        const el = (
+          <circle key={i} cx="36" cy="36" r={r} fill="none" stroke={s.color} strokeWidth="9" strokeDasharray={len + " " + (c - len)} strokeDashoffset={-offset} transform="rotate(-90 36 36)" strokeLinecap="butt" />
+        );
+        offset += len;
+        return el;
+      })}
+      <text x="36" y="40" textAnchor="middle" className="fill-fg" style={{ fontSize: 13, fontWeight: 700 }}>{center}</text>
+    </svg>
+  );
+}
+
 function groupByCase<T extends { case_id: string | null }>(rows: T[]): Record<string, T[]> {
   const out: Record<string, T[]> = {};
   for (const r of rows) {
@@ -125,7 +146,27 @@ function Tile({
       </Link>
     );
   }
+
+
+
   return <div className="rounded-card border border-border bg-surface p-4">{inner}</div>;
+
+
+}
+
+function Kpi({ icon, label, value, delta, href }: { icon: string; label: string; value: number | string; delta?: string; href: string }) {
+  return (
+    <Link href={href} className="flex items-center gap-3 rounded-card border border-border bg-surface p-4 transition hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-raised">
+      <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-teal-text">
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={icon} /></svg>
+      </span>
+      <span className="min-w-0">
+        <span className="block tnum font-display text-2xl font-semibold leading-none text-fg">{value}</span>
+        <span className="mt-1 block truncate text-xs text-fg-muted">{label}</span>
+        {delta ? <span className="mt-0.5 block text-[11px] text-success-text">{delta}</span> : null}
+      </span>
+    </Link>
+  );
 }
 
 export function FirmDashboard({
@@ -377,6 +418,37 @@ export function FirmDashboard({
     ];
   }, [rows, requests, tasks, pendingDocs, names, today, locale, t]);
 
+  const kpi = useMemo(() => {
+    const open = rows ?? [];
+    const inDays = (n: number) => { const d = new Date(today + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+    const all = Object.values(tasks).flat() as { done?: boolean }[];
+    const openTasks = all.filter((x) => !x.done).length;
+    const due30 = open.filter((c) => c.due_on && c.due_on >= today && c.due_on <= inDays(30)).length;
+    return { clients: metrics.active, tasks: openTasks, due30, revenue: money?.collected ?? 0 };
+  }, [rows, tasks, metrics, money, today]);
+
+  const compliance = useMemo(() => {
+    const open = rows ?? [];
+    const overdue = open.filter((c) => risk(c, today) === "overdue").length;
+    const soon = open.filter((c) => risk(c, today) === "due_soon").length;
+    const ok = Math.max(0, open.length - overdue - soon);
+    const pct = open.length ? Math.round((ok / open.length) * 100) : 100;
+    return { ok, soon, overdue, pct };
+  }, [rows, today]);
+
+  const due15 = useMemo(() => {
+    const open = rows ?? [];
+    const d = new Date(today + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + 15);
+    const limit = d.toISOString().slice(0, 10);
+    return open.filter((c) => c.due_on && c.due_on >= today && c.due_on <= limit).sort((a, b) => (a.due_on ?? "").localeCompare(b.due_on ?? "")).slice(0, 4);
+  }, [rows, today]);
+
+  const firmTasks = useMemo(() => {
+    const all: { caseId: string; label: string; done?: boolean }[] = [];
+    for (const [caseId, list] of Object.entries(tasks)) for (const x of list as { label_fr?: string; label_en?: string; label?: string; done?: boolean }[]) all.push({ caseId, label: (locale === "fr" ? x.label_fr : x.label_en) ?? x.label ?? "—", done: x.done });
+    return all.slice(0, 5);
+  }, [tasks, locale]);
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -411,50 +483,53 @@ export function FirmDashboard({
           ))}
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Tile
-            label={t.activeCases}
-            value={metrics.active}
-            tone="neutral"
-            trend={metrics.openedThisWeek > 0 ? `+${metrics.openedThisWeek}` : undefined}
-            href={`/${locale}/workspace/cases`}
-          />
-          <Tile label={t.waitingOnClients} value={metrics.waiting} tone="amber" href={`/${locale}/workspace/queue`} />
-          <Tile label={t.pendingReview} value={metrics.review} tone="neutral" href={`/${locale}/workspace/reviews`} />
-          <Tile
-            label={t.blocked}
-            value={metrics.blocked}
-            hint={t.blockedHint}
-            tone={metrics.blocked > 0 ? "danger" : "success"}
-            href={`/${locale}/workspace/queue`}
-          />
-          <Tile
-            label={t.moneyAwaiting}
-            value={money?.awaiting ?? 0}
-            tone={money && money.awaiting > 0 ? "amber" : "neutral"}
-            href={`/${locale}/workspace/billing`}
-          />
-          <Tile label={t.docsReceived} value={pendingDocs.length} tone="neutral" href={`/${locale}/workspace/inbox`} />
+        <>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Kpi icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" label={t.kpiClients} value={kpi.clients} href={`/${locale}/workspace/clients`} />
+          <Kpi icon="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" label={t.kpiTasks} value={kpi.tasks} href={`/${locale}/workspace/tasks`} />
+          <Kpi icon="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" label={t.kpiDue30} value={kpi.due30} href={`/${locale}/workspace/calendar`} />
+          <Kpi icon="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" label={t.kpiRevenue} value={formatXaf(kpi.revenue, locale)} href={`/${locale}/workspace/billing`} />
         </div>
-      )}
 
-      {/* Attention rail — every row opens the work drawer. */}
-      <section className="rounded-card border border-border bg-surface p-3">
-        <h2 className="px-2 text-xs font-semibold uppercase tracking-wide text-fg-subtle">{t.attentionTitle}</h2>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {buckets.map((b) => (
-            <button
-              key={b.key}
-              type="button"
-              onClick={() => setDrawer({ title: b.title, items: b.items })}
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border bg-surface-sunken px-3 text-sm font-medium text-fg hover:border-teal/40 hover:bg-surface"
-            >
-              <span className="tnum font-mono text-xs text-fg-muted">{b.items.length}</span>
-              {b.title}
-            </button>
-          ))}
+        <div className="grid gap-5 lg:grid-cols-3">
+          <Card>
+            <CardHeader title={t.deadlines15} action={<Link href={`/${locale}/workspace/calendar`} className="text-xs font-semibold text-teal-text">{t.viewAll}</Link>} />
+            <ul className="flex flex-col gap-2 p-4 sm:p-5">
+              {due15.length === 0 ? <li className="text-sm text-fg-muted">{t.noDeadlines15}</li> : due15.map((c) => (
+                <li key={c.id}>
+                  <Link href={`/${locale}/workspace/cases/${c.id}`} className="flex items-center justify-between gap-3 text-sm hover:underline">
+                    <span className="min-w-0"><span className="block truncate font-medium text-fg">{nameOf(c)}</span><span className="block truncate text-xs text-fg-muted">{obligationLabel(c.obligation_code, locale)}</span></span>
+                    <span className="shrink-0 text-right"><span className="tnum block font-mono text-xs text-fg">{c.due_on}</span><span className={`text-[11px] ${risk(c, today) === "overdue" ? "text-danger-text" : "text-amber-text"}`}>{risk(c, today) === "overdue" ? t.overdue : t.dueSoon}</span></span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+          <Card>
+            <CardHeader title={t.firmTasks} action={<Link href={`/${locale}/workspace/tasks`} className="text-xs font-semibold text-teal-text">{t.viewAll}</Link>} />
+            <ul className="flex flex-col gap-2 p-4 sm:p-5">
+              {firmTasks.length === 0 ? <li className="text-sm text-fg-muted">{t.noFirmTasks}</li> : firmTasks.map((x, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm">
+                  <span aria-hidden className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border ${x.done ? "border-teal-text bg-teal-text text-surface" : "border-border-strong"}`}>{x.done ? "✓" : ""}</span>
+                  <span className={`min-w-0 ${x.done ? "text-fg-subtle line-through" : "text-fg"}`}>{x.label}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+          <Card>
+            <CardHeader title={t.compliancePct} />
+            <div className="flex items-center gap-4 p-4 sm:p-5">
+              <Donut center={compliance.pct + "%"} segments={[{ value: compliance.ok, color: "rgb(var(--success))" }, { value: compliance.soon, color: "rgb(var(--amber))" }, { value: compliance.overdue, color: "rgb(var(--danger))" }]} />
+              <ul className="flex flex-col gap-1 text-xs text-fg-muted">
+                <li><span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ background: "rgb(var(--success))" }} />{t.compliant} · {compliance.ok}</li>
+                <li><span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ background: "rgb(var(--amber))" }} />{t.atRisk} · {compliance.soon}</li>
+                <li><span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ background: "rgb(var(--danger))" }} />{t.overdue} · {compliance.overdue}</li>
+              </ul>
+            </div>
+          </Card>
         </div>
-      </section>
+        </>
+      )}
 
       {/* F2 + F3: the money, and what is ageing in review. */}
       <div className="grid gap-5 lg:grid-cols-2">

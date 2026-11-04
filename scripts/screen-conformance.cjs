@@ -19,6 +19,13 @@ const PAGES = [
   { id: 'F08', route: '/templates', must: ['Modèles de mission', 'Dupliquer'], tables: ['engagement_templates'] },
   { id: 'F13', route: '/cases/' + CASE, must: ['Mboa', 'Dossier'], tables: ['compliance_cases', 'case_events'] },
   { id: 'F15', route: '/billing', must: ['Facturation'], tables: ['invoices', 'service_payments'] },
+  { id: 'F03', route: '/clients', must: ['Clients'], tables: ['taxpayers', 'engagements'] },
+  { id: 'F05', route: '/leads', must: ['Accueil'], tables: ['registrations', 'taxpayers'] },
+  { id: 'F12', route: '/calendar', must: ['Calendrier'], tables: ['obligation_rules', 'compliance_cases'] },
+  { id: 'F17', route: '/messages', must: ['Communications'], tables: ['message_threads', 'messages'] },
+  { id: 'F18', route: '/incidents', must: ['Incidents'], tables: ['incidents', 'service_payments'] },
+  { id: 'A01', route: '/kyc', must: ['KYC'], tables: ['registrations', 'firms'] },
+  { id: 'F14', route: '/dsf', must: ['DSF'], tables: ['compliance_cases'] },
 ];
 
 async function sql(q) {
@@ -83,7 +90,27 @@ async function tableExists(t) {
   const cres = await client.goto('http://localhost:3000/fr/app', { waitUntil: 'load', timeout: 120000 }).catch(() => null);
   await client.waitForTimeout(1200);
   const cbody = await client.locator('body').innerText().catch(() => '');
-  out.push({ id: 'C02', route: '/app', status: cres ? cres.status() : 'ERR', h1: (await client.locator('h1').first().innerText().catch(() => '')).trim().slice(0, 30), theme: true, mains: await client.locator('main#main').count(), missing: ['Envoyer une pièce', 'Écrire au cabinet', 'Voir les factures'].filter((m) => !cbody.toLowerCase().includes(m.toLowerCase())), tables: { document_requests: await tableExists('document_requests') } });
+  const PORTAL = [
+    { id: 'C02', route: '', must: ['Envoyer une pièce', 'Écrire au cabinet', 'Voir les factures'], tables: ['document_requests'] },
+    { id: 'C03', route: '/requests', must: ['demande'], tables: ['document_requests'] },
+    { id: 'C04', route: '/documents', must: ['document'], tables: ['documents'] },
+    { id: 'C05', route: '/compliance', must: ['conform'], tables: ['compliance_cases', 'obligation_rules'] },
+    { id: 'C06', route: '/messages', must: ['message'], tables: ['message_threads', 'messages'] },
+    { id: 'C07', route: '/payments', must: ['facture'], tables: ['invoices', 'service_payments'] },
+    { id: 'C08', route: '/profile', must: ['profil'], tables: ['taxpayers', 'engagements'] },
+    { id: 'C03b', route: '/declarations', must: ['déclaration'], tables: ['compliance_cases'] },
+    { id: 'C04b', route: '/services', must: ['service'], tables: ['engagements', 'compliance_cases'] },
+  ];
+  for (const pp of PORTAL) {
+    const r2 = await client.goto('http://localhost:3000/fr/app' + pp.route, { waitUntil: 'load', timeout: 120000 }).catch(() => null);
+    await client.waitForTimeout(1800);
+    const b2 = await client.locator('body').innerText().catch(() => '');
+    const low = b2.toLowerCase();
+    const missing = pp.must.filter((m) => !low.includes(m.toLowerCase()));
+    const tbl = {};
+    for (const t of pp.tables) tbl[t] = await tableExists(t);
+    out.push({ id: pp.id, route: '/app' + pp.route, status: r2 ? r2.status() : 'ERR', h1: (await client.locator('h1').first().innerText().catch(() => '')).trim().slice(0, 30), theme: true, mains: await client.locator('main#main').count(), missing, tables: tbl });
+  }
 
   console.log('CONF=' + JSON.stringify(out));
   await b.close();
