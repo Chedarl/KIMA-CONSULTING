@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { obligationLabel } from "@/lib/cases";
 import { resolvePortalContext, savePortalFirmChoice, supabase } from "@/lib/supabase";
+import { clearSession } from "@/lib/portal-auth";
 
 type IconName =
   | "home"
@@ -339,6 +340,26 @@ export function ClientPortalShell({
                 {biz.length <= 1 && biz.length > 0 && (
                   <li className="px-3 py-2 text-xs text-fg-muted">{copy.onlyBusiness}</li>
                 )}
+                {/*
+                  Sign out. The portal had no way to leave: clearSession lived
+                  in portal-login and in the firm's session bar, and nowhere a
+                  signed-in client could reach. It drops the stored session and
+                  the Supabase one, then returns to the login route.
+                */}
+                <li className="mt-1 border-t border-border pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void (async () => {
+                        await clearSession();
+                        router.replace(`/${locale}/login`);
+                      })();
+                    }}
+                    className="flex min-h-[44px] w-full items-center rounded-lg px-3 text-left text-sm font-semibold text-fg-muted transition hover:bg-surface-sunken hover:text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-teal-text"
+                  >
+                    {copy.signOut}
+                  </button>
+                </li>
               </ul>
             )}
           </div>
