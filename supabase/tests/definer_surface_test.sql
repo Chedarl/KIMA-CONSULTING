@@ -63,12 +63,20 @@ select is(
 -- The reminder, incident and document-version helpers arrived on 2 Nov 2026
 -- (20261102200000 .. 20261102230000); each is a trigger body or a service-role-only
 -- entry point, so none is reachable through PostgREST.
+-- contact_source_key and contact_inbox_ceiling arrived with the contact-inbox
+-- ceiling (20261103140000). The first is EXECUTE-granted to anon and
+-- authenticated on purpose -- it is the DEFAULT on contact_inquiries.source_key,
+-- so the inserting role has to be able to call it -- and it returns only a
+-- keyed digest of the caller's own forwarded address, which tells the caller
+-- nothing it did not already know. The second is a trigger body, reachable
+-- only by inserting into the table it guards.
 select is(
   (select string_agg(distinct p.proname, ', ' order by p.proname)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'private'),
   'auth_identity_is_single, can_see_taxpayer, case_client_approval_guard, '
   'case_stage_guard, case_task_assignee_guard, claim_reminders, client_taxpayer_ids, '
+  'contact_inbox_ceiling, contact_source_key, '
   'create_invitation_for_contact_internal, create_invitation_internal, current_firm_role, '
   'current_member_id, current_member_label, current_member_org, '
   'decide_invitation_internal, delivered_evidence_lock, demo_taxpayer_id, '
