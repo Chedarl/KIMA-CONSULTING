@@ -3,8 +3,15 @@ import { getDictionary, isLocale } from "@/lib/i18n";
 import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import { DemoBanner } from "@/components/ui";
 import { StaffWorkspace } from "@/components/live/staff-workspace";
+import { CapacityWorkspace } from "@/components/live/capacity-workspace";
 
-/** Phase 2 item 2: the people in the firm, and who may change that list. */
+/**
+ * Phase 2 item 2: the people in the firm, and who may change that list.
+ *
+ * Capacity lives here too: "who are the people" and "how loaded are they" are
+ * one question asked twice, and splitting them across two screens made the
+ * answer harder to reach. /workspace/capacity redirects here.
+ */
 export default function StaffPage({ params }: { params: { locale: string } }) {
   if (!isLocale(params.locale)) notFound();
   const locale = params.locale;
@@ -20,6 +27,7 @@ export default function StaffPage({ params }: { params: { locale: string } }) {
         <p className="text-sm text-fg-muted">{s.subtitle}</p>
       </div>
       <StaffWorkspace labels={s} />
+      <CapacityWorkspace locale={locale} />
     </div>
   );
 }

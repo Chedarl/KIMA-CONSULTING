@@ -1,31 +1,13 @@
-import { notFound } from "next/navigation";
-import { getDictionary, isLocale } from "@/lib/i18n";
-import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
-import { DemoBanner } from "@/components/ui";
-import { WorkQueue } from "@/components/live/work-queue";
+import { redirect } from "next/navigation";
+import { isLocale } from "@/lib/i18n";
 
 /**
- * The work queue — the spine of the firm workspace.
+ * The work queue and the board read the same rows; one surface is enough.
  *
- * One case per obligation per period, ordered by risk rather than by date, so
- * the row to open first is the row at the top.
+ * The route stays as a redirect rather than a 404: an old bookmark or a link in
+ * a colleague's message must land somewhere sensible, not on an error.
  */
-export default function QueuePage({ params }: { params: { locale: string } }) {
-  if (!isLocale(params.locale)) notFound();
-  const locale = params.locale;
-  const t = getDictionary(locale);
-  const w = getWorkspaceDictionary(locale);
-
-  return (
-    <div className="flex flex-col gap-5">
-      <DemoBanner>{t.home.demoNotice}</DemoBanner>
-
-      <div>
-        <h2 className="font-display text-lg font-semibold text-fg">{w.queue.title}</h2>
-        <p className="text-sm text-fg-muted">{w.queue.subtitle}</p>
-      </div>
-
-      <WorkQueue locale={locale} t={w.queue} />
-    </div>
-  );
+export default function MovedPage({ params }: { params: { locale: string } }) {
+  if (!isLocale(params.locale)) redirect("/fr");
+  redirect(`/${params.locale}/workspace/workflows`);
 }
