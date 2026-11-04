@@ -189,40 +189,61 @@ export function OnboardingFlow({
             </div>
           </header>
           <main id="main" className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-            <ol className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-fg-muted" aria-label={t.steps[0]}>
-              {t.steps.map((label, i) => (
-                <li key={label} className="flex items-center gap-3" aria-current={i === 0 ? "step" : undefined}>
-                  <span className={i === 0 ? "font-semibold text-fg" : ""}>
-                    {i + 1}. {label}
-                  </span>
-                  {i < t.steps.length - 1 && (
-                    <span aria-hidden="true" className="text-fg-subtle">
-                      →
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
+            <Stepper labels={t.steps} current={0} />
             <div id="choose" className="mx-auto mt-12 max-w-3xl text-center">
               <h1 className="font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">{t.title}</h1>
               <p className="mt-3 text-sm text-fg-muted sm:text-base">{t.subtitle}</p>
             </div>
-            <div className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-3" role="radiogroup" aria-label={t.title}>
+            {/*
+              A radiogroup is one tab stop with arrow keys inside it, not three
+              tab stops. The previous markup announced the role and then behaved
+              like three separate buttons, which is the shape that fails a
+              keyboard review. Roving tabindex fixes it.
+            */}
+            <div
+              className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-3"
+              role="radiogroup"
+              aria-label={t.title}
+              onKeyDown={(e) => {
+                const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
+                if (!keys.includes(e.key)) return;
+                e.preventDefault();
+                const at = draft.kind ? KINDS.indexOf(draft.kind) : -1;
+                const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
+                const next = KINDS[(at + delta + KINDS.length) % KINDS.length];
+                patch({ kind: next });
+                document.getElementById(`kind-${next}`)?.focus();
+              }}
+            >
               {KINDS.map((kind) => {
                 const selected = draft.kind === kind;
                 const card = t.cards[kind];
                 return (
                   <button
                     key={kind}
+                    id={`kind-${kind}`}
                     type="button"
                     role="radio"
                     aria-checked={selected}
+                    tabIndex={selected || (!draft.kind && kind === KINDS[0]) ? 0 : -1}
                     onClick={() => patch({ kind })}
-                    className={`rounded-card border bg-white px-5 py-8 text-center transition hover:shadow-raised ${
+                    className={`relative rounded-card border bg-white px-5 py-8 text-center transition duration-200 hover:-translate-y-0.5 hover:shadow-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-teal-text motion-reduce:transform-none motion-reduce:transition-none ${
                       selected ? "border-teal bg-teal-soft shadow-card" : "border-border hover:border-teal/50"
                     }`}
                   >
-                    <span className={`mx-auto flex justify-center ${selected ? "text-teal-text" : "text-navy"}`}>
+                    {selected && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-teal-text text-xs font-bold text-white"
+                      >
+                        ✓
+                      </span>
+                    )}
+                    <span
+                      className={`mx-auto flex h-12 w-12 items-center justify-center rounded-xl transition-colors ${
+                        selected ? "bg-teal-text text-white" : "bg-surface-sunken text-navy"
+                      }`}
+                    >
                       <ServiceIcon name={KIND_ICON[kind]} />
                     </span>
                     <span className="mt-3 block font-display text-lg font-semibold text-fg">{card.title}</span>
@@ -236,11 +257,27 @@ export function OnboardingFlow({
                 {t.errors.kind}
               </p>
             )}
-            <div className="mt-8 flex justify-center">
-              <button type="button" onClick={() => go("account")} className="public-cta inline-flex min-h-[48px] items-center gap-2 rounded-lg px-8 text-sm font-semibold">
+            {/*
+              Continue waits for a choice rather than taking the click and
+              answering with an error. The hint says why it is waiting, so a
+              disabled control is never a dead end.
+            */}
+            <div className="mt-8 flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={() => go("account")}
+                disabled={!draft.kind}
+                aria-describedby={draft.kind ? undefined : "choose-hint"}
+                className="public-cta inline-flex min-h-[48px] items-center gap-2 rounded-lg px-8 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45"
+              >
                 {t.continue}
                 <span aria-hidden="true">→</span>
               </button>
+              {!draft.kind && (
+                <p id="choose-hint" className="text-xs text-fg-muted">
+                  {locale === "fr" ? "Choisissez une option pour continuer." : "Choose an option to continue."}
+                </p>
+              )}
             </div>
             <ChannelBar
               t={t}
@@ -385,6 +422,57 @@ export function OnboardingFlow({
         </main>
       )}
     </div>
+  );
+}
+
+/**
+ * Where you are in the application, drawn rather than written.
+ *
+ * The four steps were a line of plain text with arrows between them: readable,
+ * but it did not show progress, and a numbered list where every number looks
+ * identical does not say which ones are behind you. Each step is now a marker
+ * with three states -- done, current, still to come -- joined by a rail that
+ * fills as you advance.
+ *
+ * The markers are decoration: the list carries aria-current="step" and the
+ * labels stay visible, so nothing here is conveyed by shape or colour alone.
+ */
+function Stepper({ labels, current }: { labels: readonly string[]; current: number }) {
+  return (
+    <ol
+      className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-1.5 gap-y-3 text-[13px] sm:text-sm"
+      aria-label={labels[0]}
+    >
+      {labels.map((label, i) => {
+        const done = i < current;
+        const now = i === current;
+        return (
+          <li key={label} className="flex items-center gap-2" aria-current={now ? "step" : undefined}>
+            <span
+              aria-hidden="true"
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                done
+                  ? "bg-teal-text text-white"
+                  : now
+                    ? "bg-teal-soft text-teal-text ring-2 ring-teal-text"
+                    : "bg-surface-sunken text-fg-subtle"
+              }`}
+            >
+              {done ? "✓" : i + 1}
+            </span>
+            <span className={now ? "font-semibold text-fg" : done ? "text-fg-muted" : "text-fg-subtle"}>
+              {label}
+            </span>
+            {i < labels.length - 1 && (
+              <span
+                aria-hidden="true"
+                className={`hidden h-0.5 w-5 rounded-full lg:block ${done ? "bg-teal-text" : "bg-border"}`}
+              />
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
