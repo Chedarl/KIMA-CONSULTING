@@ -444,16 +444,21 @@ export function CaseDetail({
     setFailed(null);
     setRefusedBy(null);
     try {
-      const written = await updateById("compliance_cases", row.id, result.patch);
-      if (!written.ok) {
-        setFailed(to);
-        setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
-        return;
-      }
+      // One transaction: the case row and its audit events commit or fail
+      // together. advance_case() re-asserts the caller's authority (and the
+      // case_stage_guard trigger re-checks the transition), so a rejected write
+      // can never leave the case advanced with no audit trail.
       const db = supabase();
-      if (result.events.length > 0) {
-        const { error: logError } = await db.from("case_events").insert(result.events);
-        if (logError) throw logError;
+      const { error: rpcError } = await db.rpc("advance_case", {
+        p_case_id: row.id,
+        p_patch: result.patch,
+        p_events: result.events,
+      });
+      if (rpcError) {
+        setFailed(to);
+        const denied = /not_permitted|requires current firm authority/i.test(rpcError.message);
+        setRefusedBy(denied ? t.notPermitted : t.moveFailed);
+        return;
       }
       await load();
     } catch {
