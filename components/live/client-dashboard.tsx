@@ -358,22 +358,22 @@ export function ClientDashboard({
             locale={locale}
             taxpayerId={ids?.taxpayerId ?? null}
             t={{
-              empty: copy.statusCompleted,
-              emptyHint: copy.overview,
+              empty: copy.queueEmpty,
+              emptyHint: copy.queueEmptyHint,
               offline: copy.offline,
               loading: copy.loading,
-              seeAll: copy.nav.dashboard,
+              seeAll: copy.queueSeeAll,
               groups: {
                 documents: copy.nav.documents,
                 tasks: copy.tasks,
                 messages: copy.nav.messages,
                 invoices: copy.nav.payments,
               },
-              open: copy.tasks,
+              open: copy.queueToDo,
               returned: copy.returned,
-              unpaid: copy.nav.payments,
+              unpaid: copy.queueToPay,
               unread: copy.unread,
-              toSend: copy.upload,
+              toSend: copy.queueToSend,
             }}
           />
           <PortalAside

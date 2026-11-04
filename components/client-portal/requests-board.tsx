@@ -110,7 +110,7 @@ export function RequestsBoard({ locale }: { locale: "fr" | "en" }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeading title={copy.requestsTitle} subtitle={copy.receivedNotSame} />
+      <PageHeading title={copy.requestsTitle} subtitle={copy.requestsSubtitle} />
       {offline && <OfflineNote>{copy.offline}</OfflineNote>}
       <div className="flex flex-wrap items-center gap-2">
         <FilterBar label={copy.searchDocs} value={q} onChange={setQ} placeholder={copy.searchPlaceholder} />

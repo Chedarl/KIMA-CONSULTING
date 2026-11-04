@@ -113,7 +113,10 @@ const fr = {
   servicesNoMatch: "Aucun service pour ce filtre.",
   servicesNoMatchHint: "Essayez « Tous », ou demandez un nouveau service.",
   documentsTitle: "Documents",
-  receivedNotSame: "Reçu n'est pas accepté.",
+  // The English says "Received is not the same as accepted." The French said
+  // "Reçu n'est pas accepté." -- which reads as "received is NOT accepted",
+  // the opposite of a firm telling a client their document arrived safely.
+  receivedNotSame: "« Reçu » ne veut pas dire « accepté ».",
   tabRequested: "Demandées",
   tabUploaded: "Déposées",
   colName: "Nom",
@@ -235,6 +238,18 @@ const fr = {
     duration: "Durée",
     terms: "Conditions",
   },
+  // The queue's own words. These used to borrow keys that existed rather than
+  // keys that said the right thing: the empty state read "Terminée" over the
+  // page's own subtitle, and "Voir tout" read "Tableau de bord".
+  queueEmpty: "Rien à faire pour l'instant.",
+  queueEmptyHint:
+    "Le cabinet vous écrira dès qu'une pièce, une validation ou un règlement sera nécessaire.",
+  queueSeeAll: "Tout voir",
+  queueToDo: "À faire",
+  queueToPay: "À régler",
+  queueToSend: "À envoyer",
+  requestsSubtitle:
+    "Ce que le cabinet attend de vous, et où en est chaque pièce.",
   nameHeldByFirm:
     "Le nom et le numéro figurant sur votre dossier sont ceux que le cabinet détient. Pour les corriger, écrivez au cabinet : une correction doit suivre vos pièces d'état civil ou votre attestation d'immatriculation.",
   emailIsWhereCodeGoes:
@@ -492,6 +507,15 @@ const en: typeof fr = {
     duration: "Duration",
     terms: "Terms",
   },
+  queueEmpty: "Nothing to do right now.",
+  queueEmptyHint:
+    "The firm will write to you as soon as a document, an approval or a payment is needed.",
+  queueSeeAll: "See all",
+  queueToDo: "To do",
+  queueToPay: "To pay",
+  queueToSend: "To send",
+  requestsSubtitle:
+    "What the firm needs from you, and where each document stands.",
   nameHeldByFirm:
     "The name and number on your file are the ones the firm holds. To correct them, write to the firm: a correction has to follow your civil-status documents or your registration certificate.",
   emailIsWhereCodeGoes:
