@@ -9,27 +9,20 @@ import { StatusPill } from "@/components/ui/status-pill";
 /**
  * "À traiter" -- the portal home as a queue of things to do.
  *
- * The three reference portals the owner supplied are three generations of one
- * idea, and the direction of travel is the useful part: a flat chronological
- * To-Do, then the same items GROUPED by what they are, then grouped and
- * aggregated across every account the person holds.
+ * The three reference portals are three generations of one idea: a flat
+ * chronological To-Do, then the same items GROUPED by what they are, then
+ * grouped and aggregated across every account a person holds.
  *
- * Grouping is what makes it readable. A flat list of eleven unread documents
- * and six unpaid invoices reads as noise; "Documents (2)" and "Factures (6)"
- * reads as two decisions.
+ * Grouping is what makes it readable -- eleven unread documents and six unpaid
+ * invoices in one flat list read as noise. And none of it is a dashboard: no
+ * chart, every row ending in a verb, because the question is "what do you need
+ * from me", not "how am I doing".
  *
- * None of it is a dashboard. There is no chart, and every row ends in a verb,
- * because the client's question is "what do you need from me", not "how am I
- * doing".
+ * The portal home reads three tables today, so a task assigned to the client,
+ * an unread message and an unpaid invoice were all invisible on the screen
+ * meant to tell them what to do. This reads those too.
  *
- * KIMA's portal home reads three tables today -- compliance_cases,
- * document_requests, taxpayers -- so most of what a client owes never reached
- * it: a task assigned to them, an unread message and an unpaid invoice were all
- * invisible. This reads those too.
- *
- * Honest states throughout. Loading, empty and offline are three different
- * facts: an empty queue is good news and says so; an unreachable one says that
- * instead of rendering nothing and implying there is nothing.
+ * Loading, empty and offline stay three different facts.
  */
 type Group = "documents" | "tasks" | "messages" | "invoices";
 
