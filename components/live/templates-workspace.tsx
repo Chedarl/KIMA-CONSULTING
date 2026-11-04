@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { stageLabel, type CaseStage } from "@/lib/cases";
+import { PageHeading } from "@/components/ui";
 
 const STAGES: CaseStage[] = ["documents", "accounting", "preparation", "review", "filing", "evidence", "client_approval", "delivered"];
 
@@ -18,10 +19,19 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
   const [editId, setEditId] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [showForm, setShowForm] = useState(false);
+  const [clients, setClients] = useState<{ id: string; legal_name: string }[]>([]);
+  const [applyId, setApplyId] = useState<string | null>(null);
+  const [applyClient, setApplyClient] = useState("");
+  const [applyStatus, setApplyStatus] = useState<"idle" | "applied" | "failed">("idle");
 
   async function load() {
-    const { data } = await supabase().from("engagement_templates").select("id, name, kind, services, stage_flow, letter").order("name");
-    setRows((data ?? []) as Row[]);
+    const db = supabase();
+    const [tpl, tps] = await Promise.all([
+      db.from("engagement_templates").select("id, name, kind, services, stage_flow, letter").order("name"),
+      db.from("taxpayers").select("id, legal_name").order("legal_name"),
+    ]);
+    setRows((tpl.data ?? []) as Row[]);
+    setClients((tps.data ?? []) as { id: string; legal_name: string }[]);
   }
 
   useEffect(() => { void load(); }, []);
@@ -40,6 +50,14 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
     await load();
   }
 
+  async function apply(r: Row) {
+    if (!applyClient) return;
+    setApplyStatus("idle");
+    const { error } = await supabase().rpc("instantiate_engagement_template", { p_template: r.id, p_taxpayer: applyClient });
+    setApplyStatus(error ? "failed" : "applied");
+    if (!error) { setApplyId(null); setApplyClient(""); await load(); }
+  }
+
   async function save() {
     if (!name.trim()) return;
     setStatus("saving");
@@ -53,13 +71,7 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-fg">{t.title}</h1>
-          <p className="mt-1 text-sm text-fg-muted">{t.subtitle}</p>
-        </div>
-        <button type="button" onClick={() => { setShowForm((v) => !v); setEditId(null); setName(""); setServices(""); setStages(["documents", "preparation", "review", "filing"]); setScope(""); }} className="inline-flex min-h-[44px] items-center rounded-lg bg-[#18243B] px-4 text-sm font-semibold text-white hover:bg-[#24314d]">{t.new}</button>
-      </div>
+      <PageHeading title={t.title} lede={t.subtitle} actions={<button type="button" onClick={() => { setShowForm((v) => !v); setEditId(null); setName(""); setServices(""); setStages(["documents", "preparation", "review", "filing"]); setScope(""); }} className="inline-flex min-h-[44px] items-center rounded-lg bg-[#18243B] px-4 text-sm font-semibold text-white hover:bg-[#24314d]">{t.new}</button>} />
 
       {showForm && (
         <section className="rounded-card border border-border bg-surface p-5">
@@ -94,9 +106,23 @@ export function TemplatesWorkspace({ locale, t }: { locale: "fr" | "en"; t: C })
               {r.kind === "inbuilt" ? (
                 <button type="button" onClick={() => duplicate(r)} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.duplicate}</button>
               ) : (
-                <button type="button" onClick={() => startEdit(r)} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.edit}</button>
+                <>
+                  <button type="button" onClick={() => { setApplyId(applyId === r.id ? null : r.id); setApplyStatus("idle"); }} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.apply}</button>
+                  <button type="button" onClick={() => startEdit(r)} className="min-h-[40px] rounded-lg border border-border px-3 text-sm font-semibold text-fg hover:bg-surface-sunken">{t.edit}</button>
+                </>
               )}
             </div>
+            {applyId === r.id ? (
+              <div className="flex w-full flex-wrap items-center gap-2 pt-1">
+                <select value={applyClient} onChange={(e) => setApplyClient(e.target.value)} className="min-h-[40px] rounded-lg border border-border bg-surface px-2 text-sm text-fg">
+                  <option value="">{t.applyTo}</option>
+                  {clients.map((c) => (<option key={c.id} value={c.id}>{c.legal_name}</option>))}
+                </select>
+                <button type="button" onClick={() => apply(r)} disabled={!applyClient} className="min-h-[40px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d] disabled:opacity-50">{t.apply}</button>
+                {applyStatus === "applied" && <span className="text-sm text-success-text">{t.applied}</span>}
+                {applyStatus === "failed" && <span className="text-sm text-danger-text">{t.applyFailed}</span>}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
