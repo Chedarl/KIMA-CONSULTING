@@ -84,6 +84,8 @@ export function InboxWorkspace({
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [clientFilter, setClientFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [tab, setTab] = useState("all");
+  const requestOnly = tab === "requests";
   const [returning, setReturning] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -186,9 +188,10 @@ export function InboxWorkspace({
     return docs.filter(
       (d) =>
         (!clientFilter || d.taxpayer_id === clientFilter) &&
-        (!statusFilter || d.review_status === statusFilter),
+        (!statusFilter || d.review_status === statusFilter) &&
+        (!requestOnly || Boolean(d.request_id)),
     );
-  }, [docs, clientFilter, statusFilter]);
+  }, [docs, clientFilter, statusFilter, requestOnly]);
 
   async function recordAcceptance(doc: DocumentRow, record: AcceptanceRecord) {
     if (refuse("document.review", doc.taxpayer_id)) return;
@@ -433,22 +436,11 @@ export function InboxWorkspace({
             </option>
           ))}
         </select>
-        <label className="sr-only" htmlFor="f-status">
-          {labels.allStatuses}
-        </label>
-        <select
-          id="f-status"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="min-h-[44px] rounded-lg border border-border bg-surface px-2 text-sm text-fg"
-        >
-          <option value="">{labels.allStatuses}</option>
-          {["pending", "accepted", "returned"].map((s) => (
-            <option key={s} value={s}>
-              {labels.status[s] ?? s}
-            </option>
+        <div role="group" aria-label={locale === "fr" ? "Filtres" : "Filters"} className="flex flex-wrap gap-1 rounded-lg border border-border p-0.5">
+          {[["all", "Tous", "All"], ["requests", "Demandes", "Requests"], ["review", "À revoir", "To review"], ["approved", "Approuvés", "Approved"], ["versions", "Versions", "Versions"], ["audit", "Audit", "Audit"]].map(([id, fr, en]) => (
+            <button key={id} type="button" onClick={() => { setTab(id); setStatusFilter(id === "review" ? "pending" : id === "approved" ? "accepted" : ""); }} className={"inline-flex min-h-[36px] items-center rounded-md px-3 text-xs font-semibold " + (tab === id ? "bg-surface-sunken text-fg" : "text-fg-muted hover:text-fg")}>{locale === "fr" ? fr : en}</button>
           ))}
-        </select>
+        </div>
         <span className="ml-auto text-xs text-fg-subtle">{labels.latest}</span>
       </div>
 
@@ -518,7 +510,16 @@ export function InboxWorkspace({
         </div>
       )}
 
-      {shown.length === 0 ? (
+      {tab === "versions" ? (
+        <div className="rounded-card border border-border bg-surface p-5">
+          <p className="text-sm text-fg-muted">{locale === "fr" ? "Chaque document conserve ses versions. Ouvrez un document pour voir son historique." : "Every document keeps its versions. Open a document to see its history."}</p>
+        </div>
+      ) : tab === "audit" ? (
+        <div className="rounded-card border border-border bg-surface p-5">
+          <p className="text-sm text-fg-muted">{locale === "fr" ? "La piste d'audit s'écrit à chaque revue : qui a décidé, quand, et pourquoi." : "The audit trail is written on every review: who decided, when, and why."}</p>
+          <a href={`/${locale}/workspace/ai`} className="mt-3 inline-flex min-h-[40px] items-center text-sm font-semibold text-teal-text hover:underline">{locale === "fr" ? "Demander à Kima" : "Ask Kima"}</a>
+        </div>
+      ) : shown.length === 0 ? (
         <p className="rounded-card border border-border bg-surface px-4 py-6 text-sm text-fg-muted">
           {labels.empty}
         </p>
