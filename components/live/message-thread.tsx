@@ -141,6 +141,11 @@ export function MessageThread({
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  // The demo note below said the sender was not authenticated. That was true
+  // while the portal ran on the anon demo branch; a client now holds a real
+  // Supabase session, and the note contradicted the screen. Ask, do not
+  // assume from `side`.
+  const [anonymous, setAnonymous] = useState(false);
   const [threadId, setThreadId] = useState("general");
   const bottom = useRef<HTMLDivElement>(null);
   const currentTaxpayer = useRef(taxpayerId);
@@ -194,10 +199,13 @@ export function MessageThread({
         .map((grant) => grant.organization_id as string))];
       const names = new Map<string, string>((directory ?? []).map(
         (firm: { id: string; name: string }) => [firm.id, firm.name] as const));
-      setFirms(liveIds.map((id) => ({
-        id,
-        name: names.get(id) ?? `${labels.firmName} (${id.slice(0, 8)})`,
-      })));
+      // A firm whose name the directory does not carry is shown by its role,
+      // not by eight characters of its primary key. The id fragment was
+      // reaching the client's screen as "Équipe KIMA (24403cfe)"; a person
+      // cannot tell two firms apart by hex, so it bought nothing and read as
+      // a leak. If two unnamed firms ever collide here, the directory is what
+      // needs fixing.
+      setFirms(liveIds.map((id) => ({ id, name: names.get(id) ?? labels.firmName })));
       setOrgId((current) =>
         current && liveIds.includes(current)
           ? current : liveIds.length === 1 ? liveIds[0] : null);
@@ -208,6 +216,21 @@ export function MessageThread({
       setError(true);
     }
   }, [taxpayerId, labels.firmName, side, firmMemberId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void supabase()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (!cancelled) setAnonymous(!data.user);
+      })
+      .catch(() => {
+        if (!cancelled) setAnonymous(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setOrgId(null);
@@ -394,7 +417,7 @@ export function MessageThread({
     }
     for (const m of visibleMsgs) {
       const id = m.request_id ?? "general";
-      const slot = groups.get(id) ?? { id, title: labels.firmName, preview: "", unread: false };
+      const slot = groups.get(id) ?? { id, title: labels.noRequest, preview: "", unread: false };
       slot.preview = m.body;
       if (m.sender === "firm" && !m.read_at) slot.unread = true;
       groups.set(id, slot);
@@ -427,8 +450,14 @@ export function MessageThread({
                   >
                     <span aria-hidden className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${g.unread ? "bg-amber" : "bg-transparent"}`} />
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-fg">{activeFirmLabel}</span>
-                      <span className="block truncate text-xs text-fg-muted">{g.title}</span>
+                      {/*
+                        The subject leads. Every thread in this list is with
+                        the same firm, so heading each row with the firm's
+                        name produced six identical rows and hid the only
+                        thing that tells them apart.
+                      */}
+                      <span className="block truncate text-sm font-semibold text-fg">{g.title}</span>
+                      <span className="block truncate text-xs text-fg-muted">{activeFirmLabel}</span>
                     </span>
                   </button>
                 </li>
@@ -437,8 +466,8 @@ export function MessageThread({
           </aside>
           <div className="flex min-h-[24rem] flex-col">
             <div className="border-b border-border px-4 py-3">
-              <p className="text-sm font-semibold text-fg">{activeFirmLabel}</p>
-              <p className="text-xs text-fg-muted">{activeTitle}</p>
+              <p className="text-sm font-semibold text-fg">{activeTitle}</p>
+              <p className="text-xs text-fg-muted">{activeFirmLabel}</p>
             </div>
             <ol className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4" aria-live="polite">
               {shown.length === 0 && (
@@ -484,7 +513,7 @@ export function MessageThread({
             </form>
           </div>
         </div>
-        <p className="text-xs text-fg-subtle">{labels.demoIdentity}</p>
+        {anonymous && <p className="text-xs text-fg-subtle">{labels.demoIdentity}</p>}
       </div>
     );
   }
@@ -499,7 +528,7 @@ export function MessageThread({
           aria-hidden="true"
         />
         {live ? labels.live : labels.connecting}
-        {sendBlocked ? ` · ${sendBlocked}` : side === "taxpayer" ? ` · ${labels.demoIdentity}` : ""}
+        {sendBlocked ? ` · ${sendBlocked}` : side === "taxpayer" && anonymous ? ` · ${labels.demoIdentity}` : ""}
       </p>
 
       <ol className="flex max-h-[26rem] flex-col gap-2.5 overflow-y-auto rounded-card border border-border bg-surface p-4">
