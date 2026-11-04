@@ -52,6 +52,7 @@ export default function FirmLayout({
     { href: `${base}/reports`, label: w.firm.nav.reports, icon: "chart", ready: false },
     { href: `${base}/settings`, label: w.firm.nav.admin, icon: "cog", ready: true },
     { href: `${base}/branding`, label: w.firm.nav.branding, icon: "chart", ready: true },
+    { href: `${base}/templates`, label: w.firm.nav.templates, icon: "folder", ready: true },
   ];
 
   return (

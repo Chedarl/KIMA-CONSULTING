@@ -13,6 +13,10 @@ export type KimaLabels = {
   tabGuide: string;
   tabChecklist: string;
   tabSearch: string;
+  tabAsk: string;
+  askPlaceholder: string;
+  askSubmit: string;
+  asking: string;
   searchPlaceholder: string;
   stepsTitle: string;
   firstActionTitle: string;
@@ -37,8 +41,11 @@ const STORE = "kima-checklist-v1";
 export function KimaAssistant({ locale, t }: { locale: GuideLocale; t: KimaLabels }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"guide" | "checklist" | "search">("guide");
+  const [tab, setTab] = useState<"guide" | "checklist" | "search" | "ask">("guide");
   const [query, setQuery] = useState("");
+  const [askQ, setAskQ] = useState("");
+  const [askResult, setAskResult] = useState<{ kind: string; text: string } | null>(null);
+  const [asking, setAsking] = useState(false);
   const [done, setDone] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -66,6 +73,20 @@ export function KimaAssistant({ locale, t }: { locale: GuideLocale; t: KimaLabel
 
   const checklist = kimaChecklist[locale];
   const doneCount = checklist.filter((c) => done[c.id]).length;
+
+  async function submitAsk() {
+    const q = askQ.trim();
+    if (!q || asking) return;
+    setAsking(true);
+    try {
+      const res = await fetch("/api/assistant/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, locale }) });
+      setAskResult((await res.json()) as { kind: string; text: string });
+    } catch {
+      setAskResult({ kind: "refusal", text: t.nothingFound });
+    } finally {
+      setAsking(false);
+    }
+  }
 
   function toggle(id: string) {
     const next = { ...done, [id]: !done[id] };
@@ -116,6 +137,7 @@ export function KimaAssistant({ locale, t }: { locale: GuideLocale; t: KimaLabel
                 ["guide", t.tabGuide],
                 ["checklist", t.tabChecklist],
                 ["search", t.tabSearch],
+                ["ask", t.tabAsk],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -218,6 +240,17 @@ export function KimaAssistant({ locale, t }: { locale: GuideLocale; t: KimaLabel
                     <p className="mt-1 text-sm text-fg-muted">{g.firstAction[locale]}</p>
                   </div>
                 ))}
+              </div>
+            ) : null}
+            {tab === "ask" ? (
+              <div className="flex flex-col gap-3">
+                <input value={askQ} onChange={(e) => setAskQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submitAsk(); }} placeholder={t.askPlaceholder} aria-label={t.askPlaceholder} className="min-h-[44px] rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                <button type="button" onClick={() => void submitAsk()} disabled={asking} className="min-h-[40px] rounded-lg bg-[#18243B] px-3 text-sm font-semibold text-white hover:bg-[#24314d] disabled:opacity-50">{asking ? t.asking : t.askSubmit}</button>
+                {askResult ? (
+                  <div className="rounded-lg border border-border p-3">
+                    <p className="whitespace-pre-wrap text-sm text-fg">{askResult.text}</p>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
