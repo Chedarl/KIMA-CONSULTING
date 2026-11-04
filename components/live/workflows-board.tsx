@@ -28,6 +28,7 @@ export function WorkflowsBoard({ locale, t }: { locale: "fr" | "en"; t: C }) {
   const [names, setNames] = useState<Record<string, string>>({});
   const [view, setView] = useState<"kanban" | "list" | "calendar" | "models" | "automations">("kanban");
   const [owner, setOwner] = useState("");
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -44,6 +45,15 @@ export function WorkflowsBoard({ locale, t }: { locale: "fr" | "en"; t: C }) {
       setNames(m);
     })();
     return () => { alive = false; };
+  }, [tick]);
+
+  useEffect(() => {
+    const db = supabase();
+    const channel = db
+      .channel("workflows-board")
+      .on("postgres_changes", { event: "*", schema: "public", table: "compliance_cases" }, () => setTick((v) => v + 1))
+      .subscribe();
+    return () => { void db.removeChannel(channel); };
   }, []);
 
   const owners = useMemo(() => [...new Set((rows ?? []).map((r) => r.owner).filter(Boolean))] as string[], [rows]);
