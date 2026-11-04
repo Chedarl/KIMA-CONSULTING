@@ -53,10 +53,12 @@ select is(
 
 -- T-375  A malformed address is refused: an email that cannot receive the
 --        one-time code would strand the client silently.
+-- Four-argument throws_ok is (sql, errcode, errmsg, description). A bare
+-- RAISE carries SQLSTATE P0001 and puts the text in the message.
 select throws_ok(
   $$select public.update_my_contact_details('not-an-address', null)$$,
+  'P0001',
   'bad_email',
-  null,
   'T-375 an address that could not receive a sign-in code is refused'
 );
 
@@ -68,6 +70,10 @@ select is(
 );
 
 -- T-377  And the firm is told, because that is where the next code goes.
+--        Asserted as the owner: audit_events is deliberately unreadable by the
+--        client, so a client-role select here would return nothing whether or
+--        not the row was written.
+reset role;
 select is(
   (select count(*)::int from audit_events
     where action = 'contact.email_changed'
@@ -77,6 +83,10 @@ select is(
   1,
   'T-377 an email change is audited with both values'
 );
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-e500-000000000001","role":"authenticated"}', true);
 
 -- T-378  The columns that are not the client's stay untouched. The function
 --        has no parameter for either, which is the point of using a function.
