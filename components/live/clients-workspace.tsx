@@ -12,6 +12,7 @@ import {
   type Segment,
 } from "@/lib/crm";
 import { requestIsOutstanding, type RequestStatus } from "@/lib/cases";
+import { useRefreshTick } from "@/lib/refresh";
 
 /**
  * The firm's client list, with onboarding attached.
@@ -84,6 +85,7 @@ export function ClientsWorkspace({
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
+  const tick = useRefreshTick();
 
   /**
    * Chase a client by email. The endpoint takes a taxpayer id, not an address,
@@ -150,7 +152,7 @@ export function ClientsWorkspace({
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, tick]);
 
   return (
     <div className="flex flex-col gap-5">

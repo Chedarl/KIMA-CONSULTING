@@ -5,6 +5,7 @@ import Link from "next/link";
 import { obligationLabel, type ComplianceCase } from "@/lib/cases";
 import { supabase } from "@/lib/supabase";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
+import { useRefreshTick } from "@/lib/refresh";
 
 type Dict = ReturnType<typeof getWorkspaceDictionary>["deadlineCalendar"];
 
@@ -22,6 +23,7 @@ export function DeadlineCalendar({ locale, t }: { locale: "fr" | "en"; t: Dict }
   const [names, setNames] = useState<Record<string, string>>({});
   const [offline, setOffline] = useState(false);
 
+  const tick = useRefreshTick();
   const load = useCallback(async () => {
     try {
       const db = supabase();
@@ -55,7 +57,7 @@ export function DeadlineCalendar({ locale, t }: { locale: "fr" | "en"; t: Dict }
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, tick]);
 
   return (
     <div className="flex flex-col gap-3">

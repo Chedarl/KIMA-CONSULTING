@@ -8,6 +8,8 @@ import { FirmSessionBar } from "@/components/live/firm-session-bar";
 import { KimaAssistant } from "@/components/live/kima-assistant";
 import { CommandPalette } from "@/components/live/command-palette";
 import { ThemeRoot } from "@/components/theme-root";
+import { LiveRefresh } from "@/components/live/live-refresh";
+import { FreshOnFocus } from "@/components/live/fresh-on-focus";
 
 /**
  * Firm workspace chrome.
@@ -58,7 +60,6 @@ export default function FirmLayout({
     { href: "#", label: locale === "fr" ? "Finances" : "Finances", icon: "grid", ready: true, section: true },
     { href: `${base}/billing`, label: w.firm.nav.billing, icon: "card", ready: true },
     { href: `${base}/time`, label: locale === "fr" ? "Temps" : "Time", icon: "chart", ready: true },
-    { href: `${base}/capacity`, label: locale === "fr" ? "Capacité" : "Capacity", icon: "people", ready: true },
     { href: `${base}/reports`, label: w.firm.nav.reports, icon: "chart", ready: false },
     { href: "#", label: locale === "fr" ? "Cabinet" : "Firm", icon: "grid", ready: true, section: true },
     { href: `${base}/staff`, label: w.firm.nav.staff, icon: "people", ready: true },
@@ -77,6 +78,7 @@ export default function FirmLayout({
       menuLabel={w.menu}
       tone="navy"
     >
+      <LiveRefresh />
       <div className="mb-4 flex flex-col gap-3">
         <FirmSessionBar locale={locale} t={w.firmLogin} />
         <KimaAssistant locale={locale} t={w.firm.kima} />
@@ -111,7 +113,7 @@ export default function FirmLayout({
           </Link>
         </div>
       </div>
-      {children}
+      <FreshOnFocus>{children}</FreshOnFocus>
     </Shell>
     </ThemeRoot>
   );

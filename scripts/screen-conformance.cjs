@@ -19,6 +19,8 @@ const PAGES = [
   { id: 'F08', route: '/templates', must: ['Modèles de mission', 'Dupliquer'], tables: ['engagement_templates'] },
   { id: 'F13', route: '/cases/' + CASE, must: ['Mboa', 'Dossier'], tables: ['compliance_cases', 'case_events'] },
   { id: 'F15', route: '/billing', must: ['Facturation'], tables: ['invoices', 'service_payments'] },
+  { id: 'F16', route: '/time', must: ['Temps et rentabilité', 'Heures ce mois', 'Heures facturables', 'Taux de facturabilité', 'Saisir du temps'], tables: ['time_entries'] },
+  { id: 'F09', route: '/capacity', must: ['Capacité et échéances', 'Responsables', 'Dossiers ouverts', 'Échéances des 14 prochains jours'], tables: ['compliance_cases', 'time_entries'] },
   { id: 'F03', route: '/clients', must: ['Clients'], tables: ['taxpayers', 'engagements'] },
   { id: 'F05', route: '/leads', must: ['Accueil'], tables: ['registrations', 'taxpayers'] },
   { id: 'F12', route: '/calendar', must: ['Calendrier'], tables: ['compliance_cases'] },
@@ -50,6 +52,20 @@ async function tableExists(t) {
   const b = await chromium.launch();
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
   const out = [];
+
+  const publicChecks = [
+    { id: 'C01', url: 'http://localhost:3000/fr/login', must: ['Bon retour', 'Courriel', 'Mot de passe', 'Se connecter'] },
+    { id: 'P01', url: 'http://localhost:3000/fr', must: ['KIMA', 'Cameroun'] },
+  ];
+  for (const pub of publicChecks) {
+    const pg = await ctx.newPage();
+    const res = await pg.goto(pub.url, { waitUntil: 'load', timeout: 120000 }).catch(() => null);
+    await pg.waitForTimeout(1500);
+    const body = await pg.locator('body').innerText().catch(() => '');
+    const low = body.toLowerCase();
+    out.push({ id: pub.id, route: pub.url.replace('http://localhost:3000', ''), status: res ? res.status() : 'ERR', h1: (await pg.locator('h1').first().innerText().catch(() => '')).trim().slice(0, 30), theme: true, mains: await pg.locator('main#main').count(), missing: pub.must.filter((m) => !low.includes(m.toLowerCase())), tables: {} });
+    await pg.close();
+  }
 
   const firm = await ctx.newPage();
   await firm.goto('http://localhost:3000/fr/firm-login', { waitUntil: 'networkidle', timeout: 90000 });

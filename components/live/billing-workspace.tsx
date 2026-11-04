@@ -20,6 +20,7 @@ import { formatXaf } from "@/lib/i18n";
 import { can, denialLabel, type Actor } from "@/lib/permissions";
 import { audit, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
+import { useRefreshTick } from "@/lib/refresh";
 
 /**
  * The firm's fee book.
@@ -96,6 +97,7 @@ export function BillingWorkspace({
   const [names, setNames] = useState<Record<string, string>>({});
   const [offline, setOffline] = useState(false);
   const [refs, setRefs] = useState<Record<string, string>>({});
+  const tick = useRefreshTick();
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => subscribeFirmSession(setSession), []);
@@ -136,7 +138,7 @@ export function BillingWorkspace({
       setPayments([]);
       setCases([]);
     }
-  }, []);
+  }, [tick]);
 
   useEffect(() => {
     if (mayView) void load();

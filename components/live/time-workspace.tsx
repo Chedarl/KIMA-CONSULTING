@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeading } from "@/components/ui";
+import { useRefreshTick } from "@/lib/refresh";
 
 type C = { [k: string]: string };
 type Entry = { id: string; taxpayer_id: string; case_id: string | null; member_id: string | null; minutes: number; kind: string; note: string | null; billable: boolean; worked_on: string };
@@ -14,6 +15,7 @@ export function TimeWorkspace({ locale }: { locale: "fr" | "en" }) {
   const [clients, setClients] = useState<{ id: string; legal_name: string }[]>([]);
   const [clientId, setClientId] = useState("");
   const [minutes, setMinutes] = useState("30");
+  const tick = useRefreshTick();
   const [kind, setKind] = useState("preparation");
   const [billable, setBillable] = useState(true);
   const [note, setNote] = useState("");
@@ -36,7 +38,7 @@ export function TimeWorkspace({ locale }: { locale: "fr" | "en" }) {
     setNames(m);
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [tick]);
 
   const month = today.slice(0, 7);
   const kpi = useMemo(() => {
