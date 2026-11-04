@@ -180,7 +180,12 @@ export function Shell({
             <p className="mt-1 text-sm text-fg-muted">{subtitle}</p>
           </header>
         )}
-        {tone === "navy" && <p className="sr-only">{subtitle}</p>}
+        {tone === "navy" && (
+          <>
+            <h1 className="sr-only">{title}</h1>
+            <p className="sr-only">{subtitle}</p>
+          </>
+        )}
         {children}
       </div>
     </div>
