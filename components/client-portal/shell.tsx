@@ -113,6 +113,7 @@ export function ClientPortalShell({
     { href: `${base}/payments`, label: copy.nav.payments, icon: "globe" },
     { href: `${base}/calendar`, label: copy.nav.calendar, icon: "calendar" },
     { href: `${base}/records`, label: copy.nav.records, icon: "archive" },
+    { href: `${base}/engagement`, label: copy.nav.engagement, icon: "clipboard" },
     { href: `${base}/profile`, label: copy.nav.profile, icon: "user" },
   ];
 

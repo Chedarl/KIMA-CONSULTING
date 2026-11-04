@@ -15,6 +15,7 @@ const fr = {
     payments: "Paiements",
     calendar: "Calendrier",
     records: "Mes dossiers",
+    engagement: "Lettre de mission",
     profile: "Profil",
   },
   menu: "Menu du portail",
@@ -199,6 +200,41 @@ const fr = {
   contacts: "Personnes à contacter",
   preferences: "Préférences",
   security: "Sécurité",
+  letterTitle: "Ma lettre de mission",
+  letterSubtitle: "Ce que le cabinet s'engage à faire, et ce que cela coûte.",
+  letterNoEngagement: "Aucune mission en cours.",
+  letterNoEngagementHint:
+    "Une lettre de mission apparaît ici dès qu'un cabinet vous en propose une.",
+  letterNotIssued:
+    "Le cabinet n'a pas encore émis de lettre pour cette mission. Rien ne vous est demandé pour l'instant.",
+  // Accepted with no letter on file is a real state, not an error: the
+  // engagement predates the letter. Saying "pas encore émise" under an
+  // "Acceptée" pill would read as a contradiction and tell the client nothing
+  // they can act on.
+  letterNotIssuedAccepted:
+    "Cette mission a été acceptée sans lettre conservée dans le portail. Demandez-en une copie au cabinet si vous en avez besoin.",
+  letterUntitled: "Mission",
+  letterStateAccepted: "Acceptée",
+  letterStateToAccept: "À lire et accepter",
+  letterStateNone: "Pas encore émise",
+  letterVersion: "Version",
+  letterIssued: "Émise le",
+  letterFee: "Honoraires",
+  letterFeeUnset: "À convenir",
+  letterAccept: "J'accepte ces conditions",
+  letterAcceptNote:
+    "En acceptant, vous confirmez avoir lu ces conditions. Le cabinet en est informé et la version acceptée est conservée.",
+  letterAccepted: "Lettre de mission acceptée.",
+  letterAcceptedOn: "Acceptée le",
+  letterAcceptFailed:
+    "Acceptation refusée. Le cabinet conserve cette lettre ; contactez-le si cela se répète.",
+  letterSections: {
+    scope: "Objet de la mission",
+    responsibilities: "Responsabilités",
+    fees: "Honoraires",
+    duration: "Durée",
+    terms: "Conditions",
+  },
   nameHeldByFirm:
     "Le nom et le numéro figurant sur votre dossier sont ceux que le cabinet détient. Pour les corriger, écrivez au cabinet : une correction doit suivre vos pièces d'état civil ou votre attestation d'immatriculation.",
   emailIsWhereCodeGoes:
@@ -241,6 +277,7 @@ const en: typeof fr = {
     payments: "Payments",
     calendar: "Calendar",
     records: "My Records",
+    engagement: "Engagement letter",
     profile: "Profile",
   },
   menu: "Portal menu",
@@ -425,6 +462,36 @@ const en: typeof fr = {
   contacts: "Contact persons",
   preferences: "Preferences",
   security: "Security",
+  letterTitle: "My engagement letter",
+  letterSubtitle: "What the firm commits to do, and what it costs.",
+  letterNoEngagement: "No engagement under way.",
+  letterNoEngagementHint: "An engagement letter appears here as soon as a firm offers you one.",
+  letterNotIssued:
+    "The firm has not issued a letter for this engagement yet. Nothing is being asked of you for now.",
+  letterNotIssuedAccepted:
+    "This engagement was accepted without a letter kept in the portal. Ask the firm for a copy if you need one.",
+  letterUntitled: "Engagement",
+  letterStateAccepted: "Accepted",
+  letterStateToAccept: "To read and accept",
+  letterStateNone: "Not issued yet",
+  letterVersion: "Version",
+  letterIssued: "Issued",
+  letterFee: "Fees",
+  letterFeeUnset: "To be agreed",
+  letterAccept: "I accept these terms",
+  letterAcceptNote:
+    "By accepting you confirm you have read these terms. The firm is told, and the version you accepted is kept.",
+  letterAccepted: "Engagement letter accepted.",
+  letterAcceptedOn: "Accepted on",
+  letterAcceptFailed:
+    "Acceptance refused. The firm holds this letter; contact them if this repeats.",
+  letterSections: {
+    scope: "Scope of the engagement",
+    responsibilities: "Responsibilities",
+    fees: "Fees",
+    duration: "Duration",
+    terms: "Terms",
+  },
   nameHeldByFirm:
     "The name and number on your file are the ones the firm holds. To correct them, write to the firm: a correction has to follow your civil-status documents or your registration certificate.",
   emailIsWhereCodeGoes:
