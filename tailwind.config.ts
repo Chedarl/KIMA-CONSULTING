@@ -45,6 +45,16 @@ const config: Config = {
           text: "rgb(var(--amber-text) / <alpha-value>)",
           soft: "rgb(var(--amber-soft) / <alpha-value>)",
         },
+        // The brand's second colour, and the one that had never been
+        // implemented. Per the owner's UX principles it is used for SHAPES and
+        // RULES on white only -- the logo node and the 2px line under a section
+        // title. `gold-text` is the darker #8A6D12, because #C9A227 as text on
+        // white is 2.3:1 and fails. Keeping them as two tokens is what stops
+        // the rule colour being reached for as a text colour.
+        gold: {
+          DEFAULT: "rgb(var(--gold) / <alpha-value>)",
+          text: "rgb(var(--gold-text) / <alpha-value>)",
+        },
         danger: {
           DEFAULT: "rgb(var(--danger) / <alpha-value>)",
           text: "rgb(var(--danger-text) / <alpha-value>)",
