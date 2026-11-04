@@ -1,23 +1,13 @@
-import { notFound } from "next/navigation";
-import { getDictionary, isLocale } from "@/lib/i18n";
-import { getWorkspaceDictionary } from "@/lib/i18n-workspace";
-import { DemoBanner } from "@/components/ui";
-import { WorkTasks } from "@/components/live/work-tasks";
+import { redirect } from "next/navigation";
+import { isLocale } from "@/lib/i18n";
 
-export default function TasksPage({ params }: { params: { locale: string } }) {
-  if (!isLocale(params.locale)) notFound();
-  const locale = params.locale;
-  const t = getDictionary(locale);
-  const w = getWorkspaceDictionary(locale);
-
-  return (
-    <div className="flex flex-col gap-5">
-      <DemoBanner>{t.home.demoNotice}</DemoBanner>
-      <div>
-        <h2 className="font-display text-lg font-semibold text-fg">{w.tasks.title}</h2>
-        <p className="text-sm text-fg-muted">{w.tasks.subtitle}</p>
-      </div>
-      <WorkTasks t={w.tasks} />
-    </div>
-  );
+/**
+ * Tasks are folded into the workflows board: the board is the work surface, and a task's detail lives on its case record.
+ *
+ * The route stays as a redirect rather than a 404: an old bookmark or a link in
+ * a colleague's message must land somewhere sensible, not on an error.
+ */
+export default function MovedPage({ params }: { params: { locale: string } }) {
+  if (!isLocale(params.locale)) redirect("/fr");
+  redirect(`/${params.locale}/workspace/workflows`);
 }
