@@ -469,20 +469,25 @@ export function PageHeading({
   eyebrow,
   title,
   lede,
+  actions,
 }: {
   eyebrow?: string;
   title: string;
   lede?: string;
+  actions?: ReactNode;
 }) {
   return (
-    <header className="mb-6">
-      {eyebrow && (
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-teal-text">
-          {eyebrow}
-        </p>
-      )}
-      <h1 className="text-2xl font-bold tracking-tight text-fg sm:text-3xl">{title}</h1>
-      {lede && <p className="mt-2 max-w-2xl text-fg-muted">{lede}</p>}
+    <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        {eyebrow && (
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-teal-text">
+            {eyebrow}
+          </p>
+        )}
+        <h1 className="text-2xl font-bold tracking-tight text-fg sm:text-3xl">{title}</h1>
+        {lede && <p className="mt-2 max-w-2xl text-fg-muted">{lede}</p>}
+      </div>
+      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>
   );
 }
