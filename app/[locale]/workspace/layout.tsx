@@ -8,6 +8,8 @@ import { FirmSessionBar } from "@/components/live/firm-session-bar";
 import { KimaAssistant } from "@/components/live/kima-assistant";
 import { CommandPalette } from "@/components/live/command-palette";
 import { ThemeRoot } from "@/components/theme-root";
+import { LiveRefresh } from "@/components/live/live-refresh";
+import { FreshOnFocus } from "@/components/live/fresh-on-focus";
 
 /**
  * Firm workspace chrome.
@@ -76,6 +78,7 @@ export default function FirmLayout({
       menuLabel={w.menu}
       tone="navy"
     >
+      <LiveRefresh />
       <div className="mb-4 flex flex-col gap-3">
         <FirmSessionBar locale={locale} t={w.firmLogin} />
         <KimaAssistant locale={locale} t={w.firm.kima} />
@@ -110,7 +113,7 @@ export default function FirmLayout({
           </Link>
         </div>
       </div>
-      {children}
+      <FreshOnFocus>{children}</FreshOnFocus>
     </Shell>
     </ThemeRoot>
   );

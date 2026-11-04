@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { PageHeading } from "@/components/ui";
+import { useRefreshTick } from "@/lib/refresh";
 
 type Row = { id: string; owner: string | null; due_on: string | null; stage: string };
 type Entry = { minutes: number; worked_on: string };
@@ -12,6 +13,7 @@ export function CapacityWorkspace({ locale }: { locale: "fr" | "en" }) {
   const L = (fr: string, en: string) => (locale === "fr" ? fr : en);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [time, setTime] = useState<Entry[]>([]);
+  const tick = useRefreshTick();
 
   useEffect(() => {
     let alive = true;
@@ -26,7 +28,7 @@ export function CapacityWorkspace({ locale }: { locale: "fr" | "en" }) {
       setTime((te.data ?? []) as Entry[]);
     })();
     return () => { alive = false; };
-  }, []);
+  }, [tick]);
 
   const today = new Date().toISOString().slice(0, 10);
   const inDays = (n: number) => { const d = new Date(today + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };

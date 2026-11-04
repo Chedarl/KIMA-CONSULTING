@@ -53,7 +53,13 @@ export function WorkflowsBoard({ locale, t }: { locale: "fr" | "en"; t: C }) {
       .channel("workflows-board")
       .on("postgres_changes", { event: "*", schema: "public", table: "compliance_cases" }, () => setTick((v) => v + 1))
       .subscribe();
-    return () => { void db.removeChannel(channel); };
+    // Poll as the floor: a dropped socket or a row realtime does not publish
+    // still reaches the board within a few seconds.
+    const poll = setInterval(() => setTick((v) => v + 1), 6000);
+    return () => {
+      clearInterval(poll);
+      void db.removeChannel(channel);
+    };
   }, []);
 
   const owners = useMemo(() => [...new Set((rows ?? []).map((r) => r.owner).filter(Boolean))] as string[], [rows]);
@@ -114,7 +120,7 @@ export function WorkflowsBoard({ locale, t }: { locale: "fr" | "en"; t: C }) {
 ) : view === "kanban" ? (
         <div className="flex gap-3 overflow-x-auto pb-2">
           {grouped.map((b) => (
-            <section key={b.key} className="flex w-[16rem] shrink-0 flex-col gap-2 rounded-xl border border-border bg-surface-sunken/60 p-2.5">
+            <section key={b.key} data-bucket={b.key} className="flex w-[16rem] shrink-0 flex-col gap-2 rounded-xl border border-border bg-surface-sunken/60 p-2.5">
               <header className="flex items-center justify-between px-1">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-fg-muted">{t[b.labelKey]}</h3>
                 <span className="tnum rounded-full bg-surface px-2 py-0.5 font-mono text-[11px] text-fg-muted">{b.cases.length}</span>
