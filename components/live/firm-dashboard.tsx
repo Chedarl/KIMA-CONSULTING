@@ -1,5 +1,6 @@
 "use client";
 import { ledgerBalance } from "@/lib/billing";
+import { daysAgoInDouala, hourInDouala, todayInDouala } from "@/lib/dates";
 import { formatXaf } from "@/lib/i18n";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -73,18 +74,6 @@ function groupByCase<T extends { case_id: string | null }>(rows: T[]): Record<st
   }
   return out;
 }
-
-/** Local date, not UTC: "today" in Douala is not today in London. */
-const todayISO = () => {
-  const d = new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-};
-
-const daysAgoISO = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-};
 
 /** Whole days since an ISO timestamp, floored at 0 — the age a reviewer cares about. */
 function daysWaiting(iso: string): number {
@@ -227,7 +216,7 @@ export function FirmDashboard({
         let collected = 0;
         let outstanding = 0;
         let overdue = 0;
-        const todayIso = todayISO();
+        const todayIso = todayInDouala();
         for (const row of invRows) {
           if (row.status === "void" || row.status === "draft") continue;
           const bal = ledgerBalance(payRows as never, row.id);
@@ -274,7 +263,7 @@ export function FirmDashboard({
     return () => window.removeEventListener("keydown", onKey);
   }, [drawer]);
 
-  const today = todayISO();
+  const today = todayInDouala();
 
   const metrics = useMemo(() => {
     const open = rows ?? [];
@@ -290,7 +279,7 @@ export function FirmDashboard({
       if (derived?.waiting_on === "firm") return true;
       return !derived && Boolean(c.blocker?.trim());
     }).length;
-    const weekAgo = daysAgoISO(7);
+    const weekAgo = daysAgoInDouala(7);
     const openedThisWeek = open.filter((c) => (c.opened_at ?? "") >= weekAgo).length;
     const overdue = open.filter((c) => risk(c, today) === "overdue").length;
     const dueSoon = open.filter((c) => risk(c, today) === "due_soon").length;
@@ -328,8 +317,32 @@ export function FirmDashboard({
     [rows],
   );
 
+  // The greeting is resolved in Africa/Douala, not in whatever timezone the
+  // code happens to be running in.
+  //
+  // It used to read `new Date().getHours()`. This is a client component, but
+  // Next still pre-renders it on the server, and the server runs in iad1
+  // (UTC-5) while a Douala accountant's browser is UTC+1. Six hours apart, so
+  // for a quarter of the day the two disagreed about which greeting to show.
+  // React then found different text than the HTML it was hydrating and
+  // reported, on production:
+  //
+  //   #425 text content does not match server-rendered HTML
+  //   #418 hydration failed because the initial UI does not match the server
+  //   #423 error while hydrating; the entire root will switch to client rendering
+  //
+  // The third is the damaging one: the mismatch sits outside any Suspense
+  // boundary, so React discarded the whole server-rendered tree and re-rendered
+  // the entire workspace in the browser. A blank flash on every load, on the
+  // slow connections this product is explicitly built for.
+  //
+  // Pinning the zone fixes the greeting as well as the hydration. KIMA's market
+  // is Cameroon: a partner in Douala should read "Bonsoir" at 19:00 Douala time
+  // whether the HTML came from Virginia or their own laptop, and WAT is a fixed
+  // UTC+1 with no daylight saving, so the answer is stable. h23 is requested
+  // explicitly because hour12:false reports midnight as 24 on some engines.
   const greeting = useMemo(() => {
-    const h = new Date().getHours();
+    const h = hourInDouala();
     if (h < 12) return t.greetingMorning;
     if (h < 18) return t.greetingAfternoon;
     return t.greetingEvening;
@@ -368,7 +381,15 @@ export function FirmDashboard({
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-fg sm:text-3xl">{greeting}</h1>
+          <h1
+            className="font-display text-2xl font-semibold text-fg sm:text-3xl"
+            // Belt and braces for the hour boundary: a server render at 11:59:59
+            // and a hydration at 12:00:00 still differ. One attribute, and this
+            // heading can never take the whole root down again.
+            suppressHydrationWarning
+          >
+            {greeting}
+          </h1>
           <p className="mt-1 text-sm text-fg-muted">{t.subtitle}</p>
         </div>
         <p className="flex items-center gap-2">

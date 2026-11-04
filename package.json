@@ -2,14 +2,14 @@
   "name": "kima-compliance-os",
   "version": "0.1.0",
   "private": true,
-  "description": "KIMA OS — design system and interface prototype",
+  "description": "KIMA OS \u2014 design system and interface prototype",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
-    "test": "node scripts/engine-check.mjs && node scripts/dsf-check.mjs && node scripts/clarity-check.mjs && npm run test:phase5 && npm run test:phase7:pilot && node scripts/light-scope-tokens-check.mjs && node --experimental-strip-types --test scripts/grant-rpc-refusal.test.mjs",
+    "test": "node --experimental-strip-types scripts/jurisdiction-clock-check.mjs && node scripts/engine-check.mjs && node scripts/dsf-check.mjs && node scripts/clarity-check.mjs && npm run test:phase5 && npm run test:phase7:pilot && node scripts/light-scope-tokens-check.mjs && node --experimental-strip-types --test scripts/grant-rpc-refusal.test.mjs",
     "test:journey": "node scripts/journey-check.mjs && node scripts/firm-signup-journey-check.mjs && node scripts/contact-inquiry-check.mjs && node scripts/onboarding-firm-optional-check.mjs",
     "test:staff:contract": "node scripts/staff-contract-smoke.mjs",
     "test:staff:screen": "node scripts/staff-screen-smoke.mjs",
@@ -24,7 +24,8 @@
     "test:onboarding:firm-optional": "node scripts/onboarding-firm-optional-check.mjs",
     "test:phase7:pilot": "node scripts/phase7-pilot-check.mjs",
     "test:phase7:http": "node scripts/phase7-incident-http-smoke.mjs",
-    "test:dsf": "node scripts/dsf-check.mjs"
+    "test:dsf": "node scripts/dsf-check.mjs",
+    "test:clock": "node --experimental-strip-types scripts/jurisdiction-clock-check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
