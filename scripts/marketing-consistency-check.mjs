@@ -43,6 +43,9 @@ function eq(a, b, message) {
 const copy = readFileSync(join(root, "lib", "i18n-public.ts"), "utf8");
 const onboarding = readFileSync(join(root, "lib", "public-onboarding.ts"), "utf8");
 const home = readFileSync(join(root, "components", "marketing", "home-page.tsx"), "utf8");
+// The signed-in product's dictionary, which carries the banner the 21 workspace
+// pages render through <DemoBanner>{t.home.demoNotice}</DemoBanner>.
+const workspace = readFileSync(join(root, "lib", "i18n.ts"), "utf8");
 
 const openKinds = [
   ...(onboarding.match(/OPEN_WORKSPACE_KINDS = \[([^\]]+)\]/)?.[1] ?? "").matchAll(/"([a-z_]+)"/g),
@@ -125,6 +128,51 @@ check("the site claims no tax-authority authorization, partnership or e-filing",
     /dépôt officiel/.test(copy) && /l['’]envoi externe reste une décision humaine/.test(copy),
     "the copy must keep saying that external submission stays a human decision",
   );
+});
+
+check("the workspace keeps the regulatory disclaimer it used to carry", () => {
+  // The banner on the 21 workspace pages used to carry two claims in one
+  // string: that the interface was a prototype over demonstration data, and
+  // that no DGI integration exists. The owner opened the product to real firms
+  // on 4 Nov, so the first became false and was removed. The second is a hard
+  // constraint, and removing the first is exactly the edit that could take it
+  // along by accident -- so it is asserted here, per locale, by its words.
+  ok(
+    /No tax-authority authorization, partnership or e-filing integration is established or claimed/.test(
+      workspace,
+    ),
+    "the English workspace banner no longer disclaims authorization, partnership and e-filing",
+  );
+  ok(
+    /Aucune autorisation, aucun partenariat et aucune intégration de télédéclaration[\s\S]{0,60}n['’]est établi/.test(
+      workspace,
+    ),
+    "the French workspace banner no longer disclaims authorization, partnership and e-filing",
+  );
+  ok(
+    /No tax values are computed/.test(workspace) &&
+      /Aucune valeur fiscale n['’]est calculée/.test(workspace),
+    "the banner must keep saying no tax values are computed -- AI never presents a DGI determination",
+  );
+});
+
+check("the workspace no longer calls itself a prototype over demo data", () => {
+  // Real firms work in these screens now. A banner on every page telling them
+  // the records are demonstration data is both false and corrosive to trust.
+  const notice = [...workspace.matchAll(/demoNotice:\s*\n?\s*"([^"]*)"/g)].map((m) => m[1]);
+  eq(notice.length, 2, "expected one demoNotice per locale in lib/i18n.ts");
+  for (const line of notice) {
+    ok(
+      !/prototype/i.test(line),
+      `the workspace banner still calls the product a prototype: ${line}`,
+    );
+    ok(
+      !/Demonstration data only|Données de démonstration uniquement|no real client files|aucun dossier réel/i.test(
+        line,
+      ),
+      `the workspace banner still says the data is only for demonstration: ${line}`,
+    );
+  }
 });
 
 console.log(`\n${checks} checks, ${assertions} assertions passed.`);
