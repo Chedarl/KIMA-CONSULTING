@@ -36,8 +36,13 @@ const fr = {
       "Kima réunit les contribuables et leurs comptables dans un même espace : collecte des pièces, suivi des obligations, préparation des déclarations et archivage probant.",
     ctaPrimary: "Voir l'espace client",
     ctaSecondary: "Voir l'espace cabinet",
+    // Two claims used to share this string: that the interface was a prototype
+    // over demonstration data, and that no DGI integration exists. The first
+    // stopped being true when real firms started working in it; the second is a
+    // hard constraint and must never be dropped. They are separate strings now
+    // so that removing the first cannot quietly remove the second.
     demoNotice:
-      "Prototype d'interface. Données de démonstration uniquement — aucun dossier réel, aucune valeur fiscale calculée, aucune intégration avec la DGI.",
+      "Aucune valeur fiscale n'est calculée. Aucune autorisation, aucun partenariat et aucune intégration de télédéclaration avec la DGI n'est établi ou revendiqué.",
     pillarsTitle: "Ce qui distingue Kima",
     pillars: [
       {
@@ -265,7 +270,7 @@ const en: Dictionary = {
     ctaPrimary: "See the client portal",
     ctaSecondary: "See the firm workspace",
     demoNotice:
-      "Interface prototype. Demonstration data only — no real client files, no computed tax values, no DGI integration.",
+      "No tax values are computed. No tax-authority authorization, partnership or e-filing integration is established or claimed.",
     pillarsTitle: "What makes Kima different",
     pillars: [
       {
