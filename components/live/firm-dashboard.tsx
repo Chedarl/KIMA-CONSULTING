@@ -3,7 +3,7 @@ import { ledgerBalance } from "@/lib/billing";
 import { daysAgoInDouala, hourInDouala, todayInDouala } from "@/lib/dates";
 import { formatXaf } from "@/lib/i18n";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
@@ -195,7 +195,22 @@ function Tile({
 
 }
 
-function Kpi({ icon, label, value, delta, href }: { icon: string; label: string; value: number | string; delta?: string; href: string }) {
+/**
+ * A figure the dashboard does not have. Drawn as a dash and announced as
+ * words, because an em dash on its own tells a screen reader nothing -- and
+ * because rendering 0 here would be the dashboard asserting a number it has
+ * not read.
+ */
+function UnknownFigure({ label }: { label: string }) {
+  return (
+    <span className="text-fg-subtle" title={label}>
+      <span aria-hidden="true">—</span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
+function Kpi({ icon, label, value, delta, href }: { icon: string; label: string; value: ReactNode; delta?: string; href: string }) {
   return (
     <Link href={href} className="flex items-center gap-3 rounded-card border border-border bg-surface p-4 transition hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-raised">
       <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-teal-text">
@@ -485,8 +500,9 @@ export function FirmDashboard({
     const all = Object.values(tasks).flat() as { done?: boolean }[];
     const openTasks = all.filter((x) => !x.done).length;
     const due30 = open.filter((c) => c.due_on && c.due_on >= today && c.due_on <= inDays(30)).length;
-    return { clients: metrics.active, tasks: openTasks, due30, revenue: money?.collected ?? 0 };
-  }, [rows, tasks, metrics, money, today]);
+    // null, not 0: the ledger may simply not have loaded.
+    return { clients: metrics.active, tasks: openTasks, due30, revenue: money ? formatXaf(money.collected, locale) : null };
+  }, [rows, tasks, metrics, money, today, locale]);
 
   const compliance = useMemo(() => {
     const open = rows ?? [];
@@ -549,7 +565,7 @@ export function FirmDashboard({
           <Kpi icon="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" label={t.kpiClients} value={kpi.clients} href={`/${locale}/workspace/clients`} />
           <Kpi icon="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" label={t.kpiTasks} value={kpi.tasks} href={`/${locale}/workspace/tasks`} />
           <Kpi icon="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" label={t.kpiDue30} value={kpi.due30} href={`/${locale}/workspace/calendar`} />
-          <Kpi icon="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" label={t.kpiRevenue} value={formatXaf(kpi.revenue, locale)} href={`/${locale}/workspace/billing`} />
+          <Kpi icon="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" label={t.kpiRevenue} value={kpi.revenue ?? <UnknownFigure label={t.moneyUnknown} />} href={`/${locale}/workspace/billing`} />
         </div>
 
         <DeadlineHorizon rows={rows} today={today} locale={locale} t={t} />
@@ -609,16 +625,28 @@ export function FirmDashboard({
             }
           />
           <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4 sm:p-5">
+            {/*
+              An unavailable figure is not zero. `money` is null until the
+              ledger loads and again whenever the load fails, and these tiles
+              used to coalesce that to 0 -- so a firm with unread invoices was
+              shown "Facturé 0 XAF", a statement about its billing that the
+              dashboard had no basis for. The panel's own offline line already
+              promises the opposite: nothing shown rather than stale figures.
+            */}
             {[
-              { label: t.moneyBilled, value: money?.billed ?? 0 },
-              { label: t.moneyCollected, value: money?.collected ?? 0 },
-              { label: t.moneyOutstanding, value: money?.outstanding ?? 0 },
-              { label: t.moneyAwaiting, value: money?.awaiting ?? 0 },
+              { label: t.moneyBilled, value: money?.billed },
+              { label: t.moneyCollected, value: money?.collected },
+              { label: t.moneyOutstanding, value: money?.outstanding },
+              { label: t.moneyAwaiting, value: money?.awaiting },
             ].map((s) => (
               <div key={s.label}>
                 <p className="text-[11px] uppercase tracking-wide text-fg-subtle">{s.label}</p>
                 <p className="tnum mt-1 font-mono text-sm font-semibold text-fg">
-                  {formatXaf(s.value, locale)} XAF
+                  {s.value === undefined ? (
+                    <UnknownFigure label={t.moneyUnknown} />
+                  ) : (
+                    <>{formatXaf(s.value, locale)} XAF</>
+                  )}
                 </p>
               </div>
             ))}
