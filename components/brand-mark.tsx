@@ -19,5 +19,6 @@ export function BrandMark({ size = 28, className = "h-7 w-7 shrink-0" }: { size?
     })();
     return () => { alive = false; };
   }, []);
+  // eslint-disable-next-line @next/next/no-img-element -- a signed external logo, not a local asset
   return <img src={src} alt="" width={size} height={size} className={className} />;
 }

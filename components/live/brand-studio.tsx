@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { readFirmSession } from "@/lib/firm-auth";
 import { hexToRgb, luminance } from "@/lib/theme";
+import { PageHeading } from "@/components/ui";
 
 type Copy = { [k: string]: string };
 
@@ -59,10 +60,7 @@ export function BrandStudio({ t }: { t: Copy }) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-fg">{t.title}</h1>
-        <p className="mt-1 text-sm text-fg-muted">{t.subtitle}</p>
-      </div>
+      <PageHeading title={t.title} lede={t.subtitle} />
 
       <section className="rounded-card border border-border bg-surface p-5">
         <label className="text-sm font-semibold text-fg">{t.accentLabel}</label>
