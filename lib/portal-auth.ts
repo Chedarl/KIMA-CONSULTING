@@ -149,6 +149,74 @@ export async function verifyPortalCode(
   }
 }
 
+/**
+ * The portal session for a client who signed in with a password.
+ *
+ * Two sign-in routes reach the portal, and only one of them was finishing the
+ * job. The one-time-code route ends in `verifyPortalCode`, which returns a
+ * `PortalSession` the caller stores; the password route only called
+ * `auth.signInWithPassword` and navigated. That leaves a real Supabase Auth
+ * session with NO `kima.portal.session` behind it -- and `sessionTaxpayerId()`
+ * reads exactly that key. So every portal screen asked which taxpayer this was,
+ * got null, and rendered its empty or offline branch: requests, documents,
+ * payments, messages and the profile all looked permanently static to a client
+ * who had in fact signed in correctly. One missing session, six dead screens.
+ *
+ * The taxpayer is not taken from anything the browser said. It comes from
+ * `client_taxpayer_ids()`, the security-definer bridge that reads
+ * `contacts.auth_user_id = auth.uid()` -- the same binding every RLS policy
+ * uses. A caller who is not bound to a taxpayer gets no rows, and therefore no
+ * session, which is the honest answer rather than a signed-in shell with
+ * nothing in it.
+ *
+ * `audience` is derived from the taxpayer's own type, never from which tab the
+ * person happened to be on, so an individual cannot land in the business
+ * portal by choosing the wrong tab before typing a password.
+ */
+export async function sessionFromAuthUser(): Promise<PortalSession | null> {
+  const db = supabase();
+  const { data: auth } = await db.auth.getUser();
+  if (!auth.user) return null;
+
+  const { data: bridge, error: bridgeError } = await db.rpc("client_taxpayer_ids");
+  const ids = (bridge ?? []) as { taxpayer_id: string }[];
+  if (bridgeError || ids.length === 0) return null;
+
+  // More than one file is legitimate -- a person can be the contact for several
+  // taxpayers. The first is the landing file; `MyFiles` lists the rest.
+  const taxpayerId = ids[0].taxpayer_id;
+
+  const { data: row, error } = await db
+    .from("taxpayers")
+    .select("id, legal_name, taxpayer_type, niu, tax_centre, tax_regime, profile_verified")
+    .eq("id", taxpayerId)
+    .maybeSingle();
+  if (error || !row) return null;
+
+  const tp = row as {
+    id: string;
+    legal_name: string | null;
+    taxpayer_type: string | null;
+    niu: string | null;
+    tax_centre: string | null;
+    tax_regime: string | null;
+    profile_verified: boolean | null;
+  };
+  const type = (tp.taxpayer_type as TaxpayerType) ?? null;
+
+  return {
+    taxpayerId: tp.id,
+    displayName: tp.legal_name ?? "",
+    taxpayerType: type,
+    niu: tp.niu,
+    taxCentre: (tp.tax_centre as TaxCentre) ?? null,
+    taxRegime: (tp.tax_regime as Regime) ?? null,
+    profileVerified: Boolean(tp.profile_verified),
+    audience: (type ? taxpayerType(type)?.family : null) ?? "individual",
+    signedInAt: new Date().toISOString(),
+  };
+}
+
 export function audienceMismatch(session: PortalSession): boolean {
   if (!session.taxpayerType) return false;
   const family = taxpayerType(session.taxpayerType)?.family;

@@ -14,6 +14,7 @@ import {
   readSession,
   rememberSession,
   requestPortalCode,
+  sessionFromAuthUser,
   verifyPortalCode,
   type PortalAudience,
   type PortalSession,
@@ -87,11 +88,26 @@ export function PortalLogin({
     setBusy(true);
     setError(null);
     const { error: authError } = await supabase().auth.signInWithPassword({ email, password });
-    setBusy(false);
     if (authError) {
+      setBusy(false);
       setError(t.wrongCode);
       return;
     }
+    // An auth session alone is not a portal session. Every portal screen asks
+    // `sessionTaxpayerId()` which taxpayer this is, and that reads
+    // `kima.portal.session`. Navigating without writing it gave a signed-in
+    // client a portal where nothing loaded. The code route already stores one;
+    // this route has to as well.
+    const resolved = await sessionFromAuthUser();
+    setBusy(false);
+    if (!resolved) {
+      // Authenticated, but bound to no taxpayer. There is nothing to show, so
+      // say so instead of opening an empty portal.
+      await clearSession();
+      setError(t.noAccess);
+      return;
+    }
+    rememberSession(resolved);
     window.location.assign(portalHref);
   }
 
