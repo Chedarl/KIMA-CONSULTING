@@ -2002,3 +2002,27 @@ assert.ok(reviewSingleFlightBody.includes("if (reviewContextCurrent()) {\n      
   reviewSingleFlightBody.includes("if (reviewContextCurrent()) setFailed(r.id);") &&
   reviewSingleFlightBody.includes("if (reviewContextCurrent()) setBusy(null);"),
   "late document review outcomes must not alter a new case's feedback");
+
+
+// Phase 3/4: document-request creation must not submit a previous case's
+// non-idempotent INSERT after asynchronous Auth/engagement checks cross a
+// route or firm-member switch. Successful inserts still require audit events,
+// even if the screen changes after the write. This is a source-contract test,
+// not authenticated multi-tenant replay or database idempotency proof.
+assert.ok(requestReplayBody.includes("const requestContextCurrent = () =>") &&
+  requestReplayBody.includes("activeCaseIdRef.current === actionCaseId") &&
+  requestReplayBody.includes("sessionMemberRef.current === actionMemberId"),
+  "request creation must bind its original case and acting firm member");
+const requestContextGuard = requestReplayBody.indexOf('if (!requestContextCurrent()) throw new Error("Case or firm session changed");');
+const requestContextInsert = requestReplayBody.indexOf('db.from("document_requests").insert({');
+assert.ok(requestContextGuard >= 0 && requestContextGuard < requestContextInsert &&
+  requestContextGuard > requestReplayBody.indexOf("if (engagementError || !liveEngagement)"),
+  "stale request creation must be rejected after live preflight but before INSERT");
+const requestAuditInsert = requestReplayBody.indexOf('db.from("case_events").insert(event)');
+const requestContextReload = requestReplayBody.indexOf('if (requestContextCurrent()) {\n        setAskFr("");');
+assert.ok(requestAuditInsert > requestContextInsert && requestContextReload > requestAuditInsert &&
+  requestReplayBody.includes("        await load();"),
+  "successful request insert must attempt audit logging before guarded UI reset/reload");
+assert.ok(requestReplayBody.includes('if (requestContextCurrent()) setFailed("new-request");') &&
+  requestReplayBody.includes("if (requestContextCurrent()) setBusy(null);"),
+  "late request creation must not overwrite another case's failure or busy state");
