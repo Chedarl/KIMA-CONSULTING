@@ -86,32 +86,6 @@ export function PrimaryButton({
   );
 }
 
-export function Pill({
-  children,
-  tone,
-}: {
-  children: ReactNode;
-  tone: "green" | "green-outline" | "amber" | "amber-outline" | "muted" | "danger";
-}) {
-  const cls =
-    tone === "green"
-      ? "bg-success-soft text-success-text"
-      : tone === "green-outline"
-        ? "border border-success-text/40 bg-white text-success-text"
-        : tone === "amber"
-          ? "bg-amber-soft text-amber-text"
-          : tone === "amber-outline"
-            ? "border border-amber-text/40 bg-white text-amber-text"
-            : tone === "danger"
-              ? "bg-danger-soft text-danger-text"
-              : "border border-border bg-surface-sunken text-fg-muted";
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}>
-      {children}
-    </span>
-  );
-}
-
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
     <div className="rounded-card border border-dashed border-border bg-white px-5 py-8 text-center">

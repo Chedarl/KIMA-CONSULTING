@@ -9,10 +9,9 @@ import { join } from "node:path";
 // forbids both of those readings.
 //
 // StatusPill replaces the colour vocabulary with a meaning vocabulary. The
-// migration is not finished, so this is a ratchet rather than a ban: the
-// number of colour-chosen pills may fall, never rise. When it reaches zero,
-// delete Pill and this file with it.
-const BUDGET = 6;
+// migration is finished: the old Pill is deleted and this is now a ban, so a
+// colour-chosen pill cannot return.
+const BUDGET = 0;
 
 const roots = ["components", "app"];
 const files = [];
@@ -33,17 +32,12 @@ for (const file of files) {
 }
 const total = offenders.reduce((sum, o) => sum + o.count, 0);
 
-assert.ok(
-  total <= BUDGET,
-  `colour-chosen <Pill> count rose to ${total} (budget ${BUDGET}). ` +
+assert.equal(
+  total,
+  0,
+  `colour-chosen <Pill> count is ${total}; the old Pill is deleted. ` +
     "Use StatusPill with a tone that says what the state IS:\n" +
     offenders.map((o) => `  ${o.file}: ${o.count}`).join("\n"),
 );
 
-// A budget nobody lowers is a budget nobody honours.
-assert.ok(
-  total >= BUDGET - 3,
-  `colour-chosen <Pill> count fell to ${total}; lower BUDGET in this file to ${total} so it cannot climb back.`,
-);
-
-console.log(`ok status pill ratchet: ${total} colour-chosen pills left (budget ${BUDGET})`);
+console.log(`ok status pill ratchet: ${total} colour-chosen pills left`);
