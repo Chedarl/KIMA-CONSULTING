@@ -27,14 +27,15 @@ Checked 5 November 2026 against commit `9056916` (`refactor(ui): retire the colo
 - A client accepts an engagement letter; the database records which letter (#295; migrations `20261105110000`, `20261105120000`).
 - `route_unassigned_registration()` writes `organization_id` immediately. A suggestion is not built. That RPC is not applicant consent.
 
-**Open pull requests** (not done)
+**Selected open pull requests** (a short list of blockers, not every open pull request, and not done)
 
-- #422 firm suggestion (does not assign; not applied). #423 is the screen for it and does not call `route_unassigned_registration`. #424 classifies a missing records session; it replaces #154, which still conflicts. #421 is this note.
+- #422 and #423 are unmerged and on HOLD for security and correctness. They are not on main, not applied in production, and not verified as a French or English journey. #422 must not be merged while a caller can still assign a firm without the applicant, or answer with only an application reference. #423 must not be merged while the applicant cannot return later, signed in, to answer.
+- #424 classifies a missing records session on its own branch. Classifier unit tests passed there. That is not a browser session, and it is not deployed. #421 is this note.
 - #152 routing nav conflicts. #156 fresh-draft accept is +555/−30, conflicts, and the letter work supersedes it — do not merge as-is. #158 is a 31 October status list. #124 support packet conflicts. #298 conflicts; the live page no longer uses the `h-auto max-h-12` class that pull request describes.
 
 **Still missing**
 
-- The suggestion is not on main and not in production. A suggestion alone must not let the firm read the application or a client file. The applicant may decline. No production assignments and no production KIMA administrator provisioning in this note.
+- Firm suggestion is not deployed and not journey-tested. On main, `route_unassigned_registration()` still names a firm immediately. A suggestion alone must not let the firm read the application or a client file. The applicant may decline. No production assignments and no production KIMA administrator provisioning in this note.
 - Tax calendar, document exchange audit trail, messaging journey, in-app deadline reminders, firm-page redesign, and a French/English launch checklist. Payment incidents are marked verified in the 3 November snapshot; do not start a second packet beside #124.
 
 ---
