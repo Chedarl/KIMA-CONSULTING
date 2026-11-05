@@ -697,6 +697,10 @@ export function CaseDetail({
         </div>
       </div>
 
+      <div className="border-y border-border py-4">
+        <StageRail current={row.stage} locale={locale} stepWord={t.step} />
+      </div>
+
       {!session && (
         <p className="rounded-card border border-amber/50 bg-amber-soft px-4 py-3 text-sm text-amber-text">
           {t.actingAsHint}{" "}
@@ -774,7 +778,6 @@ export function CaseDetail({
           <Card>
             <CardHeader title={t.stageTitle} />
             <div className="flex flex-col gap-4 p-4 sm:p-5">
-              <StageRail current={row.stage} locale={locale} stepWord={t.step} />
               {requests.length > 0 ? (
                 <p className="text-sm text-fg-muted">
                   {t.receivedCount}{" "}
