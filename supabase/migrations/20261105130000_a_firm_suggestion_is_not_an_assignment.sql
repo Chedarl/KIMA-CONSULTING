@@ -22,9 +22,6 @@ create unique index registration_firm_suggestions_one_pending
 alter table public.registration_firm_suggestions enable row level security;
 revoke all on public.registration_firm_suggestions from public, anon, authenticated;
 
-comment on table public.registration_firm_suggestions is
-  'A proposed firm for an unassigned application. Pending grants the firm nothing. Only applicant acceptance sets registrations.organization_id.';
-
 create function public.suggest_firm_for_registration(
   p_registration_id uuid, p_firm_id uuid, p_reason text
 ) returns uuid
@@ -113,6 +110,7 @@ language plpgsql volatile security definer set search_path = ''
 as $$
 declare
   v_reg uuid;
+  v_already uuid;
   v_sug uuid;
   v_firm uuid;
   v_name text;
@@ -121,12 +119,19 @@ begin
   if p_action is null or p_action not in ('accept', 'decline') then
     raise exception 'accept or decline is required' using errcode = '22023';
   end if;
-  select r.id into v_reg
+  select r.id, r.organization_id into v_reg, v_already
     from public.registrations r
-   where r.workspace_ref = p_workspace_ref and r.organization_id is null
+   where r.workspace_ref = p_workspace_ref
    for update;
   if v_reg is null then
     raise exception 'no pending suggestion' using errcode = '22023';
+  end if;
+  if v_already is not null then
+    update public.registration_firm_suggestions
+       set status = 'expired', decided_at = pg_catalog.now()
+     where registration_id = v_reg and status = 'pending';
+    return query select 'expired'::text, ''::text;
+    return;
   end if;
   select s.id, s.organization_id, s.expires_at, o.name
     into v_sug, v_firm, v_expires, v_name
@@ -141,7 +146,8 @@ begin
     update public.registration_firm_suggestions
        set status = 'expired', decided_at = pg_catalog.now()
      where id = v_sug;
-    raise exception 'suggestion expired' using errcode = '22023';
+    return query select 'expired'::text, v_name;
+    return;
   end if;
   if p_action = 'decline' then
     update public.registration_firm_suggestions
@@ -167,8 +173,3 @@ revoke all on function public.my_firm_suggestion(uuid) from public;
 revoke all on function public.respond_to_firm_suggestion(uuid, text) from public;
 grant execute on function public.my_firm_suggestion(uuid) to anon, authenticated;
 grant execute on function public.respond_to_firm_suggestion(uuid, text) to anon, authenticated;
-
-comment on function public.suggest_firm_for_registration(uuid, uuid, text) is
-  'KIMA admin proposes a firm. Does not set registrations.organization_id. Repeat of the same pending firm returns the existing id.';
-comment on function public.respond_to_firm_suggestion(uuid, text) is
-  'Applicant, identified by their workspace_ref, accepts or declines. Accept is the moment the firm is named. Decline, expiry, and a stale row grant nothing.';
