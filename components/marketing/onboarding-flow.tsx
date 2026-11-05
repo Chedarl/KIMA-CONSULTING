@@ -189,7 +189,7 @@ export function OnboardingFlow({
             </div>
           </header>
           <main id="main" className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-            <Stepper labels={t.steps} current={0} />
+            <Stepper labels={t.steps} current={0} label={t.stepsLabel} doneLabel={t.stepDone} todoLabel={t.stepTodo} />
             <div id="choose" className="mx-auto mt-12 max-w-3xl text-center">
               <h1 className="font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">{t.title}</h1>
               <p className="mt-3 text-sm text-fg-muted sm:text-base">{t.subtitle}</p>
@@ -208,7 +208,9 @@ export function OnboardingFlow({
                 const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
                 if (!keys.includes(e.key)) return;
                 e.preventDefault();
-                const at = draft.kind ? KINDS.indexOf(draft.kind) : -1;
+                const focusedId = (document.activeElement as HTMLElement | null)?.id ?? "";
+                const fromFocus = KINDS.findIndex((k) => `kind-${k}` === focusedId);
+                const at = fromFocus >= 0 ? fromFocus : draft.kind ? KINDS.indexOf(draft.kind) : 0;
                 const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
                 const next = KINDS[(at + delta + KINDS.length) % KINDS.length];
                 patch({ kind: next });
@@ -234,9 +236,9 @@ export function OnboardingFlow({
                     {selected && (
                       <span
                         aria-hidden="true"
-                        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-teal-text text-xs font-bold text-white"
+                        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-teal-text text-white"
                       >
-                        ✓
+                        <CheckMark className="h-3.5 w-3.5" />
                       </span>
                     )}
                     <span
@@ -258,26 +260,31 @@ export function OnboardingFlow({
               </p>
             )}
             {/*
-              Continue waits for a choice rather than taking the click and
-              answering with an error. The hint says why it is waiting, so a
-              disabled control is never a dead end.
+              Continue looks unavailable until a choice is made, but it stays in
+              the tab order: a native `disabled` button cannot be focused, so a
+              keyboard user would tab straight past it and never learn why.
+              `aria-disabled` plus a guard keeps it reachable, and the guard
+              raises the same `errors.kind` alert the channel buttons raise, so
+              one condition has one message.
             */}
-            <div className="mt-8 flex flex-col items-center gap-2">
+            <div className="mt-8 flex justify-center">
               <button
                 type="button"
-                onClick={() => go("account")}
-                disabled={!draft.kind}
-                aria-describedby={draft.kind ? undefined : "choose-hint"}
-                className="public-cta inline-flex min-h-[48px] items-center gap-2 rounded-lg px-8 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() => {
+                  if (!draft.kind) {
+                    setIssues(["kind"]);
+                    return;
+                  }
+                  go("account");
+                }}
+                aria-disabled={!draft.kind}
+                className={`public-cta inline-flex min-h-[48px] items-center gap-2 rounded-lg px-8 text-sm font-semibold transition ${
+                  draft.kind ? "" : "opacity-45"
+                }`}
               >
                 {t.continue}
                 <span aria-hidden="true">→</span>
               </button>
-              {!draft.kind && (
-                <p id="choose-hint" className="text-xs text-fg-muted">
-                  {locale === "fr" ? "Choisissez une option pour continuer." : "Choose an option to continue."}
-                </p>
-              )}
             </div>
             <ChannelBar
               t={t}
@@ -434,14 +441,28 @@ export function OnboardingFlow({
  * with three states -- done, current, still to come -- joined by a rail that
  * fills as you advance.
  *
- * The markers are decoration: the list carries aria-current="step" and the
- * labels stay visible, so nothing here is conveyed by shape or colour alone.
+ * The markers are decoration. The current step carries aria-current="step",
+ * and a step behind or ahead carries a visually hidden word, because the fill
+ * of a circle is not readable: without it, done and still-to-come would differ
+ * by colour and shape alone.
  */
-function Stepper({ labels, current }: { labels: readonly string[]; current: number }) {
+function Stepper({
+  labels,
+  current,
+  label,
+  doneLabel,
+  todoLabel,
+}: {
+  labels: readonly string[];
+  current: number;
+  label: string;
+  doneLabel: string;
+  todoLabel: string;
+}) {
   return (
     <ol
       className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-1.5 gap-y-3 text-[13px] sm:text-sm"
-      aria-label={labels[0]}
+      aria-label={label}
     >
       {labels.map((label, i) => {
         const done = i < current;
@@ -458,10 +479,11 @@ function Stepper({ labels, current }: { labels: readonly string[]; current: numb
                     : "bg-surface-sunken text-fg-subtle"
               }`}
             >
-              {done ? "✓" : i + 1}
+              {done ? <CheckMark className="h-3.5 w-3.5" /> : i + 1}
             </span>
             <span className={now ? "font-semibold text-fg" : done ? "text-fg-muted" : "text-fg-subtle"}>
               {label}
+              {!now && <span className="sr-only"> ({done ? doneLabel : todoLabel})</span>}
             </span>
             {i < labels.length - 1 && (
               <span
@@ -473,6 +495,15 @@ function Stepper({ labels, current }: { labels: readonly string[]; current: numb
         );
       })}
     </ol>
+  );
+}
+
+/** The one check mark these screens use. CLAUDE.md: an icon is an SVG, never a glyph. */
+function CheckMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3.2 8.6l3 3 6.6-7" />
+    </svg>
   );
 }
 
