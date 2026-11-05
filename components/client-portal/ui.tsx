@@ -64,18 +64,21 @@ export function PrimaryButton({
   disabled,
   onClick,
   className = "",
+  ariaDescribedBy,
 }: {
   children: ReactNode;
   type?: "button" | "submit";
   disabled?: boolean;
   onClick?: () => void;
   className?: string;
+  ariaDescribedBy?: string;
 }) {
   return (
     <button
       type={type}
       disabled={disabled}
       onClick={onClick}
+      aria-describedby={ariaDescribedBy}
       className={`inline-flex min-h-[44px] items-center justify-center rounded-lg bg-teal-text px-4 text-sm font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-teal-text disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
     >
       {children}
