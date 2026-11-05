@@ -65,6 +65,7 @@ export function OnboardingFlow({
   const [inviteIssue, setInviteIssue] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [channelHint, setChannelHint] = useState<"whatsapp" | "callback" | "office" | null>(null);
 
   useEffect(() => {
@@ -117,6 +118,12 @@ export function OnboardingFlow({
       setStep("ready");
       return;
     }
+    const { data: auth, error: authError } = await supabase().auth.getUser();
+    if (authError || !auth.user) {
+      setNeedsSignIn(true);
+      return;
+    }
+    setNeedsSignIn(false);
     setBusy(true);
     const ref = workspaceRef ?? crypto.randomUUID();
     setWorkspaceRef(ref);
@@ -344,6 +351,15 @@ export function OnboardingFlow({
                   {saveFailed && (
                     <p role="alert" className="mt-3 text-sm text-danger-text">
                       {t.errors.failed}
+                    </p>
+                  )}
+                  {needsSignIn && (
+                    <p role="alert" className="mt-3 text-sm text-danger-text">
+                      <Link href={`/${locale}/login`} className="font-semibold underline">
+                        {locale === "fr"
+                          ? "Connectez-vous avant d'envoyer. Une demande anonyme ne peut pas être confirmée plus tard."
+                          : "Sign in before sending. An anonymous application cannot be confirmed later."}
+                      </Link>
                     </p>
                   )}
                   {step !== "ready" && (
