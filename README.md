@@ -38,6 +38,12 @@ Checked 5 November 2026 against commit `9056916` (`refactor(ui): retire the colo
 - Firm suggestion is not deployed and not journey-tested. On main, `route_unassigned_registration()` still names a firm immediately. A suggestion alone must not let the firm read the application or a client file. The applicant may decline. No production assignments and no production KIMA administrator provisioning in this note.
 - Tax calendar, document exchange audit trail, messaging journey, in-app deadline reminders, firm-page redesign, and a French/English launch checklist. Payment incidents are marked verified in the 3 November snapshot; do not start a second packet beside #124.
 
+### Status: done / still missing (this branch)
+
+**Done on this branch, not deployed.** A missing records session is signed out (`AuthSessionMissingError`, HTTP 401, HTTP 403). A retryable fetch, or an error with no HTTP status, is offline and the previous rows are cleared. The classifier unit tests passed. That is a test of the helper, not a browser session.
+
+**Still missing.** French and English use of the records screens has not been verified in a browser. This branch does not claim a deployment.
+
 ---
 
 
@@ -1086,7 +1092,7 @@ an accountant's decision reaches the client without either of them pressing
 anything.
 
 **Client record pages are now live too** (`components/live/client-records.tsx`,
-mounted at `/[locale]/app/{compliance,declarations,archive}`). They used to
+mounted at `/[locale]/app/{compliance,declarations,archive}`). A missing session (`AuthSessionMissingError`, 401, 403) is signed out. A retryable fetch or an error with no HTTP status is offline, and the previous rows are cleared. One `getUser` runs per load. They used to
 render `lib/demo-data` — an invented profile and invented obligations — while
 `lib/rules` and the case engine sat unused by them. They now read `taxpayers`,
 `compliance_cases`, `document_requests` and `case_events`: the four axes on

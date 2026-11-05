@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
-    "test": "node --experimental-strip-types scripts/jurisdiction-clock-check.mjs && node scripts/engine-check.mjs && node scripts/dsf-check.mjs && node scripts/clarity-check.mjs && npm run test:phase5 && npm run test:phase7:pilot && node scripts/light-scope-tokens-check.mjs && node --experimental-strip-types --test scripts/grant-rpc-refusal.test.mjs && node scripts/status-pill-ratchet.mjs && node scripts/dashboard-freshness-check.mjs && node scripts/workspace-nav-check.mjs && node scripts/money-honesty-check.mjs && node scripts/stat-tile-scope-check.mjs && node scripts/portal-audience-voice-check.mjs",
+    "test": "node --experimental-strip-types scripts/jurisdiction-clock-check.mjs && node scripts/engine-check.mjs && node scripts/dsf-check.mjs && node scripts/clarity-check.mjs && npm run test:phase5 && npm run test:phase7:pilot && node scripts/light-scope-tokens-check.mjs && node --experimental-strip-types --test scripts/grant-rpc-refusal.test.mjs scripts/client-records-auth.test.mjs && node scripts/status-pill-ratchet.mjs && node scripts/dashboard-freshness-check.mjs && node scripts/workspace-nav-check.mjs && node scripts/money-honesty-check.mjs && node scripts/stat-tile-scope-check.mjs && node scripts/portal-audience-voice-check.mjs",
     "test:journey": "node scripts/journey-check.mjs && node scripts/firm-signup-journey-check.mjs && node scripts/contact-inquiry-check.mjs && node scripts/onboarding-firm-optional-check.mjs",
     "test:staff:contract": "node scripts/staff-contract-smoke.mjs",
     "test:staff:screen": "node scripts/staff-screen-smoke.mjs",
