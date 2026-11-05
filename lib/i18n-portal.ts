@@ -216,10 +216,18 @@ const fr = {
   // they can act on.
   letterNotIssuedAccepted:
     "Cette mission a été acceptée sans lettre conservée dans le portail. Demandez-en une copie au cabinet si vous en avez besoin.",
+  letterSessionFailed: "Votre session a expiré. Reconnectez-vous pour voir votre lettre de mission.",
+  letterLoadFailed: "Impossible de charger votre lettre de mission.",
+  letterLoadFailedHint:
+    "Vérifiez votre connexion, puis réessayez. Rien n'a été accepté et rien n'a été modifié.",
+  letterRetry: "Réessayer",
+  letterUnavailable:
+    "La lettre n'a pas pu être chargée. Rien ne peut être accepté avant que vous ayez pu la lire.",
   letterUntitled: "Mission",
   letterStateAccepted: "Acceptée",
   letterStateToAccept: "À lire et accepter",
   letterStateNone: "Pas encore émise",
+  letterStateUnavailable: "Lettre indisponible",
   letterVersion: "Version",
   letterIssued: "Émise le",
   letterFee: "Honoraires",
@@ -485,10 +493,18 @@ const en: typeof fr = {
     "The firm has not issued a letter for this engagement yet. Nothing is being asked of you for now.",
   letterNotIssuedAccepted:
     "This engagement was accepted without a letter kept in the portal. Ask the firm for a copy if you need one.",
+  letterSessionFailed: "Your session has expired. Sign in again to see your engagement letter.",
+  letterLoadFailed: "Your engagement letter could not be loaded.",
+  letterLoadFailedHint:
+    "Check your connection and try again. Nothing was accepted and nothing was changed.",
+  letterRetry: "Try again",
+  letterUnavailable:
+    "The letter could not be loaded. Nothing can be accepted until you have been able to read it.",
   letterUntitled: "Engagement",
   letterStateAccepted: "Accepted",
   letterStateToAccept: "To read and accept",
   letterStateNone: "Not issued yet",
+  letterStateUnavailable: "Letter unavailable",
   letterVersion: "Version",
   letterIssued: "Issued",
   letterFee: "Fees",
