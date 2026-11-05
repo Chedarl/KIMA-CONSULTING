@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+type Firm = { id: string; name: string };
 type Row = {
   id: string;
   applicant_name: string;
@@ -19,23 +20,53 @@ type Row = {
 export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
   const fr = locale === "fr";
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [firms, setFirms] = useState<Firm[]>([]);
+  const [firmId, setFirmId] = useState("");
+  const [reason, setReason] = useState("");
   const [error, setError] = useState<"denied" | "offline" | null>(null);
+  const [formNote, setFormNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
     void (async () => {
-      const { data, error: failure } = await supabase().rpc("list_unassigned_registrations");
+      const db = supabase();
+      const [{ data, error: failure }, directory] = await Promise.all([
+        db.rpc("list_unassigned_registrations"),
+        db.rpc("firm_directory"),
+      ]);
       if (!active) return;
       if (failure) {
         setRows([]);
-        setError(/administrator required/i.test(failure.message) ? "denied" : "offline");
+        setError(failure.code === "42501" ? "denied" : "offline");
         return;
       }
       setError(null);
       setRows((data ?? []) as Row[]);
+      setFirms(((directory.data ?? []) as Firm[]).filter((f) => f.id && f.name));
     })();
     return () => { active = false; };
   }, []);
+
+  async function suggest(id: string) {
+    setBusy(true);
+    setFormNote(null);
+    const { data, error: failure } = await supabase().rpc("suggest_firm_for_registration", {
+      p_registration_id: id, p_firm_id: firmId, p_reason: reason.trim(),
+    });
+    setBusy(false);
+    if (failure || data == null || data === "") {
+      setFormNote(failure?.code === "42501"
+        ? (fr ? "Réservé à un administrateur KIMA." : "KIMA administrators only.")
+        : failure?.code === "22023"
+          ? (fr ? "Vérifiez le cabinet, le motif (12 caractères au moins) et qu'aucune proposition n'est déjà en cours." : "Check the firm, the reason (at least 12 characters), and that no suggestion is already pending.")
+          : (fr ? "Proposition refusée. Aucune attribution n'a été faite." : "Suggestion refused. Nothing was assigned."));
+      return;
+    }
+    setFormNote(fr
+      ? "Proposition enregistrée. Le cabinet ne voit pas la demande tant que le demandeur n'a pas accepté."
+      : "Suggestion recorded. The firm cannot see the application until the applicant accepts.");
+  }
 
   if (rows === null) {
     return <p role="status" className="text-sm text-fg-muted">{fr ? "Chargement…" : "Loading…"}</p>;
@@ -57,19 +88,33 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
   }
   return (
     <div className="overflow-x-auto rounded-card border border-border bg-white">
+      <p className="px-4 py-3 text-sm text-fg-muted">
+        {fr
+          ? "Une proposition n'attribue pas la demande. Le demandeur doit accepter."
+          : "A suggestion does not assign the application. The applicant must accept."}
+      </p>
+      <div className="flex flex-col gap-2 border-b border-border px-4 pb-3">
+        <label className="text-sm text-fg">
+          {fr ? "Cabinet proposé (nom public seulement)" : "Suggested firm (public name only)"}
+          <select value={firmId} onChange={(e) => setFirmId(e.target.value)} className="mt-1 min-h-[44px] w-full rounded-lg border border-border px-2">
+            <option value="">{fr ? "Choisir" : "Choose"}</option>
+            {firms.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        </label>
+        <label className="text-sm text-fg">
+          {fr ? "Motif (conservé dans l'audit KIMA)" : "Reason (kept in the KIMA audit)"}
+          <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-border px-2 py-1" />
+        </label>
+        {formNote && <p role="status" className="text-sm text-fg">{formNote}</p>}
+      </div>
       <table className="w-full min-w-[720px] text-left text-sm">
-        <caption className="px-4 py-3 text-left text-sm text-fg-muted">
-          {fr
-            ? "Lecture seule. L'attribution à un cabinet n'est pas encore décidée."
-            : "Read only. Assigning a firm is not decided yet."}
-        </caption>
         <thead className="text-fg-muted">
           <tr className="border-b border-border">
             <th className="px-4 py-3 font-medium">{fr ? "Demandeur" : "Applicant"}</th>
             <th className="px-4 py-3 font-medium">{fr ? "Raison sociale" : "Legal name"}</th>
             <th className="px-4 py-3 font-medium">{fr ? "NIU déclaré" : "Declared NIU"}</th>
             <th className="px-4 py-3 font-medium">{fr ? "Reçue" : "Received"}</th>
-            <th className="px-4 py-3 font-medium">{fr ? "État" : "Status"}</th>
+            <th className="px-4 py-3 font-medium">{fr ? "Proposer" : "Suggest"}</th>
           </tr>
         </thead>
         <tbody>
@@ -82,7 +127,13 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
               <td className="px-4 py-3 text-fg">{row.legal_name ?? row.taxpayer_type}</td>
               <td className="tnum px-4 py-3 font-mono text-xs text-fg">{row.declared_niu ?? "—"}</td>
               <td className="tnum px-4 py-3 text-fg-muted">{row.submitted_at.slice(0, 10)}</td>
-              <td className="px-4 py-3 text-fg-muted">{row.status} · {row.intake_channel}</td>
+              <td className="px-4 py-3">
+                <button type="button" disabled={busy || !firmId || reason.trim().length < 12}
+                  onClick={() => void suggest(row.id)}
+                  className="inline-flex min-h-[44px] items-center rounded-lg bg-navy px-3 text-sm font-semibold text-white disabled:opacity-50">
+                  {fr ? "Proposer" : "Suggest"}
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
