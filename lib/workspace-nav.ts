@@ -3,10 +3,10 @@ import type { IconName } from "@/components/shell";
 /**
  * The firm workspace information architecture, in one place.
  *
- * The rail had grown to 21 destinations across 7 headings against a specified
- * IA of 10. This is the nine the 4 Nov UI/UX audit asked for: every screen kept,
- * still reachable, and no URL changed. The tab strip is what replaces a rail
- * entry, which is the only reason collapsing the rail is safe.
+ * The 4 Nov update document specifies seven destinations: Accueil, Tâches,
+ * Coffre, Messages, Clients, Calendrier, Réglages. The rail carried nine. Every
+ * other screen stays reachable as a tab, no URL changes, and the tab strip is
+ * what makes collapsing the rail safe.
  *
  * `tabKey` indexes the firm nav dictionary, so FR/EN parity is already covered.
  */
@@ -38,6 +38,38 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
     tabs: [],
   },
   {
+    key: "work",
+    path: "/workflows",
+    icon: "queue",
+    fr: "Tâches",
+    en: "Tasks",
+    tabs: [
+      { path: "/workflows", tabKey: "workflows" },
+      { path: "/reviews", tabKey: "reviews" },
+      { path: "/cases", tabKey: "cases" },
+      { path: "/filing", tabKey: "filing" },
+    ],
+  },
+  {
+    key: "documents",
+    path: "/vault",
+    icon: "archive",
+    fr: "Coffre",
+    en: "Vault",
+    tabs: [
+      { path: "/vault", tabKey: "vault" },
+      { path: "/inbox", tabKey: "inbox" },
+    ],
+  },
+  {
+    key: "messages",
+    path: "/messages",
+    icon: "chat",
+    fr: "Messages",
+    en: "Messages",
+    tabs: [{ path: "/ai", tabKey: "ai" }],
+  },
+  {
     key: "clients",
     path: "/clients",
     icon: "people",
@@ -50,69 +82,27 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
       { path: "/routing", tabKey: "routing" },
       { path: "/engagements", tabKey: "engagements" },
       { path: "/templates", tabKey: "templates" },
-    ],
-  },
-  {
-    key: "work",
-    path: "/workflows",
-    icon: "queue",
-    fr: "Missions",
-    en: "Work",
-    tabs: [
-      { path: "/workflows", tabKey: "workflows" },
-      { path: "/reviews", tabKey: "reviews" },
-    ],
-  },
-  {
-    key: "documents",
-    path: "/inbox",
-    icon: "inbox",
-    fr: "Documents",
-    en: "Documents",
-    tabs: [
-      { path: "/inbox", tabKey: "inbox" },
-      { path: "/vault", tabKey: "vault" },
+      { path: "/billing", tabKey: "billing" },
+      { path: "/time", tabKey: "time" },
     ],
   },
   {
     key: "compliance",
     path: "/calendar",
     icon: "calendar",
-    fr: "Conformité",
-    en: "Compliance",
+    fr: "Calendrier",
+    en: "Calendar",
     tabs: [
       { path: "/calendar", tabKey: "calendar" },
       { path: "/dsf", tabKey: "dsf" },
-      { path: "/cases", tabKey: "cases" },
-      { path: "/filing", tabKey: "filing" },
-    ],
-  },
-  {
-    key: "messages",
-    path: "/messages",
-    icon: "chat",
-    fr: "Messages",
-    en: "Messages",
-    tabs: [],
-  },
-  {
-    key: "finance",
-    path: "/billing",
-    icon: "card",
-    fr: "Finances",
-    en: "Finance",
-    tabs: [
-      { path: "/billing", tabKey: "billing" },
-      { path: "/time", tabKey: "time" },
-      { path: "/reports", tabKey: "reports", ready: false },
     ],
   },
   {
     key: "firm",
     path: "/settings",
     icon: "cog",
-    fr: "Cabinet",
-    en: "Firm",
+    fr: "Réglages",
+    en: "Settings",
     tabs: [
       { path: "/settings", tabKey: "admin" },
       { path: "/staff", tabKey: "staff" },
@@ -120,15 +110,8 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
       { path: "/branding", tabKey: "branding" },
       { path: "/incidents", tabKey: "incidents" },
       { path: "/kyc", tabKey: "kyc" },
+      { path: "/reports", tabKey: "reports", ready: false },
     ],
-  },
-  {
-    key: "ai",
-    path: "/ai",
-    icon: "chat",
-    fr: "Kima AI",
-    en: "Kima AI",
-    tabs: [],
   },
 ];
 
