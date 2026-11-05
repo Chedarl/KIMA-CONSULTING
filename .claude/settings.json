@@ -33,5 +33,38 @@
       "Read(./.env.*.local)",
       "Read(./fixtures/real/**)"
     ]
+  },
+  "enabledPlugins": {
+    "ecc@ecc": true,
+    "superpowers@claude-plugins-official": true,
+    "caveman@caveman": true,
+    "taste-skill@taste-skill": true,
+    "task-observer@one-skill-to-rule-them-all": true,
+    "headroom@headroom-marketplace": true,
+    "claude-code-setup@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/protect-paths.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/lint-edited-file.mjs"
+          }
+        ]
+      }
+    ]
   }
 }
