@@ -2,8 +2,8 @@
 -- 20261101000000_route_unassigned_registration). The inbox half is
 -- list_unassigned_registrations() (20261031170000, unassigned_registration_
 -- list_test); this file is the act: only a bound KIMA administrator routes an
--- unassigned, still-open application to a working firm, with a reason and an
--- audit row. Synthetic data only; the whole file rolls back.
+-- unassigned application. As of 20261105141000 the function refuses every
+-- caller before it writes. Synthetic data only; the whole file rolls back.
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
@@ -40,32 +40,32 @@ select set_config('request.jwt.claims',
 select throws_ok(
   $$ select route_unassigned_registration(
        '00000000-0000-4000-e200-0000000000d1', '00000000-0000-4000-e200-0000000000b1', 'short') $$,
-  '22023', 'a documented reason is required',
-  'RT-05 routing without a documented reason is refused');
+  '42501', 'the applicant must confirm a suggestion before a firm is named',
+  'RT-05 even a short reason does not assign');
 select throws_ok(
   $$ select route_unassigned_registration(
        '00000000-0000-4000-e200-0000000000d1', '00000000-0000-4000-e200-0000000000b2',
        'Applicant asked for a francophone firm in Douala.') $$,
-  '22023', 'a working accounting firm is required',
-  'RT-06 routing to a suspended firm is refused');
+  '42501', 'the applicant must confirm a suggestion before a firm is named',
+  'RT-06 a suspended firm is not assigned by this function');
 select throws_ok(
   $$ select route_unassigned_registration(
        '00000000-0000-4000-e200-0000000000d1', '00000000-0000-4000-e200-0000000000b0',
        'Applicant asked for a francophone firm in Douala.') $$,
-  '22023', 'a working accounting firm is required',
-  'RT-07 routing to the KIMA root org itself is refused');
+  '42501', 'the applicant must confirm a suggestion before a firm is named',
+  'RT-07 the KIMA organisation is not assigned by this function');
 select throws_ok(
   $$ select route_unassigned_registration(
        '00000000-0000-4000-e200-0000000000d2', '00000000-0000-4000-e200-0000000000b1',
        'Applicant asked for a francophone firm in Douala.') $$,
-  '22023', 'no unassigned open application with this id',
-  'RT-08 an already-assigned application cannot be re-routed here');
+  '42501', 'the applicant must confirm a suggestion before a firm is named',
+  'RT-08 an already-named application is not moved');
 select throws_ok(
   $$ select route_unassigned_registration(
        '00000000-0000-4000-e200-0000000000d3', '00000000-0000-4000-e200-0000000000b1',
        'Applicant asked for a francophone firm in Douala.') $$,
-  '22023', 'no unassigned open application with this id',
-  'RT-09 a closed application is not routing material');
+  '42501', 'the applicant must confirm a suggestion before a firm is named',
+  'RT-09 a closed application is not assigned here');
 
 -- A non-admin cannot route at all, even with everything else valid.
 set local role authenticated;
@@ -75,34 +75,32 @@ select throws_ok(
   $$ select route_unassigned_registration(
        '00000000-0000-4000-e200-0000000000d1', '00000000-0000-4000-e200-0000000000b1',
        'Applicant asked for a francophone firm in Douala.') $$,
-  '42501', 'KIMA administrator required',
-  'RT-10 a firm partner cannot route the orphan to his own firm');
+  '42501', 'the applicant must confirm a suggestion before a firm is named',
+  'RT-10 a firm partner cannot assign the application to his own firm');
 
 -- The lawful route: admin, working firm, documented reason.
 set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-e200-0000000000b1","role":"authenticated"}', true);
-select lives_ok(
+select throws_ok(
   $$ select route_unassigned_registration(
        '00000000-0000-4000-e200-0000000000d1', '00000000-0000-4000-e200-0000000000b1',
        'Applicant asked for a francophone firm in Douala.') $$,
-  'RT-11 the KIMA admin routes the orphan to the working firm');
+  '42501', 'the applicant must confirm a suggestion before a firm is named',
+  'RT-11 a KIMA administrator cannot assign the firm either');
 
 reset role;
 select set_config('request.jwt.claims', '', true);
-select is(
-  (select organization_id::text from registrations
-    where id = '00000000-0000-4000-e200-0000000000d1'),
-  '00000000-0000-4000-e200-0000000000b1',
-  'RT-12 the application now belongs to the receiving firm');
+select ok(
+  (select organization_id from registrations
+    where id = '00000000-0000-4000-e200-0000000000d1') is null,
+  'RT-12 the application stays unassigned');
 select is(
   (select count(*) from audit_events
     where action = 'registration.routed'
-      and resource_id = '00000000-0000-4000-e200-0000000000d1'
-      and organization_id = '00000000-0000-4000-e200-0000000000b1'
-      and actor_member_id = '00000000-0000-4000-e200-0000000000c1'),
-  1::bigint,
-  'RT-13 and the routing sits in the receiving firm''s audit feed, reason included');
+      and resource_id = '00000000-0000-4000-e200-0000000000d1'),
+  0::bigint,
+  'RT-13 no routing audit row is written');
 
 select * from finish();
 rollback;

@@ -15,6 +15,12 @@ services. Initial market Cameroon, expansion CEMAC. French and English, XAF.
 
 > **Release status: HOLD.** The workspace is operational for signed-in firm members; the public site remains demonstration content. Migration parity is restored (104/104), and the owner enabled firm signup and public contact intake on 3 November 2026. The dated, evidence-based snapshot — feature matrix, security boundaries, known defects, testing evidence, roadmap — lives in [docs/2026-11-03-product-state.md](docs/2026-11-03-product-state.md).
 
+### Status: done / still missing (this branch)
+
+**Done on this branch, not deployed.** `route_unassigned_registration()` refuses before it writes. A KIMA administrator, a firm partner, and any other authenticated caller get the same refusal. The application stays unassigned and no routing audit row is written. The pgTAP file covers that refusal. It is not a browser test.
+
+**Still missing.** The suggestion and the applicant's confirmation are not on this branch. Nothing here is deployed.
+
 ---
 
 
