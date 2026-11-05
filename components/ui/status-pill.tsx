@@ -56,6 +56,49 @@ const TONES: Record<StatusTone, string> = {
   refused: "border-danger-text/30 bg-danger-soft text-danger-text",
 };
 
+/**
+ * Word and icon carry the state together; the tone is never the only carrier.
+ * The shapes are drawn, not emoji: check, clock, alert triangle, dashed ring,
+ * neutral dot, return arrow, cross.
+ */
+function ToneIcon({ tone }: { tone: StatusTone }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="h-3 w-3 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {tone === "confirmed" && <path d="M3.4 8.4l2.8 2.8 6.4-6.4" />}
+      {tone === "awaiting" && (
+        <>
+          <circle cx="8" cy="8" r="5.4" />
+          <path d="M8 4.6V8l2.2 1.4" />
+        </>
+      )}
+      {tone === "attention" && (
+        <>
+          <path d="M8 2.6l5.6 9.8H2.4z" />
+          <path d="M8 6.4v2.6M8 11.4v.1" />
+        </>
+      )}
+      {tone === "estimated" && <circle cx="8" cy="8" r="5.2" strokeDasharray="2.2 2.2" />}
+      {tone === "neutral" && <circle cx="8" cy="8" r="2.2" fill="currentColor" stroke="none" />}
+      {tone === "returned" && (
+        <>
+          <path d="M5.6 5.2L2.8 8l2.8 2.8" />
+          <path d="M2.8 8h6.1a3.2 3.2 0 010 6.4H6.2" />
+        </>
+      )}
+      {tone === "refused" && <path d="M4.6 4.6l6.8 6.8M11.4 4.6l-6.8 6.8" />}
+    </svg>
+  );
+}
+
 export function StatusPill({
   tone,
   children,
@@ -80,15 +123,7 @@ export function StatusPill({
         className,
       )}
     >
-      <span
-        aria-hidden="true"
-        className={cn(
-          "h-1.5 w-1.5 shrink-0 rounded-full bg-current",
-          // An estimate gets a hollow marker, so the distinction survives at a
-          // glance and in a screenshot, not only in the border.
-          tone === "estimated" && "bg-transparent ring-1 ring-current",
-        )}
-      />
+      <ToneIcon tone={tone} />
       {children}
       {note && <span className="sr-only"> — {note}</span>}
     </span>
