@@ -11,9 +11,30 @@ services. Initial market Cameroon, expansion CEMAC. French and English, XAF.
 
 ---
 
-## Current state — 3 November 2026
+## Status: done / still missing
 
-> **Release status: HOLD.** The workspace is operational for signed-in firm members; the public site remains demonstration content. Migration parity is restored (104/104), and the owner enabled firm signup and public contact intake on 3 November 2026. The dated, evidence-based snapshot — feature matrix, security boundaries, known defects, testing evidence, roadmap — lives in [docs/2026-11-03-product-state.md](docs/2026-11-03-product-state.md).
+Checked 5 November 2026 against commit `9056916` (`refactor(ui): retire the colour-chosen portal Pill`, #414). Release remains **HOLD**. The 3 November snapshot in [docs/2026-11-03-product-state.md](docs/2026-11-03-product-state.md) is older: it says 106 migrations and is not this commit.
+
+**Verified this date**
+
+- This tree has 126 files in `supabase/migrations/`. The newest name is `20261105120000`. That is a file count on this commit, not a query of production `schema_migrations`.
+- GitHub Actions for `9056916`: CI succeeded at 2026-11-05T05:52:32Z, and the Supabase migrations workflow succeeded at 2026-11-05T05:55:54Z.
+- `https://www.kimaconsulting.app/` answered HTTP 307 to `/fr` on 5 November 2026, and `/fr` answered HTTP 200. That is a reachability check, not a journey test.
+
+**Implemented on main** (merged code; not re-tested in a browser for this note)
+
+- Former-client consent, revoked rows cannot stay `authorized`, database client approval, record refresh, invitation error, scoped success colours, onboarding directory error, unassigned-application list (no phone column), and French/English refusal copy (#142–#151, #155).
+- A client accepts an engagement letter; the database records which letter (#295; migrations `20261105110000`, `20261105120000`).
+- `route_unassigned_registration()` writes `organization_id` immediately. A suggestion is not built. That RPC is not applicant consent.
+
+**Open pull requests** (not done)
+
+- #152 routing nav (conflicts with main). #154 missing-session versus offline (conflicts; `client-records.tsx` on this commit still ignores `getUser` errors). #156 fresh-draft accept, +555/−30, conflicts; the letter work supersedes it — do not merge as-is. #158 is a 31 October status list. #124 support packet and #298 header logo conflict with main.
+
+**Still missing**
+
+- KIMA suggests a firm and the applicant confirms. A suggestion alone must not let the firm read the application or a client file. The applicant may decline. No production assignments and no production KIMA administrator provisioning in this note.
+- Tax calendar, document exchange audit trail, messaging journey, in-app deadline reminders, firm-page redesign, and a French/English launch checklist. Payment incidents are marked verified in the 3 November snapshot; do not start a second packet beside #124.
 
 ---
 
