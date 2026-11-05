@@ -17,9 +17,9 @@ Checked 5 November 2026 against commit `9056916` (`refactor(ui): retire the colo
 
 **Verified this date**
 
-- This tree has 126 files in `supabase/migrations/`. The newest name is `20261105120000`. That is a file count on this commit, not a query of production `schema_migrations`.
+- This tree has 126 SQL files in `supabase/migrations/`. The newest name is `20261105120000`. On 5 November 2026 a read-only `count(*)` and `max(version)` of production `supabase_migrations.schema_migrations` returned 126 and `20261105120000`. No rows were written.
 - GitHub Actions for `9056916`: CI succeeded at 2026-11-05T05:52:32Z, and the Supabase migrations workflow succeeded at 2026-11-05T05:55:54Z.
-- `https://www.kimaconsulting.app/` answered HTTP 307 to `/fr` on 5 November 2026, and `/fr` answered HTTP 200. That is a reachability check, not a journey test.
+- `https://www.kimaconsulting.app/` answered HTTP 307 to `/fr` on 5 November 2026, and `/fr` answered HTTP 200. The French page HTML includes `logo-white.svg`, `logo-color.svg`, and the class `h-9`. That is a reachability check, not a journey test and not a measured layout.
 
 **Implemented on main** (merged code; not re-tested in a browser for this note)
 
@@ -29,11 +29,12 @@ Checked 5 November 2026 against commit `9056916` (`refactor(ui): retire the colo
 
 **Open pull requests** (not done)
 
-- #152 routing nav (conflicts with main). #154 missing-session versus offline (conflicts; `client-records.tsx` on this commit still ignores `getUser` errors). #156 fresh-draft accept, +555/−30, conflicts; the letter work supersedes it — do not merge as-is. #158 is a 31 October status list. #124 support packet and #298 header logo conflict with main.
+- #422 firm suggestion (does not assign; not applied). #423 is the screen for it and does not call `route_unassigned_registration`. #424 classifies a missing records session; it replaces #154, which still conflicts. #421 is this note.
+- #152 routing nav conflicts. #156 fresh-draft accept is +555/−30, conflicts, and the letter work supersedes it — do not merge as-is. #158 is a 31 October status list. #124 support packet conflicts. #298 conflicts; the live page no longer uses the `h-auto max-h-12` class that pull request describes.
 
 **Still missing**
 
-- KIMA suggests a firm and the applicant confirms. A suggestion alone must not let the firm read the application or a client file. The applicant may decline. No production assignments and no production KIMA administrator provisioning in this note.
+- The suggestion is not on main and not in production. A suggestion alone must not let the firm read the application or a client file. The applicant may decline. No production assignments and no production KIMA administrator provisioning in this note.
 - Tax calendar, document exchange audit trail, messaging journey, in-app deadline reminders, firm-page redesign, and a French/English launch checklist. Payment incidents are marked verified in the 3 November snapshot; do not start a second packet beside #124.
 
 ---
