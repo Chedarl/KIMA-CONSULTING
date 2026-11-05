@@ -240,6 +240,9 @@ export function CaseDetail({
   // Accept and return compete for one submitted document. Block a second
   // review decision synchronously, before React commits busy state.
   const reviewInFlight = useRef(false);
+  // Rapid task toggles can race Auth preflight before React commits busy state.
+  // Keep one task decision in flight in this mounted case screen.
+  const taskInFlight = useRef(false);
 
   const load = useCallback(async () => {
     const epoch = ++loadEpoch.current;
@@ -878,6 +881,7 @@ export function CaseDetail({
   }
 
   async function toggleTask(task: CaseTask) {
+    if (taskInFlight.current) return;
     // A disabled button is not authorization. The task must still belong to
     // this case, the firm must retain its engagement, and the member must
     // retain the ability to advance work. RLS remains the write authority.
@@ -893,6 +897,7 @@ export function CaseDetail({
       setRefusedBy(t.notPermitted);
       return;
     }
+    taskInFlight.current = true;
     setBusy(task.id);
     setFailed(null);
     setRefusedBy(null);
@@ -968,6 +973,7 @@ export function CaseDetail({
     } catch {
       setFailed(task.id);
     } finally {
+      taskInFlight.current = false;
       setBusy(null);
     }
   }
