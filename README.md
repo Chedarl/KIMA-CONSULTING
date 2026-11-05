@@ -15,6 +15,12 @@ services. Initial market Cameroon, expansion CEMAC. French and English, XAF.
 
 > **Release status: HOLD.** The workspace is operational for signed-in firm members; the public site remains demonstration content. Migration parity is restored (104/104), and the owner enabled firm signup and public contact intake on 3 November 2026. The dated, evidence-based snapshot — feature matrix, security boundaries, known defects, testing evidence, roadmap — lives in [docs/2026-11-03-product-state.md](docs/2026-11-03-product-state.md).
 
+### Status: done / still missing (this branch)
+
+**Done on this branch, not deployed.** A missing records session is signed out (`AuthSessionMissingError`, HTTP 401, HTTP 403). A retryable fetch, or an error with no HTTP status, is offline and the previous rows are cleared. The classifier unit tests passed. That is a test of the helper, not a browser session.
+
+**Still missing.** French and English use of the records screens has not been verified in a browser. This branch does not claim a deployment.
+
 ---
 
 
