@@ -10,6 +10,8 @@ import { useToast } from "@/components/toast";
 import { useRealtime } from "@/lib/use-realtime";
 import { WorkDrawer, type DrawerItem } from "@/components/live/work-drawer";
 import { Card, CardHeader } from "@/components/ui";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { StatusPill, type StatusTone } from "@/components/ui/status-pill";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
   awaitingClient,
@@ -53,6 +55,67 @@ const RISK_TONE: Record<Risk, string> = {
   due_soon: "border-amber/50 bg-amber-soft text-amber-text",
   unknown: "border-border-strong bg-surface-sunken text-fg-muted",
   on_track: "border-success/40 bg-success-soft text-success-text",
+};
+
+const DASH_COPY = {
+  fr: {
+    nextActions: "Prochaines actions",
+    month: "Ce mois-ci",
+    stages: "État des dossiers",
+    noActions: "Rien à traiter pour l'instant.",
+    noMonth: "Aucune échéance ce mois-ci.",
+    monthNote:
+      "Date indicative : source de la règle requise. KIMA n'est pas relié à la DGI.",
+    verify: "À vérifier",
+    statutory: "Statutaire",
+    open: "Ouvrir",
+    chase: "Relancer",
+    unblock: "Débloquer",
+    overdue: "En retard",
+    dueSoon: "Bientôt",
+    unknown: "Inconnu",
+    onTrack: "À jour",
+    stagesLabels: {
+      documents: "Documents",
+      preparation: "Préparation",
+      review: "Revue interne",
+      clientApproval: "Accord client",
+      blocked: "Bloqué",
+    },
+  },
+  en: {
+    nextActions: "Next actions",
+    month: "This month",
+    stages: "Portfolio state",
+    noActions: "Nothing to action right now.",
+    noMonth: "No deadline this month.",
+    monthNote:
+      "Indicative date: rule source required. KIMA is not connected to the DGI.",
+    verify: "To verify",
+    statutory: "Statutory",
+    open: "Open",
+    chase: "Chase",
+    unblock: "Unblock",
+    overdue: "Overdue",
+    dueSoon: "Due soon",
+    unknown: "Unknown",
+    onTrack: "On track",
+    stagesLabels: {
+      documents: "Documents",
+      preparation: "Preparation",
+      review: "Internal review",
+      clientApproval: "Client approval",
+      blocked: "Blocked",
+    },
+  },
+} as const;
+
+const RISK_RANK: Record<Risk, number> = { overdue: 0, due_soon: 1, unknown: 2, on_track: 3 };
+const RISK_PILL_TONE: Record<Risk, StatusTone> = {
+  overdue: "refused",
+  due_soon: "attention",
+  unknown: "neutral",
+  on_track: "confirmed",
 };
 
 const PIPELINE_STAGES: CaseStage[] = [
@@ -486,6 +549,57 @@ export function FirmDashboard({
   }, [t]);
 
   const nameOf = (c: Row) => c.taxpayer_name ?? names[c.taxpayer_id] ?? t.unnamedClient;
+  const dash = DASH_COPY[locale];
+  const riskLabel = (r: Risk) =>
+    r === "overdue"
+      ? dash.overdue
+      : r === "due_soon"
+        ? dash.dueSoon
+        : r === "unknown"
+          ? dash.unknown
+          : dash.onTrack;
+  const verbFor = (c: Row) => {
+    if (c.blocker?.trim()) return dash.unblock;
+    if (risk(c, today) === "overdue" || awaitingClient(requests[c.id] ?? [])) return dash.chase;
+    return dash.open;
+  };
+
+  const nextActions = useMemo(
+    () =>
+      [...(rows ?? [])]
+        .sort(
+          (a, b) =>
+            RISK_RANK[risk(a, today)] - RISK_RANK[risk(b, today)] ||
+            (a.due_on ?? "").localeCompare(b.due_on ?? ""),
+        )
+        .slice(0, 5),
+    [rows, today],
+  );
+
+  const monthly = useMemo(() => {
+    const month = today.slice(0, 7);
+    return (rows ?? [])
+      .filter((c) => c.due_on?.startsWith(month))
+      .sort((a, b) => (a.due_on ?? "").localeCompare(b.due_on ?? ""))
+      .slice(0, 6);
+  }, [rows, today]);
+
+  const stageCounts = useMemo(() => {
+    const open = rows ?? [];
+    return [
+      { key: "documents" as const, count: open.filter((c) => c.stage === "documents").length },
+      {
+        key: "preparation" as const,
+        count: open.filter((c) => c.stage === "accounting" || c.stage === "preparation").length,
+      },
+      { key: "review" as const, count: open.filter((c) => c.stage === "review").length },
+      {
+        key: "clientApproval" as const,
+        count: open.filter((c) => c.stage === "client_approval").length,
+      },
+      { key: "blocked" as const, count: open.filter((c) => Boolean(c.blocker?.trim())).length },
+    ];
+  }, [rows]);
 
   // Attention rail: each bucket is a query over the same rows and opens the
   // work drawer — context preserved, no route jump.
@@ -587,6 +701,84 @@ export function FirmDashboard({
           <Kpi icon="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" label={t.kpiDue30} scope={t.kpiDue30Scope} tone="amber" value={kpi.due30} href={`/${locale}/workspace/calendar`} />
           <Kpi icon="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" label={t.kpiRevenue} scope={t.kpiRevenueScope} tone="success" value={kpi.revenue ?? <UnknownFigure label={t.moneyUnknown} />} href={`/${locale}/workspace/billing`} />
         </div>
+
+        <div className="grid gap-5 xl:grid-cols-2">
+          <section>
+            <SectionHeading>{dash.nextActions}</SectionHeading>
+            <ul className="mt-3 flex flex-col gap-2">
+              {nextActions.length === 0 ? (
+                <li className="text-sm text-fg-muted">{dash.noActions}</li>
+              ) : (
+                nextActions.map((c) => (
+                  <li key={c.id}>
+                    <Link
+                      href={`/${locale}/workspace/cases/${c.id}`}
+                      className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm transition-colors hover:bg-surface-sunken"
+                    >
+                      <StatusPill size="sm" tone={RISK_PILL_TONE[risk(c, today)]}>
+                        {riskLabel(risk(c, today))}
+                      </StatusPill>
+                      <span className="min-w-0 flex-1 truncate font-medium text-fg">
+                        {nameOf(c)} · {obligationLabel(c.obligation_code, locale)}
+                      </span>
+                      <span className="text-xs font-semibold text-teal-text">{verbFor(c)}</span>
+                    </Link>
+                  </li>
+                ))
+              )}
+            </ul>
+          </section>
+
+          <section>
+            <SectionHeading>{dash.month}</SectionHeading>
+            <ul className="mt-3 flex flex-col gap-2">
+              {monthly.length === 0 ? (
+                <li className="text-sm text-fg-muted">{dash.noMonth}</li>
+              ) : (
+                monthly.map((c) => (
+                  <li
+                    key={c.id}
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm"
+                  >
+                    <span className="tnum font-mono text-xs text-fg">{c.due_on}</span>
+                    <span className="min-w-0 flex-1 truncate text-fg">
+                      {nameOf(c)} · {obligationLabel(c.obligation_code, locale)}
+                    </span>
+                    <StatusPill
+                      size="sm"
+                      tone={c.due_needs_confirmation ? "estimated" : "confirmed"}
+                    >
+                      {c.due_needs_confirmation ? dash.verify : dash.statutory}
+                    </StatusPill>
+                  </li>
+                ))
+              )}
+            </ul>
+            <p className="mt-2 max-w-[68ch] text-xs leading-relaxed text-fg-muted">
+              {dash.monthNote}
+            </p>
+          </section>
+        </div>
+
+        <section>
+          <SectionHeading>{dash.stages}</SectionHeading>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {stageCounts.map((s) => (
+              <Link
+                key={s.key}
+                href={queueHref}
+                className="rounded-lg border border-border bg-surface px-3 py-3 transition-colors hover:bg-surface-sunken"
+              >
+                <span className="tnum block font-display text-xl font-semibold text-fg">
+                  {s.count}
+                </span>
+                <span className="mt-0.5 block text-xs text-fg-muted">
+                  {dash.stagesLabels[s.key]}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
 
         <DeadlineHorizon rows={rows} today={today} locale={locale} t={t} />
 
