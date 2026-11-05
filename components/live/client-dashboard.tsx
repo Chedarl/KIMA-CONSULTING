@@ -6,7 +6,8 @@ import { demoIds, supabase } from "@/lib/supabase";
 import { submitRequestFile } from "@/lib/submit-request";
 import { todayInDouala } from "@/lib/dates";
 import { usePortalCopy } from "@/components/client-portal/copy";
-import { Pill, PrimaryButton, StatusStepper } from "@/components/client-portal/ui";
+import { PrimaryButton, StatusStepper } from "@/components/client-portal/ui";
+import { StatusPill } from "@/components/ui/status-pill";
 import { ActionQueue } from "@/components/client-portal/action-queue";
 import { PortalAside } from "@/components/client-portal/portal-aside";
 import { MyObligations } from "@/components/client-portal/my-obligations";
@@ -566,9 +567,9 @@ export function ClientDashboard({
                           ))}
                         </span>
                       </span>
-                      <Pill tone={state === "waiting_on_you" ? "amber" : state === "complete" ? "green" : "muted"}>
+                      <StatusPill tone={state === "waiting_on_you" ? "attention" : state === "complete" ? "confirmed" : "neutral"}>
                         {state === "waiting_on_you" ? copy.badgeAction : state === "complete" ? copy.badgeDone : copy.badgeActive}
-                      </Pill>
+                      </StatusPill>
                     </Link>
                   </li>
                 );

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { demoIds, supabase, type DocumentRequestRow, type DocumentRow } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { usePortalCopy } from "@/components/client-portal/copy";
-import { EmptyState, FilterBar, PageHeading, Pill, PrimaryButton } from "@/components/client-portal/ui";
+import { EmptyState, FilterBar, PageHeading, PrimaryButton } from "@/components/client-portal/ui";
+import { StatusPill } from "@/components/ui/status-pill";
 import { todayInDouala, dueBucket } from "@/lib/dates";
 import { submitRequestFile } from "@/lib/submit-request";
 import {
@@ -339,7 +340,7 @@ export function DocumentsPanel({
                     <tr key={d.id} className="border-b border-border last:border-0 hover:bg-surface-sunken">
                       <td className="px-4 py-3 font-medium text-fg">{d.file_name}</td>
                       <td className="px-4 py-3">
-                        <Pill tone={accepted ? "green" : "green-outline"}>{accepted ? copy.statusAccepted : copy.statusReceived}</Pill>
+                        <StatusPill tone={accepted ? "confirmed" : "awaiting"}>{accepted ? copy.statusAccepted : copy.statusReceived}</StatusPill>
                       </td>
                       <td className="tnum px-4 py-3 text-fg-muted">{d.created_at.slice(0, 10)}</td>
                       <td className="px-4 py-3">
@@ -406,9 +407,9 @@ export function DocumentsPanel({
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <Pill tone={accepted ? "green" : received ? "green-outline" : mine ? "amber" : "muted"}>
+                      <StatusPill tone={accepted ? "confirmed" : received ? "awaiting" : mine ? "attention" : "neutral"}>
                         {accepted ? copy.statusAccepted : received ? copy.statusReceived : mine ? copy.statusMissing : requestStatusLabel(r.status, locale)}
-                      </Pill>
+                      </StatusPill>
                     </td>
                     <td className="px-4 py-3 text-fg-muted">
                       {mine ? `${copy.requestedBy} ${r.due_on}` : received ? labels.receivedNotAccepted : "—"}

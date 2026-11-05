@@ -5,7 +5,8 @@ import { feePaymentState, ledgerBalance } from "@/lib/billing";
 import { audit, sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { usePortalCopy } from "@/components/client-portal/copy";
-import { EmptyState, FilterBar, PageHeading, Pill, PrimaryButton, xaf } from "@/components/client-portal/ui";
+import { EmptyState, FilterBar, PageHeading, PrimaryButton, xaf } from "@/components/client-portal/ui";
+import { StatusPill } from "@/components/ui/status-pill";
 import { todayInDouala } from "@/lib/dates";
 
 /**
@@ -309,9 +310,9 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
                       {labels.due} {inv.due_on ?? "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <Pill tone={settled ? "green" : reported ? "amber-outline" : "amber"}>
+                      <StatusPill tone={settled ? "confirmed" : reported ? "awaiting" : "attention"}>
                         {settled ? copy.paid : reported ? copy.paymentReported : copy.due}
-                      </Pill>
+                      </StatusPill>
                     </td>
                     <td className="px-4 py-3">
                       {settled ? (
@@ -373,9 +374,9 @@ export function PaymentsPanel({ locale, labels }: { locale: "fr" | "en"; labels:
                   <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-xs text-fg-subtle">{p.provider_reference}</code>
                 )}
                 <span className="ml-auto">
-                  <Pill tone={p.status === "confirmed" ? "green" : p.status === "rejected" ? "danger" : "amber"}>
+                  <StatusPill tone={p.status === "confirmed" ? "confirmed" : p.status === "rejected" ? "refused" : "awaiting"}>
                     {p.status === "confirmed" ? labels.statusConfirmed : p.status === "rejected" ? labels.statusRejected : labels.statusPending}
-                  </Pill>
+                  </StatusPill>
                 </span>
               </li>
             ))}

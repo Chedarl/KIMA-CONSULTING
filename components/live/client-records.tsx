@@ -5,7 +5,8 @@ import Link from "next/link";
 import { sessionTaxpayerId, supabase } from "@/lib/supabase";
 import { Card, CardHeader, Timeline } from "@/components/ui";
 import { usePortalCopy } from "@/components/client-portal/copy";
-import { EmptyState, PageHeading, Pill } from "@/components/client-portal/ui";
+import { EmptyState, PageHeading } from "@/components/client-portal/ui";
+import { StatusPill } from "@/components/ui/status-pill";
 import type { getWorkspaceDictionary } from "@/lib/i18n-workspace";
 import {
   awaitingClient,
@@ -193,7 +194,7 @@ function statusOf(c: ComplianceCase, byCase: Record<string, CaseRequest[]>): Cli
   return clientStatus(c, awaitingClient(byCase[c.id] ?? []));
 }
 
-function StatusPill({ label, status }: { label: string; status: ClientStatus }) {
+function CaseStatusPill({ label, status }: { label: string; status: ClientStatus }) {
   const cls =
     status === "complete"
       ? "border-success-text/30 bg-success-soft text-success-text"
@@ -359,7 +360,7 @@ export function ClientCompliance({
                     <p className="tnum font-mono text-xs text-fg-subtle">{cs.period_token}</p>
                   </div>
                   <DueLine c={cs} dash={dash} />
-                  <StatusPill label={clientStatusLabel(status, locale)} status={status} />
+                  <CaseStatusPill label={clientStatusLabel(status, locale)} status={status} />
                 </li>
               );
             })}
@@ -410,7 +411,7 @@ export function ClientDeclarations({
                   title={`${obligationLabel(cs.obligation_code, locale)} — ${cs.period_token}`}
                   action={
                     <span className="flex flex-wrap items-center gap-2">
-                      <StatusPill label={clientStatusLabel(status, locale)} status={status} />
+                      <CaseStatusPill label={clientStatusLabel(status, locale)} status={status} />
                       <Link
                         href={`/${locale}/app/declarations/${cs.id}`}
                         className="inline-flex min-h-[44px] items-center text-sm font-semibold text-teal-text"
@@ -554,7 +555,7 @@ export function ClientArchive({
                       <td className="px-4 py-3 font-medium text-fg">{obligationLabel(cs.obligation_code, locale)}</td>
                       <td className="tnum px-4 py-3 text-fg-muted">{cs.period_token}</td>
                       <td className="px-4 py-3">
-                        <Pill tone="green">{copy.delivered}</Pill>
+                        <StatusPill tone="confirmed">{copy.delivered}</StatusPill>
                       </td>
                       <td className="tnum px-4 py-3 text-fg-muted">{(cs.filing_verified_at ?? "").slice(0, 10) || "—"}</td>
                       <td className="px-4 py-3">
