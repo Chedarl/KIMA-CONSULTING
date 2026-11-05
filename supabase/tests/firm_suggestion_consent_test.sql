@@ -49,11 +49,11 @@ select throws_ok($$ select count(*) from registration_firm_suggestions $$, '4250
 
 reset role;
 set local role anon;
-select throws_ok($$ select firm_name from my_firm_suggestion('00000000-0000-4000-e800-0000000000e1') $$, '42501', null, 'SG-8 anonymous cannot read a suggestion');
+select throws_ok($$ select firm_name from my_firm_suggestion() $$, '42501', null, 'SG-8 anonymous cannot read a suggestion');
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e800-0000000000a4","role":"authenticated"}', true);
-select ok((select firm_name from my_firm_suggestion('00000000-0000-4000-e800-0000000000e1')) is null, 'SG-9 the exact reference shows another person nothing');
-select throws_ok($$ select * from respond_to_firm_suggestion('00000000-0000-4000-e800-0000000000e1','decline') $$, '22023', 'no pending suggestion', 'SG-10 another person cannot answer');
+select ok((select firm_name from my_firm_suggestion()) is null, 'SG-9 another signed-in person sees nothing');
+select throws_ok($$ select * from respond_to_firm_suggestion('decline') $$, '22023', 'no pending suggestion', 'SG-10 another person cannot answer');
 reset role;
 select is((select organization_id from registrations where id = '00000000-0000-4000-e800-0000000000d1'), null, 'SG-11 the stranger changed nothing');
 set local role authenticated;
@@ -94,7 +94,7 @@ select is((select organization_id from registrations where id = '00000000-0000-4
 update registration_firm_suggestions set expires_at = now() - interval '1 day' where registration_id = '00000000-0000-4000-e800-0000000000d2' and status = 'pending';
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e800-0000000000a3","role":"authenticated"}', true);
-select is((select outcome from respond_to_firm_suggestion('00000000-0000-4000-e800-0000000000e2','accept')), 'expired', 'SG-16 an expired suggestion cannot be accepted');
+select is((select outcome from respond_to_firm_suggestion('accept')), 'expired', 'SG-16 an expired suggestion cannot be accepted');
 reset role;
 select is((select organization_id from registrations where id = '00000000-0000-4000-e800-0000000000d2'), null, 'SG-17 expiry grants nothing');
 select is((select count(*) from registration_firm_suggestions where registration_id = '00000000-0000-4000-e800-0000000000d2' and status = 'pending'), 0::bigint, 'SG-20 no pending row remains after the reply');
@@ -104,7 +104,7 @@ select lives_ok($$ select suggest_firm_for_registration('00000000-0000-4000-e800
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e800-0000000000a4","role":"authenticated"}', true);
-select throws_ok($$ select * from respond_to_firm_suggestion('00000000-0000-4000-e800-0000000000e2','accept') $$, '22023', 'no pending suggestion', 'SG-19b a stranger cannot accept');
+select throws_ok($$ select * from respond_to_firm_suggestion('accept') $$, '22023', 'no pending suggestion', 'SG-19b a stranger cannot accept');
 reset role;
 select is((select organization_id from registrations where id = '00000000-0000-4000-e800-0000000000d2'), null, 'SG-19c the application stays unassigned');
 set local role authenticated;

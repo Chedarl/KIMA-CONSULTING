@@ -114,25 +114,8 @@ begin
   return v_id;
 end $$;
 
-create or replace function public.my_firm_suggestion(p_workspace_ref uuid)
-returns table (firm_name text, status text, expires_at timestamptz)
-language plpgsql stable security definer set search_path = ''
-as $$
-begin
-  if auth.uid() is null then
-    raise exception 'sign in required' using errcode = '42501';
-  end if;
-  return query
-  select o.name, s.status, s.expires_at
-    from public.registrations r
-    join public.registration_firm_suggestions s on s.registration_id = r.id
-    join public.organizations o on o.id = s.organization_id
-   where r.workspace_ref = p_workspace_ref
-     and r.applicant_user_id = auth.uid()
-     and r.organization_id is null
-     and s.status = 'pending'
-     and s.expires_at > pg_catalog.now();
-end $$;
+drop function public.my_firm_suggestion(uuid);
+drop function public.respond_to_firm_suggestion(uuid, text);
 
 create function public.my_firm_suggestion()
 returns table (firm_name text, status text, expires_at timestamptz)
@@ -153,7 +136,7 @@ begin
      and s.expires_at > pg_catalog.now();
 end $$;
 
-create or replace function public.respond_to_firm_suggestion(p_workspace_ref uuid, p_action text)
+create function public.respond_to_firm_suggestion(p_action text)
 returns table (outcome text, firm_name text)
 language plpgsql volatile security definer set search_path = ''
 as $$
@@ -173,9 +156,11 @@ begin
   end if;
   select r.id, r.organization_id into v_reg, v_already
     from public.registrations r
-   where r.workspace_ref = p_workspace_ref
-     and r.applicant_user_id = auth.uid()
-   for update;
+    join public.registration_firm_suggestions pending on pending.registration_id = r.id and pending.status = 'pending'
+   where r.applicant_user_id = auth.uid()
+   order by pending.created_at
+   limit 1
+   for update of r;
   if v_reg is null then
     raise exception 'no pending suggestion' using errcode = '22023';
   end if;
@@ -220,34 +205,7 @@ begin
   return query select 'accepted'::text, v_name;
 end $$;
 
-create function public.respond_to_firm_suggestion(p_action text)
-returns table (outcome text, firm_name text)
-language plpgsql volatile security definer set search_path = ''
-as $$
-declare
-  v_ref uuid;
-begin
-  if auth.uid() is null then
-    raise exception 'sign in required' using errcode = '42501';
-  end if;
-  select r.workspace_ref into v_ref
-    from public.registrations r
-    join public.registration_firm_suggestions s on s.registration_id = r.id
-   where r.applicant_user_id = auth.uid()
-     and s.status = 'pending'
-   order by s.created_at
-   limit 1;
-  if v_ref is null then
-    raise exception 'no pending suggestion' using errcode = '22023';
-  end if;
-  return query select * from public.respond_to_firm_suggestion(v_ref, p_action);
-end $$;
-
-revoke all on function public.my_firm_suggestion(uuid) from public, anon;
 revoke all on function public.my_firm_suggestion() from public, anon;
-revoke all on function public.respond_to_firm_suggestion(uuid, text) from public, anon;
 revoke all on function public.respond_to_firm_suggestion(text) from public, anon;
-grant execute on function public.my_firm_suggestion(uuid) to authenticated;
 grant execute on function public.my_firm_suggestion() to authenticated;
-grant execute on function public.respond_to_firm_suggestion(uuid, text) to authenticated;
 grant execute on function public.respond_to_firm_suggestion(text) to authenticated;
