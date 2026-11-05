@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { suggestionReply } from "../lib/firm-suggestion-reply.ts";
+import { suggestionDraftAfter, suggestionReply } from "../lib/firm-suggestion-reply.ts";
 
 const named = [{ outcome: "accepted", firm_name: "Cabinet Douala", staff_email: "hidden@firm.test" }];
 
@@ -30,6 +30,18 @@ test("decline, expiry, an error, and an empty result assign nothing", () => {
   assert.match(suggestionReply("fr", null, [{ outcome: "expired", firm_name: "X" }]).message, /expiré/);
   assert.match(suggestionReply("en", null, [{ outcome: "declined", firm_name: "X" }]).message, /declined/);
   assert.match(suggestionReply("en", { message: "permission denied" }, named).message, /refused/);
+});
+
+test("a recorded suggestion clears the firm and the application", () => {
+  const kept = suggestionDraftAfter(
+    { firmId: "firm-1", reason: "Douala, francophone", applicationId: "app-1" },
+    "refused",
+  );
+  assert.equal(kept.applicationId, "app-1");
+  const cleared = suggestionDraftAfter(kept, "recorded");
+  assert.equal(cleared.firmId, "");
+  assert.equal(cleared.reason, "");
+  assert.equal(cleared.applicationId, null);
 });
 
 test("the routing screen suggests and does not call the assigning RPC", () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { suggestionDraftAfter } from "@/lib/firm-suggestion-reply";
 import { supabase } from "@/lib/supabase";
 
 type Firm = { id: string; name: string };
@@ -23,6 +24,8 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
   const [firms, setFirms] = useState<Firm[]>([]);
   const [firmId, setFirmId] = useState("");
   const [reason, setReason] = useState("");
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [directoryError, setDirectoryError] = useState<string | null>(null);
   const [error, setError] = useState<"denied" | "offline" | null>(null);
   const [formNote, setFormNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,12 +46,21 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
       }
       setError(null);
       setRows((data ?? []) as Row[]);
+      if (directory.error) {
+        setDirectoryError(directory.error.code === "42501"
+          ? (fr ? "Liste des cabinets refusée." : "Firm list refused.")
+          : (fr ? "Liste des cabinets indisponible." : "Firm list unavailable."));
+        setFirms([]);
+        return;
+      }
+      setDirectoryError(null);
       setFirms(((directory.data ?? []) as Firm[]).filter((f) => f.id && f.name));
     })();
     return () => { active = false; };
-  }, []);
+  }, [fr]);
 
   async function suggest(id: string) {
+    if (id !== applicationId) return;
     setBusy(true);
     setFormNote(null);
     const { data, error: failure } = await supabase().rpc("suggest_firm_for_registration", {
@@ -56,6 +68,10 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
     });
     setBusy(false);
     if (failure || data == null || data === "") {
+      const kept = suggestionDraftAfter({ firmId, reason, applicationId }, "refused");
+      setFirmId(kept.firmId);
+      setReason(kept.reason);
+      setApplicationId(kept.applicationId);
       setFormNote(failure?.code === "42501"
         ? (fr ? "Réservé à un administrateur KIMA." : "KIMA administrators only.")
         : failure?.code === "22023"
@@ -63,9 +79,13 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
           : (fr ? "Proposition refusée. Aucune attribution n'a été faite." : "Suggestion refused. Nothing was assigned."));
       return;
     }
+    const cleared = suggestionDraftAfter({ firmId, reason, applicationId }, "recorded");
+    setFirmId(cleared.firmId);
+    setReason(cleared.reason);
+    setApplicationId(cleared.applicationId);
     setFormNote(fr
-      ? "Proposition enregistrée. Le cabinet ne voit pas la demande tant que le demandeur n'a pas accepté."
-      : "Suggestion recorded. The firm cannot see the application until the applicant accepts.");
+      ? "Proposition enregistrée pour cette demande seulement. Le cabinet ne la voit pas tant que le demandeur n'a pas accepté."
+      : "Suggestion recorded for this application only. The firm cannot see it until the applicant accepts.");
   }
 
   if (rows === null) {
@@ -105,6 +125,8 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
           {fr ? "Motif (conservé dans l'audit KIMA)" : "Reason (kept in the KIMA audit)"}
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-border px-2 py-1" />
         </label>
+        {directoryError && <p role="alert" className="text-sm text-danger-text">{directoryError}</p>}
+        {applicationId && <p className="text-sm text-fg">{fr ? "Cette proposition concerne une seule demande." : "This suggestion is for one application."}</p>}
         {formNote && <p role="status" className="text-sm text-fg">{formNote}</p>}
       </div>
       <table className="w-full min-w-[720px] text-left text-sm">
@@ -128,10 +150,14 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
               <td className="tnum px-4 py-3 font-mono text-xs text-fg">{row.declared_niu ?? "—"}</td>
               <td className="tnum px-4 py-3 text-fg-muted">{row.submitted_at.slice(0, 10)}</td>
               <td className="px-4 py-3">
-                <button type="button" disabled={busy || !firmId || reason.trim().length < 12}
-                  onClick={() => void suggest(row.id)}
+                <button type="button"
+                  disabled={busy || (applicationId === row.id && (!firmId || reason.trim().length < 12))}
+                  onClick={() => {
+                    if (applicationId !== row.id) { setApplicationId(row.id); setFormNote(null); return; }
+                    void suggest(row.id);
+                  }}
                   className="inline-flex min-h-[44px] items-center rounded-lg bg-navy px-3 text-sm font-semibold text-white disabled:opacity-50">
-                  {fr ? "Proposer" : "Suggest"}
+                  {applicationId === row.id ? (fr ? "Proposer" : "Suggest") : (fr ? "Choisir" : "Choose")}
                 </button>
               </td>
             </tr>
