@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePortalCopy } from "@/components/client-portal/copy";
 import { obligationLabel } from "@/lib/cases";
 import { resolvePortalContext, savePortalFirmChoice, supabase } from "@/lib/supabase";
-import { clearSession } from "@/lib/portal-auth";
+import { clearSession, rememberSession, sessionFromAuthUser } from "@/lib/portal-auth";
 
 type IconName =
   | "home"
@@ -232,12 +232,16 @@ export function ClientPortalShell({
   async function chooseBusiness(id: string) {
     setBizOpen(false);
     if (id === activeId || !biz.some((business) => business.id === id)) return;
+    // Rewrite the whole session from the database binding, not just the id.
+    // Audience, taxpayer type, NIU, centre and regime belong to the chosen
+    // file; changing only taxpayerId left an individual's copy describing a
+    // business, and the reverse.
     try {
-      const raw = sessionStorage.getItem("kima.portal.session");
-      const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-      sessionStorage.setItem("kima.portal.session", JSON.stringify({ ...parsed, taxpayerId: id }));
+      const next = await sessionFromAuthUser(id);
+      if (!next) return;
+      rememberSession(next);
     } catch {
-      /* storage blocked — the list still closes */
+      return;
     }
     setActiveId(id);
     router.refresh();
