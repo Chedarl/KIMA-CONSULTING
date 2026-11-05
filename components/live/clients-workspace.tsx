@@ -5,6 +5,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/toast";
 import { OnboardingWizard, type WizardLabels } from "@/components/live/onboarding-wizard";
+import { formatDay } from "@/components/client-portal/ui";
+import { StatusPill, type StatusTone } from "@/components/ui/status-pill";
 import {
   deriveSegments,
   segmentLabel,
@@ -17,14 +19,14 @@ import { useRefreshTick } from "@/lib/refresh";
 /**
  * The firm's client list, with onboarding attached.
  *
- * Reloads after a client is created, so the new file appears without a page
- * refresh. Every taxpayer created here starts unverified and says so on the
- * card: the questionnaire records what the client reported, and a reviewer
- * confirms it against their official profile.
+ * Rows are accounts, not people: one tax file per row. The table follows the
+ * 4 Nov update document, spec 05. Every value is read from the profile or from
+ * the records the rest of the product uses; nothing is a stored shadow count.
  */
 type TaxpayerRow = {
   id: string;
   legal_name: string;
+  niu: string | null;
   contact_name: string | null;
   contact_email: string | null;
   tax_centre: string | null;
@@ -35,17 +37,46 @@ type TaxpayerRow = {
   onboarded_at: string | null;
 };
 
-/**
- * Tone classes for a derived segment. Design tokens, never raw hex, so a
- * segment stays legible when the theme flips.
- */
-const TONE: Record<Segment["tone"], string> = {
-  navy: "border-navy/30 bg-navy-soft text-navy",
-  success: "border-success/40 bg-success-soft text-success-text",
-  amber: "border-amber/40 bg-amber-soft text-amber-text",
-  danger: "border-danger-text/40 bg-danger-soft text-danger-text",
-  neutral: "border-border bg-surface-sunken text-fg-muted",
+type EngagementRow = {
+  taxpayer_id: string;
+  status: string;
+  revoked_at: string | null;
+  accepted_at: string | null;
+  authorized_at: string | null;
 };
+
+type CaseRow = {
+  taxpayer_id: string;
+  due_on: string | null;
+  closed_at: string | null;
+};
+
+const ENGAGEMENT_LABEL: Record<string, { fr: string; en: string }> = {
+  draft: { fr: "Brouillon", en: "Draft" },
+  accepted: { fr: "Accepté", en: "Accepted" },
+  authorized: { fr: "Autorisé", en: "Authorized" },
+  revoked: { fr: "Révoqué", en: "Revoked" },
+};
+
+const ENGAGEMENT_TONE: Record<string, StatusTone> = {
+  accepted: "confirmed",
+  authorized: "confirmed",
+  draft: "neutral",
+  revoked: "refused",
+};
+
+const COPY = {
+  fr: {
+    legalName: "Raison sociale", niu: "NIU", centre: "Centre", regime: "Régime",
+    engagement: "Engagement", next: "Prochaine", type: "Type", noValue: "—",
+    unverified: "à vérifier", chase: "Relancer",
+  },
+  en: {
+    legalName: "Legal name", niu: "NIU", centre: "Centre", regime: "Regime",
+    engagement: "Engagement", next: "Next", type: "Type", noValue: "—",
+    unverified: "to verify", chase: "Chase",
+  },
+} as const;
 
 const segmentsOf = (c: TaxpayerRow): Segment[] =>
   deriveSegments({
@@ -78,11 +109,13 @@ export function ClientsWorkspace({
     emailNoAddress: string;
     emailBlocked: string;
   };
-  locale2?: "fr" | "en";
 }) {
   const toast = useToast();
+  const c = COPY[locale];
   const [clients, setClients] = useState<TaxpayerRow[] | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [engagements, setEngagements] = useState<Record<string, EngagementRow>>({});
+  const [nextDue, setNextDue] = useState<Record<string, string>>({});
   const [error, setError] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
   const tick = useRefreshTick();
@@ -129,24 +162,58 @@ export function ClientsWorkspace({
   const load = useCallback(async () => {
     try {
       const db = supabase();
-      const { data } = await db
-        .from("taxpayers")
-        .select(
-          "id, legal_name, contact_name, contact_email, tax_centre, taxpayer_type, tax_regime, accounting_framework, profile_verified, onboarded_at",
-        )
-        .order("legal_name");
-      const { data: reqs } = await db.from("document_requests").select("taxpayer_id, status");
+      const [people, reqs, engs, cases] = await Promise.all([
+        db
+          .from("taxpayers")
+          .select(
+            "id, legal_name, niu, contact_name, contact_email, tax_centre, taxpayer_type, tax_regime, accounting_framework, profile_verified, onboarded_at",
+          )
+          .order("legal_name"),
+        db.from("document_requests").select("taxpayer_id, status"),
+        db
+          .from("engagements")
+          .select("taxpayer_id, status, revoked_at, accepted_at, authorized_at"),
+        db
+          .from("compliance_cases")
+          .select("taxpayer_id, due_on, closed_at")
+          .is("closed_at", null)
+          .not("due_on", "is", null)
+          .order("due_on", { ascending: true }),
+      ]);
 
       const tally: Record<string, number> = {};
-      for (const r of (reqs ?? []) as { taxpayer_id: string; status: string }[]) {
+      for (const r of (reqs.data ?? []) as { taxpayer_id: string; status: string }[]) {
         if (requestIsOutstanding(r.status as RequestStatus)) {
           tally[r.taxpayer_id] = (tally[r.taxpayer_id] ?? 0) + 1;
         }
       }
+
+      const liveEngagement: Record<string, EngagementRow> = {};
+      for (const e of (engs.data ?? []) as EngagementRow[]) {
+        if (e.revoked_at) continue;
+        const current = liveEngagement[e.taxpayer_id];
+        // Accepted outranks authorized; a draft is the last resort.
+        if (!current || (e.status === "accepted" && current.status !== "accepted")) {
+          liveEngagement[e.taxpayer_id] = e;
+        }
+      }
+
+      const earliest: Record<string, string> = {};
+      for (const row of (cases.data ?? []) as CaseRow[]) {
+        if (!row.due_on) continue;
+        if (!earliest[row.taxpayer_id] || row.due_on < earliest[row.taxpayer_id]) {
+          earliest[row.taxpayer_id] = row.due_on;
+        }
+      }
+
       setCounts(tally);
-      setClients((data ?? []) as TaxpayerRow[]);
+      setEngagements(liveEngagement);
+      setNextDue(earliest);
+      setClients((people.data ?? []) as TaxpayerRow[]);
+      setError(false);
     } catch {
       setError(true);
+      setClients(null);
     }
   }, []);
 
@@ -165,7 +232,7 @@ export function ClientsWorkspace({
       ) : clients === null ? (
         <div className="flex flex-col gap-2" aria-busy="true">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="skeleton h-20 rounded-card" />
+            <div key={i} className="skeleton h-16 rounded-card" />
           ))}
         </div>
       ) : clients.length === 0 ? (
@@ -173,80 +240,100 @@ export function ClientsWorkspace({
           {labels.empty}
         </p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {clients.map((c, i) => (
-            <li
-              key={c.id}
-              className="rise-in lift rounded-card border border-border bg-surface p-4"
-              style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <Link
-                    href={`/${locale}/workspace/clients/${c.id}`}
-                    className="truncate font-display text-base font-semibold text-fg underline-offset-2 hover:underline"
-                  >
-                    {c.legal_name}
-                  </Link>
-                  {c.contact_name && (
-                    <p className="truncate text-xs text-fg-muted">{c.contact_name}</p>
-                  )}
-                  {c.contact_email && (
-                    <p className="truncate font-mono text-xs text-fg-subtle">{c.contact_email}</p>
-                  )}
-                </div>
-                <span className="shrink-0 rounded border border-border bg-surface-sunken px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  {c.tax_centre ?? labels.noCentre}
-                </span>
-              </div>
-
-              {/* Derived segments, not typed tags. The regime, the centre and
-                  the cadence all come from the verified profile through one
-                  function, so a card can never disagree with the rules — and a
-                  segment resting on an unverified field is drawn dashed, so
-                  reported information never reads as confirmed fact. */}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {segmentsOf(c).map((s) => (
-                  <span
-                    key={`${s.kind}:${s.code}`}
-                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${TONE[s.tone]} ${
-                      s.verified ? "" : "border-dashed"
-                    }`}
-                  >
-                    {segmentLabel(s, locale)}
-                  </span>
-                ))}
-                {(counts[c.id] ?? 0) > 0 && (
-                  <span className="rounded-full bg-navy-soft px-2 py-0.5 text-xs font-semibold text-navy">
-                    {counts[c.id]} {labels.openRequests}
-                  </span>
+        <div className="overflow-x-auto rounded-card border border-border bg-surface">
+          <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+            <caption className="sr-only">{labels.listTitle}</caption>
+            <thead className="border-b border-border bg-surface-sunken text-[11px] uppercase tracking-[0.08em] text-fg-muted">
+              <tr>
+                {[c.legalName, c.niu, c.centre, c.regime, c.engagement, c.next, c.type].map(
+                  (heading) => (
+                    <th key={heading} scope="col" className="px-4 py-3 font-semibold">
+                      {heading}
+                    </th>
+                  ),
                 )}
-              </div>
-
-              {(counts[c.id] ?? 0) > 0 && c.contact_email && (
-                <button
-                  type="button"
-                  disabled={sending === c.id}
-                  onClick={() => void chase(c.id)}
-                  className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg transition-colors hover:bg-surface-sunken disabled:opacity-60"
-                >
-                  <svg
-                    viewBox="0 0 16 16"
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    aria-hidden="true"
-                  >
-                    <rect x="2" y="3.5" width="12" height="9" rx="1.5" />
-                    <path d="m2.5 4.5 5.5 4 5.5-4" />
-                  </svg>
-                  {labels.emailClient}
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+                <th scope="col" className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((row) => {
+                const segments = segmentsOf(row);
+                const type = segments.find((s) => s.kind === "type");
+                const regime = segments.find((s) => s.kind === "regime");
+                const engagement = engagements[row.id];
+                const next = nextDue[row.id];
+                const outstanding = counts[row.id] ?? 0;
+                return (
+                  <tr key={row.id} className="border-b border-border last:border-0">
+                    <th scope="row" className="px-4 py-3 text-left align-top font-normal">
+                      <Link
+                        href={`/${locale}/workspace/clients/${row.id}`}
+                        className="font-semibold text-fg underline-offset-2 hover:underline"
+                      >
+                        {row.legal_name}
+                      </Link>
+                      {row.contact_name && (
+                        <span className="mt-0.5 block truncate text-xs text-fg-muted">
+                          {row.contact_name}
+                        </span>
+                      )}
+                      {outstanding > 0 && (
+                        <span className="mt-1 inline-flex rounded-full bg-navy-soft px-2 py-0.5 text-[11px] font-semibold text-navy">
+                          {outstanding} {labels.openRequests}
+                        </span>
+                      )}
+                    </th>
+                    <td className="px-4 py-3 align-top font-mono text-xs text-fg-muted">
+                      {row.niu ?? c.noValue}
+                    </td>
+                    <td className="px-4 py-3 align-top text-fg">
+                      {row.tax_centre ?? labels.noCentre}
+                    </td>
+                    <td className="px-4 py-3 align-top text-fg">
+                      {regime ? (
+                        <span className={regime.verified ? "" : "text-amber-text"}>
+                          {segmentLabel(regime, locale)}
+                          {!regime.verified && (
+                            <span className="ml-1 text-[11px]">({c.unverified})</span>
+                          )}
+                        </span>
+                      ) : (
+                        c.noValue
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {engagement ? (
+                        <StatusPill size="sm" tone={ENGAGEMENT_TONE[engagement.status] ?? "neutral"}>
+                          {ENGAGEMENT_LABEL[engagement.status]?.[locale] ?? engagement.status}
+                        </StatusPill>
+                      ) : (
+                        <span className="text-fg-subtle">{c.noValue}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top text-fg">
+                      {next ? formatDay(next, locale) : c.noValue}
+                    </td>
+                    <td className="px-4 py-3 align-top text-fg">
+                      {type ? segmentLabel(type, locale) : c.noValue}
+                    </td>
+                    <td className="px-4 py-3 align-top text-right">
+                      {outstanding > 0 && row.contact_email ? (
+                        <button
+                          type="button"
+                          disabled={sending === row.id}
+                          onClick={() => void chase(row.id)}
+                          className="inline-flex min-h-[44px] items-center rounded-lg border border-border-strong px-3 text-xs font-semibold text-fg transition-colors hover:bg-surface-sunken disabled:opacity-60"
+                        >
+                          {sending === row.id ? labels.connecting : c.chase}
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
