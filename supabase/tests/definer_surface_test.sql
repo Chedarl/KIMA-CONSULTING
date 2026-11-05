@@ -93,7 +93,7 @@ select is(
   'guard_client_invite_authorization, incident_timeline_guard, incident_verify_guard, is_kima_admin, '
   'mark_reminder_failed, mark_reminder_sent, member_has, member_has_in_org, '
   'message_thread_autolink, my_contact_id, organization_profile_guard, portal_request_code, '
-  'serialize_taxpayer_grant, signal_firm_intake_document_change, '
+  'serialize_taxpayer_grant, signal_firm_intake_document_change, stamp_registration_applicant, '
   'taxpayer_held_by_another_firm, taxpayer_id_for_niu',
   'T-52 every moved helper is in private, and nothing else is'
 );

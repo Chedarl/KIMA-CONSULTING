@@ -1191,7 +1191,7 @@ A visitor may write only the message fields (`contact_name`, `contact_email`, `c
 
 KIMA administrator safeguard (review branch): `admin_review_firm(firm_uuid, 'verify'|'suspend'|'unsuspend', reason)` is an audited privileged RPC limited to an active Auth-bound `kima_admin` of a `kind='kima'` organization. It changes only accounting firms, requires a documented reason, and never certifies professional qualifications. No public organization UPDATE permission is granted; operator provisioning and live activation require explicit owner approval. Synthetic pgTAP covers denied callers and the two-firm signup isolation path.
 
-**Firm suggestion, 5 November 2026.** `suggest_firm_for_registration` records a proposal and does not set `registrations.organization_id`. `route_unassigned_registration` still assigns immediately and is not this consent path. The applicant, using the `workspace_ref` they generated, accepts or declines. Decline and expiry leave the application unassigned. A suggestion does not move a firm already named on the row. Acceptance names the firm and creates no taxpayer and no engagement.
+**Firm suggestion, 5 November 2026.** `suggest_firm_for_registration` records a proposal and does not set `registrations.organization_id`. This follow-up is not deployed. Only the signed-in applicant stamped on the row can see or answer; the reference alone is not enough, and anonymous callers cannot. Decline, expiry, and a stale row grant no taxpayer and no engagement. `route_unassigned_registration` on main still assigns immediately; that bypass is a separate change and is not fixed here.
 
 
 ---
