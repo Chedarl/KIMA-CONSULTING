@@ -1063,7 +1063,7 @@ an accountant's decision reaches the client without either of them pressing
 anything.
 
 **Client record pages are now live too** (`components/live/client-records.tsx`,
-mounted at `/[locale]/app/{compliance,declarations,archive}`). They used to
+mounted at `/[locale]/app/{compliance,declarations,archive}`). A missing session (`AuthSessionMissingError`, 401, 403) is signed out. A retryable fetch or an error with no HTTP status is offline, and the previous rows are cleared. One `getUser` runs per load. They used to
 render `lib/demo-data` — an invented profile and invented obligations — while
 `lib/rules` and the case engine sat unused by them. They now read `taxpayers`,
 `compliance_cases`, `document_requests` and `case_events`: the four axes on
