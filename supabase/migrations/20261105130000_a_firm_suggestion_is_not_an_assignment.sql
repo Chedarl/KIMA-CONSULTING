@@ -32,6 +32,8 @@ declare
   v_kima uuid;
   v_reason text := btrim(coalesce(p_reason, ''));
   v_existing uuid;
+  v_existing_firm uuid;
+  v_existing_expires timestamptz;
   v_id uuid;
 begin
   select fm.id, fm.organization_id into v_admin, v_kima
@@ -61,16 +63,19 @@ begin
     raise exception 'no unassigned open application with this id' using errcode = '22023';
   end if;
 
-  select s.id into v_existing
+  select s.id, s.organization_id, s.expires_at
+    into v_existing, v_existing_firm, v_existing_expires
     from public.registration_firm_suggestions s
    where s.registration_id = p_registration_id and s.status = 'pending'
-     and s.expires_at > pg_catalog.now()
    for update;
+  if v_existing is not null and v_existing_expires <= pg_catalog.now() then
+    update public.registration_firm_suggestions
+       set status = 'expired', decided_at = pg_catalog.now()
+     where id = v_existing;
+    v_existing := null;
+  end if;
   if v_existing is not null then
-    if exists (
-      select 1 from public.registration_firm_suggestions s
-       where s.id = v_existing and s.organization_id = p_firm_id
-    ) then
+    if v_existing_firm = p_firm_id then
       return v_existing;
     end if;
     raise exception 'a suggestion is already pending' using errcode = '22023';

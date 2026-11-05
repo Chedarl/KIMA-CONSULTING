@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
-select plan(25);
+select plan(28);
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-e800-0000000000a1', 'sug-admin@example.test'),
@@ -72,11 +72,18 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e800-0000000
 select lives_ok($$ select suggest_firm_for_registration('00000000-0000-4000-e800-0000000000d2','00000000-0000-4000-e800-0000000000b1','Second suggestion, to be expired before the applicant answers.') $$, 'SG-15 a second application can be suggested');
 reset role;
 update registration_firm_suggestions set expires_at = now() - interval '1 day' where registration_id = '00000000-0000-4000-e800-0000000000d2';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e800-0000000000a1","role":"authenticated"}', true);
+select lives_ok($$ select suggest_firm_for_registration('00000000-0000-4000-e800-0000000000d2','00000000-0000-4000-e800-0000000000b1','The first window elapsed, so this suggestion replaces it.') $$, 'SG-16 a lapsed pending row does not block the next suggestion');
+reset role;
+select is((select count(*) from registration_firm_suggestions where registration_id = '00000000-0000-4000-e800-0000000000d2' and status = 'pending'), 1::bigint, 'SG-17 the lapsed row was closed');
+select is((select organization_id from registrations where id = '00000000-0000-4000-e800-0000000000d2'), null, 'SG-18 replacing it still assigns nothing');
+update registration_firm_suggestions set expires_at = now() - interval '1 day' where registration_id = '00000000-0000-4000-e800-0000000000d2' and status = 'pending';
 set local role anon;
 select is((select outcome from respond_to_firm_suggestion('00000000-0000-4000-e800-0000000000e2','accept')), 'expired', 'SG-16 an expired suggestion cannot be accepted');
 reset role;
 select is((select organization_id from registrations where id = '00000000-0000-4000-e800-0000000000d2'), null, 'SG-17 expiry grants nothing');
-select is((select status from registration_firm_suggestions where registration_id = '00000000-0000-4000-e800-0000000000d2'), 'expired', 'SG-18 the expiry is kept');
+select is((select count(*) from registration_firm_suggestions where registration_id = '00000000-0000-4000-e800-0000000000d2' and status = 'pending'), 0::bigint, 'SG-20 no pending row remains after the reply');
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e800-0000000000a1","role":"authenticated"}', true);
 select lives_ok($$ select suggest_firm_for_registration('00000000-0000-4000-e800-0000000000d2','00000000-0000-4000-e800-0000000000b1','A second suggestion after the first one expired.') $$, 'SG-19 suggest again after expiry');
