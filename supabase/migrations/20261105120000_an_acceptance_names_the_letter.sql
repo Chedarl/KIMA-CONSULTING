@@ -107,6 +107,28 @@ begin
      limit 1;
   end if;
 
+  -- Restored from 20261031140000. The restatement above must not drop the
+  -- returning-client rules: a taxpayer held by another firm, or a firm that
+  -- already held this taxpayer on an older engagement, still needs the
+  -- taxpayer's fresh acceptance before the grant can move.
+  if (new.status = any (granting) and not (old.status = any (granting)))
+     or (new.authorized_at is not null and old.authorized_at is null) then
+    if new.accepted_at is null
+       and taxpayer_held_by_another_firm(new.taxpayer_id, new.organization_id) then
+      raise exception
+        'another firm has held this taxpayer; only the taxpayer can bring in a new firm'
+        using errcode = '42501';
+    end if;
+    -- Same firm, former client. The revoked engagement is history. The fresh
+    -- draft is not a grant until the taxpayer accepts it again.
+    if new.accepted_at is null
+       and firm_previously_granted(new.taxpayer_id, new.organization_id, new.id) then
+      raise exception
+        'a former client must accept again before this firm can be re-authorised'
+        using errcode = '42501';
+    end if;
+  end if;
+
   return new;
 end;
 $fn$;
