@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { niuProblem } from "@/lib/public-onboarding";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { ApplicantFirmSuggestion } from "@/components/marketing/firm-suggestion";
 import { ServiceIcon, type ServiceIconName } from "@/components/marketing/icons";
 import { KimaWordmark } from "@/components/marketing/wordmark";
 import { insertRegistration, insertWorkspaceInvite } from "@/lib/insert-registration";
@@ -338,6 +339,7 @@ export function OnboardingFlow({
                       inviteState={inviteState}
                       inviteIssue={inviteIssue}
                       onInvite={(e) => void sendInvite(e)}
+                      workspaceRef={workspaceRef}
                     />
                   )}
                   <IssueList t={t} issues={step === "verify" ? issues.filter((i) => i !== "kind") : issues} />
@@ -719,6 +721,7 @@ function ReadyStep({
   inviteState,
   inviteIssue,
   onInvite,
+  workspaceRef,
 }: {
   locale: "fr" | "en";
   t: Copy["onboard"];
@@ -731,6 +734,7 @@ function ReadyStep({
   inviteState: "idle" | "busy" | "ok" | "failed";
   inviteIssue: boolean;
   onInvite: (e: FormEvent) => void;
+  workspaceRef: string | null;
 }) {
   const firm = draft.kind === "accounting_firm";
   const href = firm ? `/${locale}/firm-login` : `/${locale}/login`;
@@ -746,6 +750,7 @@ function ReadyStep({
       <p className="text-sm text-fg-muted">{t.readySeparate}</p>
       <p className="mt-3 max-w-md text-sm text-fg-muted">{t.readyHonest}</p>
       {firm && <p className="mt-2 max-w-md text-xs text-fg-subtle">{t.firmNote}</p>}
+      {!firm && workspaceRef && <ApplicantFirmSuggestion locale={locale} workspaceRef={workspaceRef} />}
       <Link href={href} className="public-cta mt-6 inline-flex min-h-[48px] items-center rounded-lg px-8 text-sm font-semibold">
         {firm ? t.enterFirm : t.enterPortal}
       </Link>

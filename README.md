@@ -1191,6 +1191,8 @@ A visitor may write only the message fields (`contact_name`, `contact_email`, `c
 
 KIMA administrator safeguard (review branch): `admin_review_firm(firm_uuid, 'verify'|'suspend'|'unsuspend', reason)` is an audited privileged RPC limited to an active Auth-bound `kima_admin` of a `kind='kima'` organization. It changes only accounting firms, requires a documented reason, and never certifies professional qualifications. No public organization UPDATE permission is granted; operator provisioning and live activation require explicit owner approval. Synthetic pgTAP covers denied callers and the two-firm signup isolation path.
 
+The routing screen suggests a firm through `suggest_firm_for_registration` and never calls `route_unassigned_registration`. A refused or empty reply is shown as a refusal. The applicant's ready step shows only the firm name from `my_firm_suggestion` and can accept or decline. That screen does nothing until the suggestion migration is applied.
+
 
 ---
 
