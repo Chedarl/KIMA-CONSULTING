@@ -569,6 +569,11 @@ export function CaseDetail({
       setRefusedBy(locale === "fr" ? result.reasonFr : result.reasonEn);
       return;
     }
+    const actionCaseId = row.id;
+    const actionMemberId = member.id;
+    const stageContextCurrent = () =>
+      activeCaseIdRef.current === actionCaseId &&
+      sessionMemberRef.current === actionMemberId;
     stageInFlight.current = true;
     setBusy(to);
     setFailed(null);
@@ -623,6 +628,7 @@ export function CaseDetail({
       // A stage decision was computed from this exact case snapshot. Refuse a
       // replay if its stage, approval round or tenant/engagement changed.
       // Database RLS and transition triggers remain the final authority.
+      if (!stageContextCurrent()) throw new Error("Case or firm session changed");
       const written = await updateById("compliance_cases", row.id, result.patch, {
         taxpayer_id: row.taxpayer_id,
         organization_id: engagement.organization_id,
@@ -631,20 +637,24 @@ export function CaseDetail({
         approval_round: row.approval_round,
       });
       if (!written.ok) {
-        setFailed(to);
-        setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        if (stageContextCurrent()) {
+          setFailed(to);
+          setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        }
         return;
       }
       if (result.events.length > 0) {
         const { error: logError } = await db.from("case_events").insert(result.events);
         if (logError) throw logError;
       }
-      await load();
+      // Always attempt the audit event above after a successful write, but
+      // never reload or publish feedback for a case no longer displayed.
+      if (stageContextCurrent()) await load();
     } catch {
-      setFailed(to);
+      if (stageContextCurrent()) setFailed(to);
     } finally {
       stageInFlight.current = false;
-      setBusy(null);
+      if (stageContextCurrent()) setBusy(null);
     }
   }
 
@@ -679,6 +689,11 @@ export function CaseDetail({
       setFailed(r.id);
       return;
     }
+    const actionCaseId = row.id;
+    const actionMemberId = member.id;
+    const reviewContextCurrent = () =>
+      activeCaseIdRef.current === actionCaseId &&
+      sessionMemberRef.current === actionMemberId;
     reviewInFlight.current = true;
     setBusy(r.id);
     setFailed(null);
@@ -728,6 +743,8 @@ export function CaseDetail({
            liveEngagement.assigned_to !== member.person_label)) {
         throw new Error("Engagement no longer authorizes this member");
       }
+      // A review must not decide a former case after route or member changes.
+      if (!reviewContextCurrent()) throw new Error("Case or firm session changed");
       const patch =
         to === "returned" ? { status: to, returned_count: r.returned_count + 1 } : { status: to };
       // Status and return count form a submission-version check. A stale
@@ -741,8 +758,10 @@ export function CaseDetail({
         responsible: r.responsible,
       });
       if (!written.ok) {
-        setFailed(r.id);
-        setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        if (reviewContextCurrent()) {
+          setFailed(r.id);
+          setRefusedBy(written.reason === "not_permitted" ? t.notPermitted : t.moveFailed);
+        }
         return;
       }
       const event = eventFromRequest(
@@ -759,13 +778,17 @@ export function CaseDetail({
         const { error: logError } = await db.from("case_events").insert(event);
         if (logError) throw logError;
       }
-      setReasons((prev) => ({ ...prev, [r.id]: "" }));
-      await load();
+      // Preserve audit insertion above even if navigation followed the write.
+      // Only the still-visible case may clear form state or reload feedback.
+      if (reviewContextCurrent()) {
+        setReasons((prev) => ({ ...prev, [r.id]: "" }));
+        await load();
+      }
     } catch {
-      setFailed(r.id);
+      if (reviewContextCurrent()) setFailed(r.id);
     } finally {
       reviewInFlight.current = false;
-      setBusy(null);
+      if (reviewContextCurrent()) setBusy(null);
     }
   }
 
@@ -783,6 +806,11 @@ export function CaseDetail({
       setRefusedBy(denialLabel(gate.reason, locale));
       return;
     }
+    const actionCaseId = row.id;
+    const actionMemberId = member.id;
+    const requestContextCurrent = () =>
+      activeCaseIdRef.current === actionCaseId &&
+      sessionMemberRef.current === actionMemberId;
     requestInFlight.current = true;
     setBusy("new-request");
     setFailed(null);
@@ -840,6 +868,9 @@ export function CaseDetail({
            liveEngagement.assigned_to !== member.person_label)) {
         throw new Error("Engagement no longer authorizes this member");
       }
+      // Async authorization may have crossed a case route or member switch.
+      // Do not create a request for the previously displayed case.
+      if (!requestContextCurrent()) throw new Error("Case or firm session changed");
       const due =
         askDue ||
         (() => {
@@ -872,14 +903,18 @@ export function CaseDetail({
         const { error: logError } = await db.from("case_events").insert(event);
         if (logError) throw logError;
       }
-      setAskFr("");
-      setAskEn("");
-      await load();
+      // A successful insert must attempt its audit event above even when
+      // navigation occurs. Only the still-visible case may clear the form.
+      if (requestContextCurrent()) {
+        setAskFr("");
+        setAskEn("");
+        await load();
+      }
     } catch {
-      setFailed("new-request");
+      if (requestContextCurrent()) setFailed("new-request");
     } finally {
       requestInFlight.current = false;
-      setBusy(null);
+      if (requestContextCurrent()) setBusy(null);
     }
   }
 

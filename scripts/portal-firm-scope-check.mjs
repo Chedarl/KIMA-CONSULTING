@@ -1958,3 +1958,71 @@ assert.ok(taskSingleFlightBody.includes("if (taskContextCurrent()) await load();
 assert.ok(taskSingleFlightBody.includes("if (taskContextCurrent()) setFailed(task.id);") &&
   taskSingleFlightBody.includes("if (taskContextCurrent()) setBusy(null);"),
   "stale task completions must not overwrite the new case's feedback");
+
+
+// Phase 3/4: a stage decision computed on an earlier case/member must not
+// mutate that case after route navigation or a firm-session switch. The audit
+// event for a successful write must still be attempted before skipping UI load.
+assert.ok(stageSingleFlightBody.includes("const stageContextCurrent = () =>") &&
+  stageSingleFlightBody.includes("activeCaseIdRef.current === actionCaseId") &&
+  stageSingleFlightBody.includes("sessionMemberRef.current === actionMemberId"),
+  "stage action must bind the rendered case and acting firm member");
+const stageContextGuard = stageSingleFlightBody.indexOf('if (!stageContextCurrent()) throw new Error("Case or firm session changed");');
+const stageConditionalWrite = stageSingleFlightBody.indexOf('const written = await updateById("compliance_cases"');
+assert.ok(stageContextGuard >= 0 && stageContextGuard < stageConditionalWrite,
+  "reject a stale stage action after async preflight and before the conditional write");
+const stageAuditInsert = stageSingleFlightBody.indexOf('db.from("case_events").insert(result.events)');
+const stageReload = stageSingleFlightBody.indexOf("if (stageContextCurrent()) await load();");
+assert.ok(stageAuditInsert > stageConditionalWrite && stageReload > stageAuditInsert,
+  "preserve stage audit insertion after successful writes even if navigation happened");
+assert.ok(stageSingleFlightBody.includes("if (stageContextCurrent()) setFailed(to);") &&
+  stageSingleFlightBody.includes("if (stageContextCurrent()) setBusy(null);") &&
+  stageSingleFlightBody.includes("if (stageContextCurrent()) {\n          setFailed(to);"),
+  "late stage outcomes must not overwrite the new case's failure or busy state");
+
+// Phase 3/4: accepting or returning a document must not submit a former
+// case's decision after asynchronous preflight crosses a route/member switch.
+// A successful conditional write must still attempt its audit event, while
+// late feedback, form clearing and reload are confined to the active case.
+// This is a source-contract check, not an authenticated cross-tenant replay.
+assert.ok(reviewSingleFlightBody.includes("const reviewContextCurrent = () =>") &&
+  reviewSingleFlightBody.includes("activeCaseIdRef.current === actionCaseId") &&
+  reviewSingleFlightBody.includes("sessionMemberRef.current === actionMemberId"),
+  "document review must bind its original case and firm member");
+const reviewContextGuard = reviewSingleFlightBody.indexOf('if (!reviewContextCurrent()) throw new Error("Case or firm session changed");');
+const reviewConditionalWrite = reviewSingleFlightBody.indexOf('const written = await updateById("document_requests"');
+assert.ok(reviewContextGuard >= 0 && reviewContextGuard < reviewConditionalWrite,
+  "stale document decisions must be rejected before the conditional PATCH");
+const reviewAuditInsert = reviewSingleFlightBody.indexOf('db.from("case_events").insert(event)');
+const reviewContextReload = reviewSingleFlightBody.indexOf("if (reviewContextCurrent()) {\n        setReasons(");
+assert.ok(reviewAuditInsert > reviewConditionalWrite && reviewContextReload > reviewAuditInsert &&
+  reviewSingleFlightBody.includes("        await load();"),
+  "a successful review must attempt audit insertion before any context-guarded UI reload");
+assert.ok(reviewSingleFlightBody.includes("if (reviewContextCurrent()) {\n          setFailed(r.id);") &&
+  reviewSingleFlightBody.includes("if (reviewContextCurrent()) setFailed(r.id);") &&
+  reviewSingleFlightBody.includes("if (reviewContextCurrent()) setBusy(null);"),
+  "late document review outcomes must not alter a new case's feedback");
+
+
+// Phase 3/4: document-request creation must not submit a previous case's
+// non-idempotent INSERT after asynchronous Auth/engagement checks cross a
+// route or firm-member switch. Successful inserts still require audit events,
+// even if the screen changes after the write. This is a source-contract test,
+// not authenticated multi-tenant replay or database idempotency proof.
+assert.ok(requestReplayBody.includes("const requestContextCurrent = () =>") &&
+  requestReplayBody.includes("activeCaseIdRef.current === actionCaseId") &&
+  requestReplayBody.includes("sessionMemberRef.current === actionMemberId"),
+  "request creation must bind its original case and acting firm member");
+const requestContextGuard = requestReplayBody.indexOf('if (!requestContextCurrent()) throw new Error("Case or firm session changed");');
+const requestContextInsert = requestReplayBody.indexOf('db.from("document_requests").insert({');
+assert.ok(requestContextGuard >= 0 && requestContextGuard < requestContextInsert &&
+  requestContextGuard > requestReplayBody.indexOf("if (engagementError || !liveEngagement)"),
+  "stale request creation must be rejected after live preflight but before INSERT");
+const requestAuditInsert = requestReplayBody.indexOf('db.from("case_events").insert(event)');
+const requestContextReload = requestReplayBody.indexOf('if (requestContextCurrent()) {\n        setAskFr("");');
+assert.ok(requestAuditInsert > requestContextInsert && requestContextReload > requestAuditInsert &&
+  requestReplayBody.includes("        await load();"),
+  "successful request insert must attempt audit logging before guarded UI reset/reload");
+assert.ok(requestReplayBody.includes('if (requestContextCurrent()) setFailed("new-request");') &&
+  requestReplayBody.includes("if (requestContextCurrent()) setBusy(null);"),
+  "late request creation must not overwrite another case's failure or busy state");
