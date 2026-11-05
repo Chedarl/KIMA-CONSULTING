@@ -31,7 +31,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(10);
+select plan(11);
 
 -- ---------------------------------------------------------------------------
 -- Nothing is left exposed.
@@ -257,6 +257,35 @@ select is(
   'T-58 control: with allow_demo_anon on, anon reads the demo taxpayer only'
 );
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- T-62 no SECURITY DEFINER function in the exposed schema holds a bare PUBLIC
+-- execute grant.
+--
+-- In Postgres a new function is executable by PUBLIC by default, so
+-- `grant execute ... to authenticated` without a prior revoke grants nothing
+-- new -- everyone, `anon` included, already had it. Three functions reached
+-- production that way (upsert_branding, upsert_engagement_template,
+-- instantiate_engagement_template, fixed in 20261104110000), and all three
+-- happened to raise before touching a row. The fourth might not.
+--
+-- T-53 above asks WHICH definer functions are callable and is satisfied by an
+-- approved name. This asks HOW: a name on that list still must not be reachable
+-- by PUBLIC. An empty proacl means the default is in force, which is PUBLIC,
+-- so that counts as a finding too.
+-- ---------------------------------------------------------------------------
+select is(
+  (select coalesce(string_agg(p.proname, ', ' order by p.proname), '(none)')
+     from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.prosecdef
+      and (p.proacl is null
+           or exists (select 1 from aclexplode(p.proacl) a
+                       where a.grantee = 0 and a.privilege_type = 'EXECUTE'))),
+  '(none)',
+  'T-62 no SECURITY DEFINER function in public is executable by PUBLIC'
+);
 
 select * from finish();
 rollback;
