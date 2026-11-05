@@ -173,7 +173,7 @@ export async function verifyPortalCode(
  * person happened to be on, so an individual cannot land in the business
  * portal by choosing the wrong tab before typing a password.
  */
-export async function sessionFromAuthUser(): Promise<PortalSession | null> {
+export async function sessionFromAuthUser(preferredTaxpayerId?: string): Promise<PortalSession | null> {
   const db = supabase();
   const { data: auth } = await db.auth.getUser();
   if (!auth.user) return null;
@@ -183,8 +183,13 @@ export async function sessionFromAuthUser(): Promise<PortalSession | null> {
   if (bridgeError || ids.length === 0) return null;
 
   // More than one file is legitimate -- a person can be the contact for several
-  // taxpayers. The first is the landing file; `MyFiles` lists the rest.
-  const taxpayerId = ids[0].taxpayer_id;
+  // taxpayers. The first is the landing file; the account switcher passes the
+  // file the person chose, which must still be one the database binding
+  // returns.
+  const preferred = preferredTaxpayerId
+    ? ids.find((row) => row.taxpayer_id === preferredTaxpayerId)
+    : undefined;
+  const taxpayerId = preferred ? preferred.taxpayer_id : ids[0].taxpayer_id;
 
   const { data: row, error } = await db
     .from("taxpayers")
