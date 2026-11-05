@@ -37,13 +37,13 @@ A screen is done only when all of these are true:
 ## Build order from the update document
 
 - [x] Gold tokens and the 2 px section rule.
-- [ ] `StatusPill` gains an icon per tone, so word and icon carry the state
+- [x] `StatusPill` gains an icon per tone, so word and icon carry the state
   together. The `returned` tone already exists; the dot is not enough.
-- [ ] Firm dashboard: PROCHAINES ACTIONS, CE MOIS-CI, ÉTAT DES DOSSIERS.
-- [ ] Firm rail to seven destinations, with folded screens reachable as tabs.
-- [ ] Accounts table rebuilt to spec 05: Raison sociale, NIU, Centre, Régime,
+- [x] Firm dashboard: PROCHAINES ACTIONS, CE MOIS-CI, ÉTAT DES DOSSIERS.
+- [x] Firm rail to seven destinations, with folded screens reachable as tabs.
+- [x] Accounts table rebuilt to spec 05: Raison sociale, NIU, Centre, Régime,
   Engagement, Prochaine, plus Type.
-- [ ] Journey stepper on the job header.
+- [x] Journey stepper on the job header.
 - [ ] Proposals (lettre de mission and quotes) with their own journey.
 - [ ] Workflows (journey templates).
 
@@ -70,13 +70,13 @@ A screen is done only when all of these are true:
 
 ### Firm workspace
 
-- [ ] Dashboard with the three specified sections.
-- [ ] Clients and accounts table to spec 05.
+- [x] Dashboard with the three specified sections.
+- [x] Clients and accounts table to spec 05.
 - [ ] Jobs, journey stepper and task lists.
 - [ ] Documents, inbox and vault.
 - [ ] Calendar, compliance radar and deadlines.
 - [ ] Messages, reviews and settings.
-- [ ] Rail at seven destinations with count badges where a single source
+- [x] Rail at seven destinations with count badges where a single source
   exists.
 
 ## Method for every increment
