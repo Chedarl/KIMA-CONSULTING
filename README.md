@@ -11,9 +11,32 @@ services. Initial market Cameroon, expansion CEMAC. French and English, XAF.
 
 ---
 
-## Current state — 3 November 2026
+## Status: done / still missing
 
-> **Release status: HOLD.** The workspace is operational for signed-in firm members; the public site remains demonstration content. Migration parity is restored (104/104), and the owner enabled firm signup and public contact intake on 3 November 2026. The dated, evidence-based snapshot — feature matrix, security boundaries, known defects, testing evidence, roadmap — lives in [docs/2026-11-03-product-state.md](docs/2026-11-03-product-state.md).
+Checked 5 November 2026 against commit `9056916` (`refactor(ui): retire the colour-chosen portal Pill`, #414). Release remains **HOLD**. The 3 November snapshot in [docs/2026-11-03-product-state.md](docs/2026-11-03-product-state.md) is older: it says 106 migrations and is not this commit.
+
+**Verified this date**
+
+- This tree has 126 SQL files in `supabase/migrations/`. The newest name is `20261105120000`. On 5 November 2026 a read-only `count(*)` and `max(version)` of production `supabase_migrations.schema_migrations` returned 126 and `20261105120000`. No rows were written.
+- GitHub Actions for `9056916`: CI succeeded at 2026-11-05T05:52:32Z, and the Supabase migrations workflow succeeded at 2026-11-05T05:55:54Z.
+- `https://www.kimaconsulting.app/` answered HTTP 307 to `/fr` on 5 November 2026, and `/fr` answered HTTP 200. The French page HTML includes `logo-white.svg`, `logo-color.svg`, and the class `h-9`. That is a reachability check, not a journey test and not a measured layout.
+
+**Implemented on main** (merged code; not re-tested in a browser for this note)
+
+- Former-client consent, revoked rows cannot stay `authorized`, database client approval, record refresh, invitation error, scoped success colours, onboarding directory error, unassigned-application list (no phone column), and French/English refusal copy (#142–#151, #155).
+- A client accepts an engagement letter; the database records which letter (#295; migrations `20261105110000`, `20261105120000`).
+- `route_unassigned_registration()` writes `organization_id` immediately. A suggestion is not built. That RPC is not applicant consent.
+
+**Selected open pull requests** (a short list of blockers, not every open pull request, and not done)
+
+- #422 and #423 are unmerged and on HOLD for security and correctness. They are not on main, not applied in production, and not verified as a French or English journey. #422 must not be merged while a caller can still assign a firm without the applicant, or answer with only an application reference. #423 must not be merged while the applicant cannot return later, signed in, to answer.
+- #424 classifies a missing records session on its own branch. Classifier unit tests passed there. That is not a browser session, and it is not deployed. #421 is this note.
+- #152 routing nav conflicts. #156 fresh-draft accept is +555/−30, conflicts, and the letter work supersedes it — do not merge as-is. #158 is a 31 October status list. #124 support packet conflicts. #298 conflicts; the live page no longer uses the `h-auto max-h-12` class that pull request describes.
+
+**Still missing**
+
+- Firm suggestion is not deployed and not journey-tested. On main, `route_unassigned_registration()` still names a firm immediately. A suggestion alone must not let the firm read the application or a client file. The applicant may decline. No production assignments and no production KIMA administrator provisioning in this note.
+- Tax calendar, document exchange audit trail, messaging journey, in-app deadline reminders, firm-page redesign, and a French/English launch checklist. Payment incidents are marked verified in the 3 November snapshot; do not start a second packet beside #124.
 
 ### Status: done / still missing (this branch)
 
