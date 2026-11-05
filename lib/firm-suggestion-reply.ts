@@ -1,5 +1,13 @@
 export type SuggestionReply = { assigned: boolean; message: string };
 
+export type SuggestionDraft = { firmId: string; reason: string; applicationId: string | null };
+
+/** A recorded suggestion cannot be reused for the next application. A refusal keeps the draft. */
+export function suggestionDraftAfter(draft: SuggestionDraft, outcome: "recorded" | "refused"): SuggestionDraft {
+  if (outcome === "recorded") return { firmId: "", reason: "", applicationId: null };
+  return draft;
+}
+
 /** Interprets one returned row. Anything else is a refusal and assigns nothing. */
 export function suggestionReply(
   locale: "fr" | "en",

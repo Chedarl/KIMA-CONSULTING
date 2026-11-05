@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { niuProblem } from "@/lib/public-onboarding";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { ApplicantFirmSuggestion } from "@/components/marketing/firm-suggestion";
 import { ServiceIcon, type ServiceIconName } from "@/components/marketing/icons";
 import { KimaWordmark } from "@/components/marketing/wordmark";
 import { insertRegistration, insertWorkspaceInvite } from "@/lib/insert-registration";
@@ -66,6 +65,7 @@ export function OnboardingFlow({
   const [inviteIssue, setInviteIssue] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [channelHint, setChannelHint] = useState<"whatsapp" | "callback" | "office" | null>(null);
 
   useEffect(() => {
@@ -118,6 +118,12 @@ export function OnboardingFlow({
       setStep("ready");
       return;
     }
+    const { data: auth, error: authError } = await supabase().auth.getUser();
+    if (authError || !auth.user) {
+      setNeedsSignIn(true);
+      return;
+    }
+    setNeedsSignIn(false);
     setBusy(true);
     const ref = workspaceRef ?? crypto.randomUUID();
     setWorkspaceRef(ref);
@@ -339,13 +345,21 @@ export function OnboardingFlow({
                       inviteState={inviteState}
                       inviteIssue={inviteIssue}
                       onInvite={(e) => void sendInvite(e)}
-                      workspaceRef={workspaceRef}
                     />
                   )}
                   <IssueList t={t} issues={step === "verify" ? issues.filter((i) => i !== "kind") : issues} />
                   {saveFailed && (
                     <p role="alert" className="mt-3 text-sm text-danger-text">
                       {t.errors.failed}
+                    </p>
+                  )}
+                  {needsSignIn && (
+                    <p role="alert" className="mt-3 text-sm text-danger-text">
+                      <Link href={`/${locale}/login`} className="font-semibold underline">
+                        {locale === "fr"
+                          ? "Connectez-vous avant d'envoyer. Une demande anonyme ne peut pas être confirmée plus tard."
+                          : "Sign in before sending. An anonymous application cannot be confirmed later."}
+                      </Link>
                     </p>
                   )}
                   {step !== "ready" && (
@@ -721,7 +735,6 @@ function ReadyStep({
   inviteState,
   inviteIssue,
   onInvite,
-  workspaceRef,
 }: {
   locale: "fr" | "en";
   t: Copy["onboard"];
@@ -734,7 +747,6 @@ function ReadyStep({
   inviteState: "idle" | "busy" | "ok" | "failed";
   inviteIssue: boolean;
   onInvite: (e: FormEvent) => void;
-  workspaceRef: string | null;
 }) {
   const firm = draft.kind === "accounting_firm";
   const href = firm ? `/${locale}/firm-login` : `/${locale}/login`;
@@ -750,7 +762,15 @@ function ReadyStep({
       <p className="text-sm text-fg-muted">{t.readySeparate}</p>
       <p className="mt-3 max-w-md text-sm text-fg-muted">{t.readyHonest}</p>
       {firm && <p className="mt-2 max-w-md text-xs text-fg-subtle">{t.firmNote}</p>}
-      {!firm && workspaceRef && <ApplicantFirmSuggestion locale={locale} workspaceRef={workspaceRef} />}
+      {!firm && (
+        <p className="mt-5 max-w-sm text-sm text-fg">
+          <Link href={`/${locale}/login`} className="font-semibold text-navy underline">
+            {locale === "fr"
+              ? "Revenez connecté pour accepter ou refuser un cabinet. Rien n'est attribué ici."
+              : "Come back signed in to accept or decline a firm. Nothing is assigned here."}
+          </Link>
+        </p>
+      )}
       <Link href={href} className="public-cta mt-6 inline-flex min-h-[48px] items-center rounded-lg px-8 text-sm font-semibold">
         {firm ? t.enterFirm : t.enterPortal}
       </Link>

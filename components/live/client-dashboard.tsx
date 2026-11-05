@@ -444,6 +444,7 @@ export function ClientDashboard({
         <Link href={`/${locale}/app/requests`} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#18243B] px-4 text-sm font-semibold text-white hover:bg-[#24314d]">{copy.quickUpload}</Link>
         <Link href={`/${locale}/app/messages`} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken">{copy.quickMessage}</Link>
         <Link href={`/${locale}/app/declarations`} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken">{copy.quickInvoices}</Link>
+        <Link href={`/${locale}/app/suggestion`} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-semibold text-fg hover:bg-surface-sunken">{locale === "fr" ? "Cabinet proposé" : "Suggested firm"}</Link>
       </nav>
 
       {cases === null ? (

@@ -6,28 +6,31 @@ import { supabase } from "@/lib/supabase";
 
 type Suggestion = { firm_name: string; status: string; expires_at: string };
 
-/** The applicant sees the firm name only, and nothing is assigned until they accept. */
-export function ApplicantFirmSuggestion({ locale, workspaceRef }: { locale: "fr" | "en"; workspaceRef: string }) {
+/** Signed-in applicant only. The reference is not sent. Nothing is assigned until they accept. */
+export function ApplicantFirmSuggestion({ locale }: { locale: "fr" | "en" }) {
   const fr = locale === "fr";
   const [row, setRow] = useState<Suggestion | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
 
   useEffect(() => {
     let live = true;
-    void supabase().rpc("my_firm_suggestion", { p_workspace_ref: workspaceRef }).then(({ data, error }) => {
-      if (!live || error) return;
+    void supabase().rpc("my_firm_suggestion").then(({ data, error }) => {
+      if (!live) return;
+      if (error) {
+        setSignedOut(error.code === "42501");
+        return;
+      }
       const first = Array.isArray(data) ? data[0] as Suggestion | undefined : null;
       if (first?.firm_name && first.status === "pending") setRow(first);
     });
     return () => { live = false; };
-  }, [workspaceRef]);
+  }, []);
 
   async function answer(action: "accept" | "decline") {
     setBusy(true);
-    const { data, error } = await supabase().rpc("respond_to_firm_suggestion", {
-      p_workspace_ref: workspaceRef, p_action: action,
-    });
+    const { data, error } = await supabase().rpc("respond_to_firm_suggestion", { p_action: action });
     setBusy(false);
     const reply = suggestionReply(locale, error, data);
     if (!reply.assigned) {
@@ -39,7 +42,12 @@ export function ApplicantFirmSuggestion({ locale, workspaceRef }: { locale: "fr"
     setNote(reply.message);
   }
 
-  if (!row && !note) return null;
+  if (signedOut) {
+    return <p role="status" className="text-sm text-fg">{fr ? "Connectez-vous pour répondre à une proposition." : "Sign in to answer a suggestion."}</p>;
+  }
+  if (!row && !note) {
+    return <p className="text-sm text-fg-muted">{fr ? "Aucune proposition en attente." : "No suggestion is waiting."}</p>;
+  }
 
   return (
     <div className="mt-5 w-full max-w-sm rounded-lg border border-border p-4 text-left">
