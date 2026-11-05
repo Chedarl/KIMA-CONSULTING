@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 
-// The firm rail is nine destinations. The point of this check is the second
+// The firm rail is seven destinations. The point of this check is the second
 // assertion: consolidating the rail must never orphan a screen. Any route that
 // renders a page has to be reachable from the rail or from a section's tabs.
 const navSrc = readFileSync("lib/workspace-nav.ts", "utf8");
@@ -11,9 +11,10 @@ const sections = [...navSrc.matchAll(/\{\s*key:\s*"([a-z]+)",\s*path:\s*"([^"]*)
   (m) => ({ key: m[1], path: m[2] }),
 );
 assert.ok(sections.length > 0, "no sections parsed from lib/workspace-nav.ts");
-assert.ok(
-  sections.length <= 9,
-  `the rail is ${sections.length} destinations; the audited IA is at most 9`,
+assert.equal(
+  sections.length,
+  7,
+  `the rail is ${sections.length} destinations; the update document specifies 7`,
 );
 assert.equal(
   new Set(sections.map((s) => s.key)).size,
