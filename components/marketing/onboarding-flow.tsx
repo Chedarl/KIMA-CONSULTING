@@ -189,40 +189,63 @@ export function OnboardingFlow({
             </div>
           </header>
           <main id="main" className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-            <ol className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-fg-muted" aria-label={t.steps[0]}>
-              {t.steps.map((label, i) => (
-                <li key={label} className="flex items-center gap-3" aria-current={i === 0 ? "step" : undefined}>
-                  <span className={i === 0 ? "font-semibold text-fg" : ""}>
-                    {i + 1}. {label}
-                  </span>
-                  {i < t.steps.length - 1 && (
-                    <span aria-hidden="true" className="text-fg-subtle">
-                      →
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
+            <Stepper labels={t.steps} current={0} label={t.stepsLabel} doneLabel={t.stepDone} todoLabel={t.stepTodo} />
             <div id="choose" className="mx-auto mt-12 max-w-3xl text-center">
               <h1 className="font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">{t.title}</h1>
               <p className="mt-3 text-sm text-fg-muted sm:text-base">{t.subtitle}</p>
             </div>
-            <div className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-3" role="radiogroup" aria-label={t.title}>
+            {/*
+              A radiogroup is one tab stop with arrow keys inside it, not three
+              tab stops. The previous markup announced the role and then behaved
+              like three separate buttons, which is the shape that fails a
+              keyboard review. Roving tabindex fixes it.
+            */}
+            <div
+              className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-3"
+              role="radiogroup"
+              aria-label={t.title}
+              onKeyDown={(e) => {
+                const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
+                if (!keys.includes(e.key)) return;
+                e.preventDefault();
+                const focusedId = (document.activeElement as HTMLElement | null)?.id ?? "";
+                const fromFocus = KINDS.findIndex((k) => `kind-${k}` === focusedId);
+                const at = fromFocus >= 0 ? fromFocus : draft.kind ? KINDS.indexOf(draft.kind) : 0;
+                const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
+                const next = KINDS[(at + delta + KINDS.length) % KINDS.length];
+                patch({ kind: next });
+                document.getElementById(`kind-${next}`)?.focus();
+              }}
+            >
               {KINDS.map((kind) => {
                 const selected = draft.kind === kind;
                 const card = t.cards[kind];
                 return (
                   <button
                     key={kind}
+                    id={`kind-${kind}`}
                     type="button"
                     role="radio"
                     aria-checked={selected}
+                    tabIndex={selected || (!draft.kind && kind === KINDS[0]) ? 0 : -1}
                     onClick={() => patch({ kind })}
-                    className={`rounded-card border bg-white px-5 py-8 text-center transition hover:shadow-raised ${
+                    className={`relative rounded-card border bg-white px-5 py-8 text-center transition duration-200 hover:-translate-y-0.5 hover:shadow-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-teal-text motion-reduce:transform-none motion-reduce:transition-none ${
                       selected ? "border-teal bg-teal-soft shadow-card" : "border-border hover:border-teal/50"
                     }`}
                   >
-                    <span className={`mx-auto flex justify-center ${selected ? "text-teal-text" : "text-navy"}`}>
+                    {selected && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-teal-text text-white"
+                      >
+                        <CheckMark className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                    <span
+                      className={`mx-auto flex h-12 w-12 items-center justify-center rounded-xl transition-colors ${
+                        selected ? "bg-teal-text text-white" : "bg-surface-sunken text-navy"
+                      }`}
+                    >
                       <ServiceIcon name={KIND_ICON[kind]} />
                     </span>
                     <span className="mt-3 block font-display text-lg font-semibold text-fg">{card.title}</span>
@@ -236,8 +259,29 @@ export function OnboardingFlow({
                 {t.errors.kind}
               </p>
             )}
+            {/*
+              Continue looks unavailable until a choice is made, but it stays in
+              the tab order: a native `disabled` button cannot be focused, so a
+              keyboard user would tab straight past it and never learn why.
+              `aria-disabled` plus a guard keeps it reachable, and the guard
+              raises the same `errors.kind` alert the channel buttons raise, so
+              one condition has one message.
+            */}
             <div className="mt-8 flex justify-center">
-              <button type="button" onClick={() => go("account")} className="public-cta inline-flex min-h-[48px] items-center gap-2 rounded-lg px-8 text-sm font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!draft.kind) {
+                    setIssues(["kind"]);
+                    return;
+                  }
+                  go("account");
+                }}
+                aria-disabled={!draft.kind}
+                className={`public-cta inline-flex min-h-[48px] items-center gap-2 rounded-lg px-8 text-sm font-semibold transition ${
+                  draft.kind ? "" : "opacity-45"
+                }`}
+              >
                 {t.continue}
                 <span aria-hidden="true">→</span>
               </button>
@@ -385,6 +429,81 @@ export function OnboardingFlow({
         </main>
       )}
     </div>
+  );
+}
+
+/**
+ * Where you are in the application, drawn rather than written.
+ *
+ * The four steps were a line of plain text with arrows between them: readable,
+ * but it did not show progress, and a numbered list where every number looks
+ * identical does not say which ones are behind you. Each step is now a marker
+ * with three states -- done, current, still to come -- joined by a rail that
+ * fills as you advance.
+ *
+ * The markers are decoration. The current step carries aria-current="step",
+ * and a step behind or ahead carries a visually hidden word, because the fill
+ * of a circle is not readable: without it, done and still-to-come would differ
+ * by colour and shape alone.
+ */
+function Stepper({
+  labels,
+  current,
+  label,
+  doneLabel,
+  todoLabel,
+}: {
+  labels: readonly string[];
+  current: number;
+  label: string;
+  doneLabel: string;
+  todoLabel: string;
+}) {
+  return (
+    <ol
+      className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-1.5 gap-y-3 text-[13px] sm:text-sm"
+      aria-label={label}
+    >
+      {labels.map((label, i) => {
+        const done = i < current;
+        const now = i === current;
+        return (
+          <li key={label} className="flex items-center gap-2" aria-current={now ? "step" : undefined}>
+            <span
+              aria-hidden="true"
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                done
+                  ? "bg-teal-text text-white"
+                  : now
+                    ? "bg-teal-soft text-teal-text ring-2 ring-teal-text"
+                    : "bg-surface-sunken text-fg-subtle"
+              }`}
+            >
+              {done ? <CheckMark className="h-3.5 w-3.5" /> : i + 1}
+            </span>
+            <span className={now ? "font-semibold text-fg" : done ? "text-fg-muted" : "text-fg-subtle"}>
+              {label}
+              {!now && <span className="sr-only"> ({done ? doneLabel : todoLabel})</span>}
+            </span>
+            {i < labels.length - 1 && (
+              <span
+                aria-hidden="true"
+                className={`hidden h-0.5 w-5 rounded-full lg:block ${done ? "bg-teal-text" : "bg-border"}`}
+              />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** The one check mark these screens use. CLAUDE.md: an icon is an SVG, never a glyph. */
+function CheckMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3.2 8.6l3 3 6.6-7" />
+    </svg>
   );
 }
 

@@ -140,6 +140,9 @@ const fr = {
   },
   onboard: {
     steps: ["Vos informations", "Vérifier l'identité", "Préférences de services", "Commencer avec KIMA"],
+    stepsLabel: "Progression de la demande",
+    stepDone: "terminée",
+    stepTodo: "à venir",
     title: "Demandez votre espace.",
     subtitle: "Votre demande reste privée : aucun autre demandeur ne peut la lire.",
     cards: {
@@ -416,6 +419,9 @@ const en: PublicCopy = {
   },
   onboard: {
     steps: ["Your Information", "Verify Identity", "Service Preferences", "Start using KIMA"],
+    stepsLabel: "Application progress",
+    stepDone: "completed",
+    stepTodo: "upcoming",
     title: "Request your workspace.",
     subtitle: "Your application stays private: no other applicant can read it.",
     cards: {
