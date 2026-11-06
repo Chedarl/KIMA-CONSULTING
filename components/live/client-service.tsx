@@ -71,6 +71,8 @@ export function ClientService({
   const authEpoch = useRef(0);
   // Synchronous guard: React may not disable the button before a second tap.
   const approvalInFlight = useRef<string | null>(null);
+  // Prevent an older attempt from unlocking a newer one after A → B → A navigation.
+  const approvalAttempt = useRef(0);
   const identityRef = useRef<string | null | undefined>(undefined);
   // Updated during render: route changes invalidate prior-case mutation completions
   // even before effect cleanup runs.
@@ -269,7 +271,7 @@ export function ClientService({
     if (approvalInFlight.current !== null) return;
     const epoch = authEpoch.current;
     const actionCaseId = caseId;
-    const approvalToken = `${epoch}:${caseId}:${row.approval_round}`;
+    const approvalToken = `${epoch}:${caseId}:${row.approval_round}:${++approvalAttempt.current}`;
     approvalInFlight.current = approvalToken;
     setBusy("client-approval");
     setFailed(null);
