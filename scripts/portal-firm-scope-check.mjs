@@ -242,7 +242,10 @@ assert.match(service.src, /if \(caseStamp !== caseId\) \{\n    setCaseStamp\(cas
 assert.ok(service.src.includes("const approvalInFlight = useRef<string | null>(null)"));
 assert.ok((serviceApproval ?? "").includes("if (approvalInFlight.current !== null) return;"));
 assert.ok((serviceApproval ?? "").includes("approvalInFlight.current = approvalToken;"));
-assert.ok((serviceApproval ?? "").includes("const approvalToken = `${epoch}:${caseId}:${row.approval_round}`;"));
+assert.ok(service.src.includes("const approvalAttempt = useRef(0)"),
+  "each approval attempt needs a monotonic identity");
+assert.ok((serviceApproval ?? "").includes("const approvalToken = `${epoch}:${caseId}:${row.approval_round}:${++approvalAttempt.current}`;"),
+  "returning to the same case/round must not let an older attempt unlock the newer one");
 assert.ok((serviceApproval ?? "").includes("try {\n      const db = supabase();"));
 assert.ok((serviceApproval ?? "").includes("if (approvalInFlight.current === approvalToken) approvalInFlight.current = null;"));
 assert.ok(service.src.includes("setCaseStamp(caseId);\n    approvalInFlight.current = null;"));
