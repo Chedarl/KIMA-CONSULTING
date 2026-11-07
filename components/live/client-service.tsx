@@ -278,14 +278,14 @@ export function ClientService({
     try {
       const db = supabase();
       const { data: auth, error: authError } = await db.auth.getUser();
-      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (approvalInFlight.current !== approvalToken || epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
       if (authError || !auth.user) throw new Error("Sign-in required");
       const { error } = await db.from("case_client_approvals").insert({
         case_id: row.id, approval_round: row.approval_round,
         taxpayer_id: ids.taxpayerId, filing_evidence_ref: row.filing_evidence_ref,
         approved_by: auth.user.id,
       });
-      if (epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
+      if (approvalInFlight.current !== approvalToken || epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;
       if (error) throw error;
       setClientApproved(true);
       await load();
