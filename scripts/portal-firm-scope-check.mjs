@@ -247,6 +247,8 @@ assert.ok(service.src.includes("const approvalAttempt = useRef(0)"),
 assert.ok((serviceApproval ?? "").includes("const approvalToken = `${epoch}:${caseId}:${row.approval_round}:${++approvalAttempt.current}`;"),
   "returning to the same case/round must not let an older attempt unlock the newer one");
 assert.ok((serviceApproval ?? "").includes("try {\n      const db = supabase();"));
+assert.ok((serviceApproval ?? "").includes('if (approvalInFlight.current === approvalToken && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");'),
+  "stale A → B → A rejection must not display an error on the newer approval attempt");
 assert.ok((serviceApproval ?? "").includes("const isCurrentAttempt = approvalInFlight.current === approvalToken;"));
 assert.ok((serviceApproval ?? "").includes("if (isCurrentAttempt) approvalInFlight.current = null;"));
 assert.ok((serviceApproval ?? "").includes("if (isCurrentAttempt && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);"),
