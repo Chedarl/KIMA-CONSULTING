@@ -294,7 +294,7 @@ export function ClientService({
     } finally {
       // Do not unlock an approval belonging to a newer account or case.
       if (approvalInFlight.current === approvalToken) approvalInFlight.current = null;
-      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
+      if (approvalInFlight.current === approvalToken && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
     }
   }
 
