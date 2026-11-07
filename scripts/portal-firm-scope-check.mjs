@@ -249,6 +249,8 @@ assert.ok((serviceApproval ?? "").includes("const approvalToken = `${epoch}:${ca
 assert.ok((serviceApproval ?? "").includes("try {\n      const db = supabase();"));
 assert.ok((serviceApproval ?? "").includes('if (approvalInFlight.current === approvalToken && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");'),
   "stale A → B → A rejection must not display an error on the newer approval attempt");
+assert.ok(((serviceApproval ?? "").match(/approvalInFlight\\.current !== approvalToken \\|\\| epoch !== authEpoch\\.current \\|\\| actionCaseId !== activeCaseId\\.current/g) ?? []).length >= 2,
+  "stale A → B → A approval responses must not mark a newer attempt approved");
 assert.ok((serviceApproval ?? "").includes("const isCurrentAttempt = approvalInFlight.current === approvalToken;"));
 assert.ok((serviceApproval ?? "").includes("if (isCurrentAttempt) approvalInFlight.current = null;"));
 assert.ok((serviceApproval ?? "").includes("if (isCurrentAttempt && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);"),
