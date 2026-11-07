@@ -293,8 +293,9 @@ export function ClientService({
       if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");
     } finally {
       // Do not unlock an approval belonging to a newer account or case.
-      if (approvalInFlight.current === approvalToken) approvalInFlight.current = null;
-      if (approvalInFlight.current === approvalToken && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
+      const isCurrentAttempt = approvalInFlight.current === approvalToken;
+      if (isCurrentAttempt) approvalInFlight.current = null;
+      if (isCurrentAttempt && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);
     }
   }
 
