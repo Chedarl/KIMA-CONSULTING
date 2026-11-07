@@ -247,7 +247,10 @@ assert.ok(service.src.includes("const approvalAttempt = useRef(0)"),
 assert.ok((serviceApproval ?? "").includes("const approvalToken = `${epoch}:${caseId}:${row.approval_round}:${++approvalAttempt.current}`;"),
   "returning to the same case/round must not let an older attempt unlock the newer one");
 assert.ok((serviceApproval ?? "").includes("try {\n      const db = supabase();"));
-assert.ok((serviceApproval ?? "").includes("if (approvalInFlight.current === approvalToken) approvalInFlight.current = null;"));
+assert.ok((serviceApproval ?? "").includes("const isCurrentAttempt = approvalInFlight.current === approvalToken;"));
+assert.ok((serviceApproval ?? "").includes("if (isCurrentAttempt) approvalInFlight.current = null;"));
+assert.ok((serviceApproval ?? "").includes("if (isCurrentAttempt && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);"),
+  "a stale A → B → A completion must not clear the newer approval busy state");
 assert.ok(service.src.includes("setCaseStamp(caseId);\n    approvalInFlight.current = null;"));
 assert.ok(service.src.includes("++authEpoch.current;\n      ++loadEpoch.current;\n      approvalInFlight.current = null;"));
 assert.ok(service.src.includes("return () => {\n      ++authEpoch.current;\n      ++loadEpoch.current;\n      approvalInFlight.current = null;"));
