@@ -290,7 +290,7 @@ export function ClientService({
       setClientApproved(true);
       await load();
     } catch {
-      if (epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");
+      if (approvalInFlight.current === approvalToken && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");
     } finally {
       // Do not unlock an approval belonging to a newer account or case.
       const isCurrentAttempt = approvalInFlight.current === approvalToken;
