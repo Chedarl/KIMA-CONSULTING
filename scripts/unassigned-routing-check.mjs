@@ -32,4 +32,13 @@ assert.match(link, /subscription\.unsubscribe\(\)/);
 assert.match(list, /if \(nextUserId === identity\) return;/);
 assert.match(link, /if \(nextUserId === identity\) return;/);
 
+
+// Failure paths must also discard stale responses rather than displaying
+// another administrator's applicant details after a switch or unmount.
+assert.match(list, /catch \{\s*if \(!active \|\| request !== epoch\) return;/);
+assert.match(list, /if \(failure\) \{\s*setRows\(\[\]\);/);
+assert.match(list, /return \(\) => \{\s*active = false;\s*\+\+epoch;/);
+assert.match(list, /if \(timer\) clearTimeout\(timer\);/);
+assert.match(list, /if \(nextUserId\) load\(\);/);
+
 console.log("ok unassigned routing list is vendor-admin only");
