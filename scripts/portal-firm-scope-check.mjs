@@ -227,13 +227,14 @@ assert.match(serviceUpload ?? "", /const actionCaseId = caseId;/);
 assert.match(serviceUpload ?? "",
   /if \(epoch !== authEpoch\.current \|\| actionCaseId !== activeCaseId\.current\) return;/);
 assert.match(serviceApproval ?? "", /const actionCaseId = caseId;/);
-assert.ok((serviceApproval?.match(
-  /if \(epoch !== authEpoch\.current \|\| actionCaseId !== activeCaseId\.current\) return;/g,
-) ?? []).length >= 2, "approval must reject old sessions and old case routes before and after insert");
-assert.match(serviceApproval ?? "",
-  /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setFailed/);
-assert.match(serviceApproval ?? "",
-  /if \(epoch === authEpoch\.current && actionCaseId === activeCaseId\.current\) setBusy/);
+// Require the attempt-token guard at both asynchronous approval boundaries.
+// Older epoch-only assertions no longer describe the single-flight implementation.
+assert.equal((serviceApproval?.split("if (approvalInFlight.current !== approvalToken || epoch !== authEpoch.current || actionCaseId !== activeCaseId.current) return;").length ?? 1) - 1, 2,
+  "approval must reject stale attempts after auth lookup and after consent insert");
+assert.ok((serviceApproval ?? "").includes('if (approvalInFlight.current === approvalToken && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");'),
+  "stale approval failure must not overwrite a newer attempt");
+assert.ok((serviceApproval ?? "").includes("if (isCurrentAttempt && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);"),
+  "stale approval completion must not unlock a newer attempt");
 assert.match(service.src, /if \(caseStamp !== caseId\) \{\n    setCaseStamp\(caseId\);\n    approvalInFlight\.current = null;\n    setBusy\(null\);\n    setFailed\(null\);\n    pending\.current = null;\n  \}/,
   "switching cases must clear approval busy, failure, and pending state before paint");
 
@@ -249,8 +250,6 @@ assert.ok((serviceApproval ?? "").includes("const approvalToken = `${epoch}:${ca
 assert.ok((serviceApproval ?? "").includes("try {\n      const db = supabase();"));
 assert.ok((serviceApproval ?? "").includes('if (approvalInFlight.current === approvalToken && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setFailed("client-approval");'),
   "stale A → B → A rejection must not display an error on the newer approval attempt");
-assert.ok(((serviceApproval ?? "").match(/approvalInFlight\\.current !== approvalToken \\|\\| epoch !== authEpoch\\.current \\|\\| actionCaseId !== activeCaseId\\.current/g) ?? []).length >= 2,
-  "stale A → B → A approval responses must not mark a newer attempt approved");
 assert.ok((serviceApproval ?? "").includes("const isCurrentAttempt = approvalInFlight.current === approvalToken;"));
 assert.ok((serviceApproval ?? "").includes("if (isCurrentAttempt) approvalInFlight.current = null;"));
 assert.ok((serviceApproval ?? "").includes("if (isCurrentAttempt && epoch === authEpoch.current && actionCaseId === activeCaseId.current) setBusy(null);"),
