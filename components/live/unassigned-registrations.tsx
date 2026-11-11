@@ -120,7 +120,12 @@ export function UnassignedRegistrations({ locale }: { locale: "fr" | "en" }) {
     return <p className="text-sm text-fg-muted">{fr ? "Aucune demande non attribuée." : "No unassigned application."}</p>;
   }
   return (
-    <div className="overflow-x-auto rounded-card border border-border bg-white">
+    <div
+      role="region"
+      aria-label={fr ? "Tableau des demandes non attribuées, défilement horizontal" : "Unassigned applications table, horizontally scrollable"}
+      tabIndex={0}
+      className="overflow-x-auto rounded-card border border-border bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+    >
       <table className="w-full min-w-[720px] text-left text-sm">
         <caption className="px-4 py-3 text-left text-sm text-fg-muted">
           {fr
