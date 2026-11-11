@@ -43,8 +43,8 @@ assert.match(list, /if \(nextUserId\) load\(\);/);
 
 // The 720px-wide queue must remain usable by keyboard on narrow FR/EN screens.
 assert.match(list, /role="region"/);
-assert.match(list, /tabIndex=\\{0\\}/);
-assert.match(list, /aria-label=\\{fr \\? "Tableau des demandes non attribuées, défilement horizontal" : "Unassigned applications table, horizontally scrollable"\\}/);
+assert.ok(list.includes("tabIndex={0}"));
+assert.ok(list.includes('aria-label={fr ? "Tableau des demandes non attribuées, défilement horizontal" : "Unassigned applications table, horizontally scrollable"}'));
 assert.match(list, /overflow-x-auto/);
 assert.match(list, /focus-visible:outline/);
 
